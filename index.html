@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>راهنورد خودرو | وارد کننده خودرو</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fefcf5;
+    --white:#ffffff;
+    --dark:#1c1c1c;
+    --gray:#6b6b68;
+    --gray-light:#e9e6db;
+    --accent:#FFCC04;
+    --accent-dark:#e0b400;
+    --radius:14px;
+    --shadow: 0 12px 32px rgba(28, 28, 28, 0.151);
+    --shadow-sm: 0 4px 14px rgba(28, 28, 28, 0.095);
+    --container: 1180px;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  html{scroll-behavior:smooth;}
+
+  body{
+    font-family:'Vazirmatn', sans-serif;
+    background:var(--bg);
+    color:var(--dark);
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  img{max-width:100%;display:block;}
+
+  a{text-decoration:none;color:inherit;}
+
+  ul{list-style:none;}
+
+  .wrap{
+    max-width:var(--container);
+    margin:0 auto;
+    padding:0 24px;
+  }
+
+  section{
+    padding:88px 0;
+  }
+
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:14px;
+    font-weight:600;
+    color:var(--accent-dark);
+    margin-bottom:10px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:22px;
+    height:3px;
+    background:var(--accent);
+    border-radius:2px;
+    display:inline-block;
+  }
+
+  .section-title{
+    font-size:32px;
+    font-weight:800;
+    margin-bottom:16px;
+  }
+
+  .section-head{
+    max-width:640px;
+    margin-bottom:48px;
+  }
+  .section-head p{
+    color:var(--gray);
+    font-size:16px;
+  }
+
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:14px 28px;
+    border-radius:10px;
+    font-family:inherit;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    border:none;
+    transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
+  }
+  .btn-primary{
+    background:var(--accent);
+    color:var(--dark);
+  }
+  .btn-primary:hover{
+    background:var(--accent-dark);
+    transform:translateY(-2px);
+  }
+  .btn-outline{
+    background:transparent;
+    color:var(--white);
+    border:1.5px solid rgba(255,255,255,0.7);
+  }
+  .btn-outline:hover{
+    background:rgba(255,255,255,0.12);
+  }
+  .btn-dark{
+    background:var(--dark);
+    color:var(--white);
+  }
+  .btn-dark:hover{
+    background:#000;
+    transform:translateY(-2px);
+  }
+
+  /* ===== HEADER ===== */
+  header{
+    position:absolute;
+    top:0;
+    right:0;
+    left:0;
+    z-index:50;
+    padding:22px 0;
+  }
+  header .wrap{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:44px;
+    position:relative;
+  }
+  .logo{
+    position:absolute;
+    right:0;
+    top:50%;
+    transform:translateY(-50%);
+    display:flex;
+    align-items:center;
+    height:44px;
+    z-index:1;
+  }
+  .logo img{
+    height:38px;
+    width:auto;
+    max-width:none;
+    filter:brightness(0) invert(1);
+    object-fit:contain;
+  }
+  nav ul{
+    display:flex;
+    align-items:center;
+    gap:34px;
+    height:44px;
+  }
+  nav a{
+    display:inline-flex;
+    align-items:center;
+    height:100%;
+    color:#fff;
+    font-size:15px;
+    font-weight:500;
+    line-height:1;
+    opacity:.92;
+    transition:opacity .15s ease;
+    position:relative;
+  }
+  nav a:hover{opacity:1;}
+
+  .nav-toggle{
+    display:none;
+    flex-direction:column;
+    justify-content:center;
+    gap:5px;
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:6px;
+    height:44px;
+  }
+  .nav-toggle span{
+    width:24px;
+    height:2px;
+    background:#fff;
+    border-radius:2px;
+  }
+
+  header.scrolled{
+    position:fixed;
+    background:rgba(254,252,245,0.92);
+    /* backdrop-filter:blur(10px); */
+    box-shadow:0 2px 18px rgba(0,0,0,0.06);
+    padding:14px 0;
+  }
+  header.scrolled .logo img{filter:none;}
+  header.scrolled nav a{color:var(--dark);}
+  header.scrolled .nav-toggle span{background:var(--dark);}
+
+  /* ===== HERO SLIDER ===== */
+  .hero{
+    position:relative;
+    width:100%;
+    max-height: 100vh;
+    aspect-ratio:1540/860;
+    overflow:hidden;
+    background:#111;
+  }
+  .hero-slide{
+    position:absolute;
+    inset:0;
+    opacity:0;
+    transition:opacity 900ms ease;
+    overflow:hidden;
+  }
+  .hero-slide.active{opacity:1;}
+  .hero-slide img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    object-position:center;
+    transform:scale(1.037);
+  }
+  .hero-slide.active img.zoom{
+    animation:heroZoomOut 6000ms ease-in-out forwards;
+  }
+  @keyframes heroZoomOut{
+    from{ transform:scale(1.037); }
+    to{ transform:scale(1); }
+  }
+  .hero::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 32%, rgba(0,0,0,0.15) 100%);
+    pointer-events:none;
+  }
+
+  .hero-content{
+    position:absolute;
+    bottom:64px;
+    right:0;
+    left:0;
+    z-index:5;
+  }
+  .hero-content .wrap{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:20px;
+  }
+  .hero-cta{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+
+  .hero-nav{
+    position:absolute;
+    top:50%;
+    right:24px;
+    left:24px;
+    transform:translateY(-50%);
+    display:flex;
+    justify-content:space-between;
+    z-index:6;
+    pointer-events:none;
+  }
+  .hero-arrow{
+    pointer-events:auto;
+    width:46px;
+    height:46px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.16);
+    border:1px solid rgba(255,255,255,0.4);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:background .2s ease;
+    backdrop-filter:blur(4px);
+  }
+  .hero-arrow:hover{background:rgba(255,255,255,0.3);}
+  .hero-arrow svg{width:20px;height:20px;}
+
+  .hero-dots{
+    position:absolute;
+    bottom:24px;
+    right:0;
+    left:0;
+    display:flex;
+    justify-content:center;
+    gap:15px;
+    z-index:6;
+  }
+  .hero-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:rgba(255, 255, 255, 0.048);
+    cursor:pointer;
+    transition:all .2s ease;
+  }
+  .hero-dot.active{
+    background:var(--accent);
+    width:26px;
+    border-radius:5px;
+  }
+
+  /* ===== WHY US ===== */
+  .why-section{
+    position:relative;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    background:var(--white);
+    padding:80px 0;
+  }
+  .why-bg{
+    position:absolute;
+    inset:0;
+    background-image:url('assets/ccchaos.svg');
+    background-size:cover;
+    background-position:center;
+    opacity:0.3;
+    z-index:1;
+  }
+  .why-content{
+    position:relative;
+    z-index:2;
+    text-align:center;
+    max-width:900px;
+    margin:0 auto;
+    padding:0 32px;
+  }
+  .why-features{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:40px;
+    margin-top:48px;
+  }
+  .why-feature{
+    text-align:center;
+    padding:24px 16px;
+    opacity:0;
+    transform:translateY(30px);
+    transition:opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .why-feature.in{
+    opacity:1;
+    transform:translateY(0);
+  }
+  .why-feature .bullet{
+    width:48px;
+    height:48px;
+    margin:0 auto 20px;
+    background-image:url('assets/sssplatter.svg');
+    background-size:contain;
+    background-repeat:no-repeat;
+    background-position:center;
+  }
+  .why-feature h3{
+    font-size:22px;
+    font-weight:800;
+    color:var(--dark);
+    margin-bottom:10px;
+  }
+  .why-feature p{
+    font-size:15px;
+    color:var(--gray);
+    line-height:1.7;
+    opacity:1;
+    animation:none;
+  }
+  .why-content h2{
+    font-size:42px;
+    font-weight:900;
+    color:var(--dark);
+    margin-bottom:28px;
+    opacity:0;
+    transform:scale(0.95);
+    animation:fadeInUp 800ms ease-out forwards;
+  }
+  .why-content p{
+    font-size:17.5px;
+    line-height:1.9;
+    color:var(--gray);
+    opacity:0;
+    transform:scale(0.95);
+    animation:fadeInUp 800ms ease-out 200ms forwards;
+  }
+  @keyframes fadeInUp{
+    to{
+      opacity:1;
+      transform:scale(1);
+    }
+  }
+
+  /* ===== CARS ===== */
+  .cars-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:24px;
+  }
+  .car-card{
+    background:var(--white);
+    border-radius:var(--radius);
+    padding:28px 24px 26px;
+    box-shadow:var(--shadow-sm);
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    height:100%;
+    transition:box-shadow .2s ease, transform .2s ease, opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .car-card:hover{
+    box-shadow:var(--shadow);
+    transform:translateY(-4px);
+  }
+  .car-card .car-img-wrap{
+    width:100%;
+    aspect-ratio:4/3;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:18px;
+    overflow:hidden;
+  }
+  .car-card img{
+    max-width:88%;
+    max-height:100%;
+    object-fit:contain;
+    transition:transform .45s cubic-bezier(.22,1,.36,1);
+    display:block;
+    margin:0 auto;
+  }
+  .car-card:hover img{
+    transform:scale(1.08) translateY(-6px);
+  }
+  .car-card .car-text{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    width:100%;
+  }
+  .car-card .brand{
+    font-family:'Poppins', 'Vazirmatn', sans-serif;
+    font-size:12.5px;
+    letter-spacing:2px;
+    color:var(--gray);
+    font-weight:600;
+    text-transform:uppercase;
+  }
+  .car-card .model{
+    font-family:'Poppins', 'Vazirmatn', sans-serif;
+    direction:ltr;
+    font-size:21px;
+    font-weight:700;
+    letter-spacing:.3px;
+    margin:6px 0 22px;
+  }
+  .car-card .btn{
+    width:100%;
+    margin-top:auto;
+  }
+
+  /* ===== ARTICLES ===== */
+  .articles-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:24px;
+  }
+  .article-card{
+    background:var(--white);
+    border-radius:var(--radius);
+    overflow:hidden;
+    box-shadow:var(--shadow-sm);
+    transition:box-shadow .2s ease, transform .2s ease, opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .article-card:hover{
+    box-shadow:var(--shadow);
+    transform:translateY(-4px);
+  }
+  .article-thumb{
+    height:160px;
+    background:linear-gradient(135deg,#ffeca1,#ffffff);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+  }
+  .article-thumb svg{width:34px;height:34px;stroke:var(--accent);}
+  .article-thumb::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(120deg, rgba(255,204,4,0.12), transparent 60%);
+  }
+  .article-body{padding:22px 22px 24px;}
+  .article-date{
+    font-size:12.5px;
+    color:var(--accent-dark);
+    font-weight:700;
+    margin-bottom:8px;
+    display:block;
+  }
+  .article-body h4{
+    font-size:17px;
+    font-weight:700;
+    margin-bottom:10px;
+  }
+  .article-body p{
+    font-size:14px;
+    color:var(--gray);
+    margin-bottom:16px;
+  }
+  .read-more{
+    font-size:14px;
+    font-weight:700;
+    color:var(--dark);
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .read-more svg{width:14px;height:14px;transition:transform .2s ease;}
+  .article-card:hover .read-more svg{transform:translateX(-3px);}
+
+  /* ===== BRANCHES ===== */
+  .branches-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:24px;
+  }
+  .branch-card{
+    background:var(--white);
+    border-radius:var(--radius);
+    padding:32px;
+    box-shadow:var(--shadow-sm);
+    display:flex;
+    align-items:flex-start;
+    gap:18px;
+    transition:box-shadow .2s ease, transform .2s ease, opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .branch-card>div:nth-child(2){flex:1;}
+  .branch-map{
+    flex-shrink:0;
+    width:180px;
+    height:180px;
+    border-radius:16px;
+    overflow:hidden;
+    border:1px solid var(--gray-light);
+    display:block;
+    cursor:pointer;
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .branch-map:hover{
+    transform:scale(1.02);
+    box-shadow:var(--shadow);
+  }
+  .branch-map img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .branch-icon{
+    margin-top: 1%;
+    flex-shrink:0;
+    width:25px;
+    height:25px;
+    border-radius:12px;
+    background:var(--accent);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .branch-icon svg{width:22px;height:22px;stroke:var(--dark);}
+  .branch-card h4{
+    font-size:19px;
+    font-weight:800;
+    margin-bottom:10px;
+  }
+  .branch-card p{
+    color:var(--gray);
+    font-size:14.5px;
+    margin-bottom:6px;
+  }
+  .branch-card .phone{
+    color:var(--dark);
+    font-weight:700;
+    margin-top:10px;
+    display:inline-block;
+    direction:ltr;
+    unicode-bidi:embed;
+  }
+
+  /* ===== FORM ===== */
+  .form-section{
+    background:var(--white);
+  }
+  .form-wrap{
+    max-width:760px;
+    margin:0 auto;
+    text-align:center;
+  }
+  .form-wrap .section-title{margin-bottom:8px;}
+  .form-wrap>p{
+    color:var(--gray);
+    margin-bottom:40px;
+  }
+  form{
+    text-align:right;
+  }
+  .form-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+    margin-bottom:18px;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .field label{
+    font-size:14px;
+    font-weight:600;
+    color:var(--dark);
+  }
+  .field input,
+  .field textarea{
+    font-family:inherit;
+    font-size:15px;
+    padding:14px 16px;
+    border-radius:10px;
+    border:1.5px solid var(--gray-light);
+    background:var(--bg);
+    color:var(--dark);
+    outline:none;
+    transition:border-color .18s ease;
+  }
+  .field input:focus,
+  .field textarea:focus{
+    border-color:var(--accent);
+  }
+  .field textarea{
+    resize:vertical;
+    min-height:120px;
+  }
+  form .btn{
+    width:100%;
+    margin-top:6px;
+  }
+  .form-note{
+    font-size:13px;
+    color:var(--gray);
+    margin-top:14px;
+    display:none;
+  }
+  .form-note.show{display:block;color:var(--accent-dark);font-weight:700;}
+
+  /* ===== FOOTER ===== */
+  footer{
+    background:var(--dark);
+    color:#fff;
+    padding:64px 0 24px;
+  }
+  .footer-grid{
+    display:grid;
+    grid-template-columns:1.3fr 1fr 1fr;
+    gap:40px;
+    padding-bottom:40px;
+    border-bottom:1px solid rgba(255,255,255,0.12);
+  }
+  .footer-logo img{
+    height:34px;
+    filter:brightness(0) invert(1);
+    margin-bottom:16px;
+  }
+  .footer-grid p{
+    color:rgba(255,255,255,0.6);
+    font-size:14px;
+    max-width:320px;
+  }
+  .footer-col h5{
+    font-size:15px;
+    font-weight:700;
+    margin-bottom:18px;
+  }
+  .footer-col ul li{margin-bottom:12px;}
+  .footer-col ul li a{
+    color:rgba(255,255,255,0.65);
+    font-size:14px;
+    transition:color .15s ease;
+  }
+  .footer-col ul li a:hover{color:var(--accent);}
+  .footer-bottom{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding-top:24px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .footer-bottom p{
+    color:rgba(255,255,255,0.45);
+    font-size:13px;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width:900px){
+    section{padding:64px 0;}
+    .why-section{min-height:80vh;padding:60px 0;}
+    .why-content h2{font-size:32px;}
+    .why-content p{font-size:16px;}
+    .why-features{gap:28px;}
+    .cars-grid{grid-template-columns:repeat(2,1fr);}
+    .articles-grid{grid-template-columns:1fr;}
+    .branches-grid{grid-template-columns:1fr 1fr;}
+    .footer-grid{grid-template-columns:1fr;gap:32px;}
+  }
+
+  @media (max-width:720px){
+    .logo{
+      position:absolute;
+      right:24px;
+      top:50%;
+      transform:translateY(-50%);
+    }
+    header .wrap{
+      justify-content:flex-end;
+      padding:0 24px;
+    }
+    .nav-toggle{
+      margin-right:auto;
+    }
+    .hero-cta{
+      display:none !important;
+    }
+    nav{
+      position:fixed;
+      top:0;
+      bottom:0;
+      left:0;
+      width:78%;
+      max-width:300px;
+      background:var(--dark);
+      transform:translateX(-100%);
+      transition:transform .3s ease;
+      padding:100px 28px 28px;
+      z-index:60;
+    }
+    nav.open{transform:translateX(0);}
+    nav::before{
+      content:'';
+      position:fixed;
+      top:0;
+      right:0;
+      bottom:0;
+      left:0;
+      background:rgba(0,0,0,0.5);
+      z-index:-1;
+      opacity:0;
+      visibility:hidden;
+      transition:opacity .3s ease, visibility .3s ease;
+    }
+    nav.open::before{
+      opacity:1;
+      visibility:visible;
+    }
+    nav ul{flex-direction:column;gap:22px;}
+    nav a{color:#fff;font-size:17px;}
+    .nav-toggle{
+      display:flex;
+      order:-1;
+      justify-self:start;
+    }
+    header.scrolled .nav-toggle span{background:var(--dark);}
+    header:not(.scrolled) .nav-toggle span{background:#fff;}
+
+    .hero-content .wrap{flex-direction:column;align-items:flex-start;gap:16px;}
+    .hero{aspect-ratio:4/5;}
+
+    .why-section{min-height:70vh;padding:48px 0;}
+    .why-content h2{font-size:28px;margin-bottom:20px;}
+    .why-content p{font-size:15px;line-height:1.8;}
+    .why-features{
+      grid-template-columns:1fr;
+      gap:24px;
+      margin-top:32px;
+    }
+    .cars-grid{grid-template-columns:1fr;}
+    .form-row{grid-template-columns:1fr;}
+
+    .branches-grid{grid-template-columns:1fr;}
+    .branch-card{
+      flex-direction:column;
+      text-align:center;
+      padding:24px 20px;
+    }
+    .branch-icon{
+      margin:0 auto 16px;
+    }
+    .branch-card>div:nth-child(2){
+      width:100%;
+    }
+    .branch-map{
+      width:100%;
+      height:200px;
+      margin-top:16px;
+      border-radius:var(--radius);
+    }
+
+    .footer-bottom{flex-direction:column;align-items:flex-start;}
+  }
+
+  /* ===== SCROLL ANIMATIONS ===== */
+  .reveal{
+    opacity:0;
+    transform:translateY(30px);
+    transition:opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .reveal.in{
+    opacity:1;
+    transform:translateY(0);
+  }
+  .reveal-left{
+    opacity:0;
+    transform:translateX(-40px);
+    transition:opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .reveal-left.in{
+    opacity:1;
+    transform:translateX(0);
+  }
+  .reveal-right{
+    opacity:0;
+    transform:translateX(40px);
+    transition:opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .reveal-right.in{
+    opacity:1;
+    transform:translateX(0);
+  }
+  .reveal-scale{
+    opacity:0;
+    transform:scale(0.9);
+    transition:opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .reveal-scale.in{
+    opacity:1;
+    transform:scale(1);
+  }
+  /* Staggered animations for grid items */
+  .car-card:nth-child(1){transition-delay:0ms;}
+  .car-card:nth-child(2){transition-delay:100ms;}
+  .car-card:nth-child(3){transition-delay:200ms;}
+  .car-card:nth-child(4){transition-delay:300ms;}
+  .car-card:nth-child(5){transition-delay:400ms;}
+
+  .article-card:nth-child(1){transition-delay:0ms;}
+  .article-card:nth-child(2){transition-delay:150ms;}
+  .article-card:nth-child(3){transition-delay:300ms;}
+
+  .why-feature:nth-child(1){transition-delay:0ms;}
+  .why-feature:nth-child(2){transition-delay:150ms;}
+  .why-feature:nth-child(3){transition-delay:300ms;}
+
+  .branch-card:nth-child(1){transition-delay:0ms;}
+  .branch-card:nth-child(2){transition-delay:200ms;}
+ @media (max-width:720px){
+  #site-nav ul li a {
+    color: #fff !important;
+  }
+}
+
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    .reveal,
+    .reveal-left,
+    .reveal-right,
+    .reveal-scale,
+    .why-feature{
+      opacity:1 !important;
+      transform:none !important;
+      transition:none !important;
+    }
+    .hero-slide{transition:none;}
+    .hero-slide img{transform:none;}
+    .hero-slide.active img.zoom{animation:none;}
+    .why-content h2,
+    .why-content p{
+      opacity:1 !important;
+      transform:none !important;
+      animation:none !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header id="site-header">
+  <div class="wrap">
+    <a href="#top" class="logo"><img src="assets/logo.png" alt="راهنورد خودرو"></a>
+    <nav id="site-nav">
+      <ul>
+        <li><a href="#top">خانه</a></li>
+        <li><a href="#why">درباره ما</a></li>
+        <li><a href="#cars">خودروها</a></li>
+        <li><a href="#articles">مقالات</a></li>
+        <li><a href="#branches">شعب</a></li>
+        <li><a href="#consult">تماس با ما</a></li>
+      </ul>
+    </nav>
+    <button class="nav-toggle" id="nav-toggle" aria-label="باز کردن منو">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- ===== HERO SLIDER ===== -->
+<div class="hero" id="top">
+  <div class="hero-slide active"><img src="assets/slider2.jpg" alt="تویوتا فرانتلندر هیبرید"></div>
+  <div class="hero-slide"><img src="assets/slider3.jpg" alt="تویوتا کمری"></div>
+  <div class="hero-slide"><img src="assets/slider4.jpg" alt="تویوتا راو۴ هیبرید"></div>
+
+  <div class="hero-nav">
+        <button class="hero-arrow" id="hero-prev" aria-label="اسلاید قبلی">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <button class="hero-arrow" id="hero-next" aria-label="اسلاید بعدی">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+
+  </div>
+
+  <div class="hero-content">
+    <div class="wrap">
+      <div class="hero-cta">
+        <a href="#cars" class="btn btn-primary">مشاهده خودروها</a>
+        <a href="#consult" class="btn btn-outline">درخواست مشاوره</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-dots" id="hero-dots"></div>
+</div>
+
+<!-- ===== WHY RAHNAVARD ===== -->
+<section id="why" class="why-section">
+  <div class="why-bg"></div>
+  <div class="why-content">
+    <h2>چرا راهنورد خودرو؟</h2>
+    <p>راهنورد خودرو با تمرکز بر واردات خودروهای روز دنیا، تلاش می‌کند تجربه‌ای مطمئن، شفاف و حرفه‌ای در خرید خودروهای وارداتی برای مشتریان خود فراهم کند. ما با بهره‌گیری از دانش تخصصی بازار خودرو، همکاری با تأمین‌کنندگان معتبر و ارائه مشاوره دقیق، امکان دسترسی به جدیدترین مدل‌های برندهای مطرح جهانی را فراهم کرده‌ایم.</p>
+    <div class="why-features">
+      <div class="why-feature reveal">
+        <div class="bullet"></div>
+        <h3>تخصص</h3>
+        <p>تجربه در واردات خودرو</p>
+      </div>
+      <div class="why-feature reveal">
+        <div class="bullet"></div>
+        <h3>شفافیت</h3>
+        <p>فرآیند واضح در واردات</p>
+      </div>
+      <div class="why-feature reveal">
+        <div class="bullet"></div>
+        <h3>اطمینان</h3>
+        <p>انتخاب از برندهای معتبر</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CARS ===== -->
+<section id="cars" style="background:var(--white)">
+  <div class="wrap">
+    <div class="section-head reveal-left">
+      <span class="eyebrow">محصولات</span>
+      <h2 class="section-title">خودروهای ما</h2>
+      <p>مجموعه‌ای منتخب از خودروهای وارداتی راهنورد خودرو، آماده تحویل با گارانتی رسمی.</p>
+    </div>
+    <div class="cars-grid">
+      <div class="car-card reveal-scale">
+        <div class="car-img-wrap"><img src="assets/car1-elantra.png" alt="هیوندای النترا"></div>
+        <div class="car-text">
+          <span class="brand">Hyundai</span>
+          <span class="model">Elantra</span>
+        </div>
+        <a href="#consult" class="btn btn-dark">مشاهده محصول</a>
+      </div>
+      <div class="car-card reveal-scale">
+        <div class="car-img-wrap"><img src="assets/car2-k4.png" alt="کیا K4"></div>
+        <div class="car-text">
+          <span class="brand">Kia</span>
+          <span class="model">K4</span>
+        </div>
+        <a href="#consult" class="btn btn-dark">مشاهده محصول</a>
+      </div>
+      <div class="car-card reveal-scale">
+        <div class="car-img-wrap"><img src="assets/car5-rav4.png" alt="تویوتا راو۴ هیبرید"></div>
+        <div class="car-text">
+          <span class="brand">Toyota</span>
+          <span class="model">RAV4 Hybrid</span>
+        </div>
+        <a href="#consult" class="btn btn-dark">مشاهده محصول</a>
+      </div>
+      <div class="car-card reveal-scale">
+        <div class="car-img-wrap"><img src="assets/car3-corolla-cross.png" alt="تویوتا کرولا کراس هیبرید"></div>
+        <div class="car-text">
+          <span class="brand">Toyota</span>
+          <span class="model">Corolla Cross Hybrid</span>
+        </div>
+        <a href="#consult" class="btn btn-dark">مشاهده محصول</a>
+      </div>
+      <div class="car-card reveal-scale">
+        <div class="car-img-wrap"><img src="assets/car4-corolla.png" alt="تویوتا کرولا هیبرید"></div>
+        <div class="car-text">
+          <span class="brand">Toyota</span>
+          <span class="model">Corolla Hybrid</span>
+        </div>
+        <a href="#consult" class="btn btn-dark">مشاهده محصول</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ARTICLES ===== -->
+<section id="articles">
+  <div class="wrap">
+    <div class="section-head reveal-right">
+      <span class="eyebrow">اخبار</span>
+      <h2 class="section-title">مقاله و اطلاعیه</h2>
+      <p>آخرین اخبار، اطلاعیه‌ها و راهنماهای خرید خودرو را دنبال کنید.</p>
+    </div>
+    <div class="articles-grid">
+      <a class="article-card reveal-scale" href="#">
+        <div class="article-thumb">
+          <!-- <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg> -->
+        </div>
+        <div class="article-body">
+          <span class="article-date">۱۲ مرداد ۱۴۰۵</span>
+          <h4>راهنمای خرید خودروی هیبریدی</h4>
+          <p>بررسی مزایای خودروهای هیبریدی و نکات مهم پیش از خرید.</p>
+          <span class="read-more">مطالعه بیشتر
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+          </span>
+        </div>
+      </a>
+      <a class="article-card reveal-scale" href="#">
+        <div class="article-thumb">
+          <!-- <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg> -->
+        </div>
+        <div class="article-body">
+          <span class="article-date">۳ مرداد ۱۴۰۵</span>
+          <h4>شرایط جدید گارانتی محصولات</h4>
+          <p>اطلاعیه به‌روزرسانی شرایط گارانتی و خدمات پس از فروش.</p>
+          <span class="read-more">مطالعه بیشتر
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+          </span>
+        </div>
+      </a>
+      <a class="article-card reveal-scale" href="#">
+        <div class="article-thumb">
+          <!-- <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M4 4h16v12H8l-4 4V4z"/></svg> -->
+        </div>
+        <div class="article-body">
+          <span class="article-date">۲۰ تیر ۱۴۰۵</span>
+          <h4>معرفی محصولات جدید ۲۰۲۵</h4>
+          <p>نگاهی به تازه‌ترین مدل‌های وارداتی راهنورد خودرو در سال جاری.</p>
+          <span class="read-more">مطالعه بیشتر
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+          </span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== BRANCHES ===== -->
+<section id="branches" style="background:var(--white)">
+  <div class="wrap">
+    <div class="section-head reveal-left">
+      <span class="eyebrow">دفاتر ما</span>
+      <h2 class="section-title">شعب راهنورد خودرو</h2>
+    </div>
+    <div class="branches-grid">
+      <div class="branch-card reveal-scale">
+        <div class="branch-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        </div>
+        <div>
+          <h4>دفتر مرکزی</h4>
+          <p>مازندران، ساری، میدان خزر </p>
+          <p>کمربندی شرقی ، ابتدای کوی دادگستری</p>
+          <a href="tel:+989112100800" class="phone">۰۹۱۱ ۲۱۰ ۰۸ ۰۰</a>
+        </div>
+        <a href="https://maps.google.com/maps?q=36.5821041,53.071149&z=17" target="_blank" class="branch-map" title="مشاهده در نقشه">
+          <img src="assets/location.jpg" alt="موقعیت نمایشگاه رهنورد - ساری" loading="lazy">
+        </a>
+      </div>
+      <!-- <div class="branch-card reveal">
+        <div class="branch-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        </div>
+        <div>
+          <h4>دفتر بابل</h4>
+          <p>بابل، خیابان شریعتی</p>
+          <span class="phone">۰۱۱ ۱۱۱ ۱۱ ۱۱</span>
+        </div>
+        <div class="branch-map">
+          <iframe src="https://maps.google.com/maps?q=Babol,Shariati%20Street&z=13&output=embed" loading="lazy" title="نقشه دفتر بابل"></iframe>
+        </div>
+      </div> -->
+    </div>
+  </div>
+</section>
+
+<!-- ===== CONSULTATION FORM ===== -->
+<section id="consult" class="form-section">
+  <div class="wrap form-wrap">
+    <span class="eyebrow" style="justify-content:center">فرم مشاوره</span>
+    <h2 class="section-title">درخواست خود را برای ما ارسال نمایید</h2>
+    <p>همکاران ما در کوتاه‌ترین زمان ممکن با شما تماس خواهند گرفت.</p>
+    <form id="consult-form">
+      <div class="form-row">
+        <div class="field">
+          <label for="f-name">نام</label>
+          <input type="text" id="f-name" placeholder="نام و نام خانوادگی" required>
+        </div>
+        <div class="field">
+          <label for="f-phone">شماره تلفن</label>
+          <input type="tel" id="f-phone" placeholder="۰۹۱۲ ۰۰۰ ۰۰ ۰۰" required>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:18px;">
+        <label for="f-subject">موضوع</label>
+        <input type="text" id="f-subject" placeholder="موضوع درخواست">
+      </div>
+      <div class="field" style="margin-bottom:22px;">
+        <label for="f-message">متن توضیحات</label>
+        <textarea id="f-message" placeholder="توضیحات خود را بنویسید..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">ارسال درخواست</button>
+      <p class="form-note" id="form-note">درخواست شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.</p>
+    </form>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a href="#top" class="footer-logo"><img src="assets/logo.png" alt="راهنورد خودرو"></a>
+        <p>راهنورد خودرو ، واردکننده رسمی خودروهای هیوندای، کیا و تویوتا با بیش از یک دهه تجربه در خدمت مشتریان.</p>
+      </div>
+      <div class="footer-col">
+        <h5>دسترسی سریع</h5>
+        <ul>
+          <li><a href="#why">درباره ما</a></li>
+          <li><a href="#cars">خودروها</a></li>
+          <li><a href="#articles">مقالات</a></li>
+          <li><a href="#consult">مشاوره</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>اطلاعات تماس</h5>
+        <ul>
+          <li>مازندران، ساری، میدان خزر ،کمربندی شرقی ، ابتدای کوی دادگستری</li>
+          <li style="direction:ltr;text-align:right"><a href="tel:+989112100800">۰۹۱۱ ۲۱۰ ۰۸ ۰۰</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p> راهنورد خودرو. تمامی حقوق محفوظ است.</p>
+      <p>طراحی و توسعه با ❤</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Header scroll state
+  const header = document.getElementById('site-header');
+  const headerCta = document.getElementById('header-cta');
+  const onScroll = () => {
+    if(window.scrollY > 40){
+      header.classList.add('scrolled');
+      if(headerCta) headerCta.style.display = 'inline-flex';
+    } else {
+      header.classList.remove('scrolled');
+      if(headerCta) headerCta.style.display = 'none';
+    }
+  };
+  window.addEventListener('scroll', onScroll);
+  onScroll();
+
+  // Mobile nav toggle
+  const navToggle = document.getElementById('nav-toggle');
+  const nav = document.getElementById('site-nav');
+  navToggle.addEventListener('click', () => nav.classList.toggle('open'));
+  nav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => nav.classList.remove('open')));
+
+  // Hero slider — each slide holds for 4s while its image slowly zooms out
+  const SLIDE_DURATION = 6000;
+  const slides = document.querySelectorAll('.hero-slide');
+  const dotsWrap = document.getElementById('hero-dots');
+  let current = 0;
+  let timer;
+
+  slides.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', 'اسلاید ' + (i+1));
+    dot.addEventListener('click', () => goTo(i));
+    dotsWrap.appendChild(dot);
+  });
+  const dots = document.querySelectorAll('.hero-dot');
+
+  function playZoom(slide){
+    const img = slide.querySelector('img');
+    img.classList.remove('zoom');
+    void img.offsetWidth; // restart the CSS animation
+    img.classList.add('zoom');
+  }
+
+  function goTo(i){
+    slides[current].classList.remove('active');
+    slides[current].querySelector('img').classList.remove('zoom');
+    dots[current].classList.remove('active');
+    current = (i + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+    playZoom(slides[current]);
+    resetTimer();
+  }
+  function next(){ goTo(current + 1); }
+  function prev(){ goTo(current - 1); }
+  function resetTimer(){
+    clearInterval(timer);
+    timer = setInterval(next, SLIDE_DURATION);
+  }
+  document.getElementById('hero-next').addEventListener('click', next);
+  document.getElementById('hero-prev').addEventListener('click', prev);
+  playZoom(slides[current]);
+  resetTimer();
+
+  // Reveal on scroll - handle multiple animation types
+  const revealSelectors = '.reveal, .reveal-left, .reveal-right, .reveal-scale';
+  const revealEls = document.querySelectorAll(revealSelectors);
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        e.target.classList.add('in');
+        io.unobserve(e.target); // Only animate once
+      }
+    });
+  }, {
+    threshold:0.15,
+    rootMargin:'0px 0px -50px 0px'
+  });
+  revealEls.forEach(el => io.observe(el));
+
+  // Consultation form (static, no backend)
+  const form = document.getElementById('consult-form');
+  const note = document.getElementById('form-note');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    note.classList.add('show');
+    form.reset();
+    setTimeout(() => note.classList.remove('show'), 4500);
+  });
+</script>
+</body>
+</html>
