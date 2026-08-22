@@ -1,2 +1,49 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Next.js
+.next/
+out/
+
+# Django
+*.sqlite3
+staticfiles/
+media/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+
+# Build
+dist/
+build/
+
+# Vercel
 .vercel
+
+# SSH Keys
 *.pem
+
+# Temp files
+ubuntu@ubuntu---1-vcpu---1-gb-ram~$.txt

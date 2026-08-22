@@ -1,0 +1,68 @@
+from django.db import models
+from django.utils.text import slugify
+from apps.core.models import Redirect
+
+
+class Article(models.Model):
+    """Model for articles."""
+    title = models.CharField(max_length=300, verbose_name='عنوان')
+    slug = models.SlugField(unique=True, db_index=True, allow_unicode=True, verbose_name='اسلاگ')
+    excerpt = models.TextField(blank=True, verbose_name='خلاصه')
+    content = models.TextField(verbose_name='محتوا')
+    cover_image = models.ImageField(upload_to='articles/', blank=True, verbose_name='تصویر کاور')
+
+    # Status
+    is_published = models.BooleanField(default=False, verbose_name='منتشر شده')
+    published_at = models.DateTimeField(null=True, blank=True, verbose_name='تاریخ انتشار')
+
+    # SEO
+    seo_title = models.CharField(max_length=200, blank=True, verbose_name='عنوان SEO')
+    seo_description = models.TextField(blank=True, verbose_name='توضیحات SEO')
+    og_image = models.ImageField(upload_to='og/articles/', blank=True, verbose_name='تصویر OG')
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='تاریخ ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='تاریخ بروزرسانی')
+
+    class Meta:
+        verbose_name = 'مقاله'
+        verbose_name_plural = 'مقالات'
+        ordering = ['-published_at']
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        # Auto-generate slug if not provided
+        if not self.slug:
+            self.slug = self._generate_slug()
+
+        # Check if slug changed and create redirect
+        if self.pk:
+            try:
+                old_instance = Article.objects.get(pk=self.pk)
+                if old_instance.slug != self.slug:
+                    Redirect.objects.create(
+                        old_path=f'/articles/{old_instance.slug}',
+                        new_path=f'/articles/{self.slug}',
+                        status_code=301,
+                    )
+            except Article.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
+    def _generate_slug(self):
+        """Generate slug from title."""
+        base_slug = slugify(self.title, allow_unicode=True)
+        if not base_slug:
+            base_slug = f'article-{self.pk or "new"}'
+
+        # Ensure uniqueness
+        slug = base_slug
+        counter = 1
+        while Article.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            slug = f'{base_slug}-{counter}'
+            counter += 1
+
+        return slug

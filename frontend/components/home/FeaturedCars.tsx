@@ -1,0 +1,125 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+
+interface Car {
+  id: number
+  brand: string
+  model: string
+  persian_name: string
+  slug: string
+  main_image: string
+}
+
+export default function FeaturedCars() {
+  const sectionRef = useRef<HTMLElement>(null)
+  const [cars, setCars] = useState<Car[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sectionTitle, setSectionTitle] = useState('خودروهای ما')
+  const [sectionDescription, setSectionDescription] = useState('مجموعه‌ای منتخب از خودروهای وارداتی راهنورد خودرو، آماده تحویل با گارانتی رسمی.')
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [settingsRes, carsRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/`, { next: { revalidate: 60 } }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/cars/?is_featured=true`, { next: { revalidate: 60 } })
+        ])
+
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json()
+          if (settings.cars_section_title) setSectionTitle(settings.cars_section_title)
+          if (settings.cars_section_description) setSectionDescription(settings.cars_section_description)
+        }
+
+        if (carsRes.ok) {
+          const data = await carsRes.json()
+          setCars(data.results || data || [])
+        }
+      } catch (error) {
+        console.error('Error fetching cars:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -50px 0px' }
+    )
+
+    const elements = sectionRef.current?.querySelectorAll('.reveal-left, .reveal-scale')
+    elements?.forEach((el) => observer.observe(el))
+
+    return () => observer.disconnect()
+  }, [cars])
+
+  return (
+    <section id="cars" ref={sectionRef} className="bg-bg">
+      <div className="wrap">
+        <div className="section-head reveal-left">
+          <span className="eyebrow">محصولات</span>
+          <h2 className="section-title">{sectionTitle}</h2>
+          <p>{sectionDescription}</p>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12 text-gray">در حال بارگذاری...</div>
+        ) : cars.length === 0 ? (
+          <div className="text-center py-12 text-gray">
+            خودرویی یافت نشد. از پنل مدیریت خودرو اضافه کنید.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {cars.map((car) => (
+              <div
+                key={car.id}
+                className="car-card reveal-scale bg-white rounded-[14px] p-7 pb-6 shadow-card text-center flex flex-col items-center h-full transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1"
+              >
+                <div className="w-full aspect-[4/3] flex items-center justify-center mb-[18px] overflow-hidden">
+                  {car.main_image ? (
+                    <Image
+                      src={car.main_image}
+                      alt={car.persian_name}
+                      width={400}
+                      height={300}
+                      className="max-w-[88%] max-h-full object-contain transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-translate-y-1.5"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-light flex items-center justify-center text-gray">
+                      بدون تصویر
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-start w-full">
+                  <span className="font-poppins text-[12.5px] tracking-[2px] text-gray font-semibold uppercase">
+                    {car.brand}
+                  </span>
+                  <span className="font-poppins ltr text-[21px] font-bold tracking-[0.3px] my-1.5 mb-[22px]">
+                    {car.model}
+                  </span>
+                </div>
+                <Link href={`/cars/${car.slug}`} className="btn btn-dark w-full mt-auto">
+                  مشاهده محصول
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
