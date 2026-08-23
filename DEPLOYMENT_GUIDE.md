@@ -72,19 +72,9 @@ Generate a secret key:
 python3 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-## Step 3: Setup SSL Certificate
+## Step 3: Deploy the Application
 
-```bash
-# Install Certbot
-sudo apt install -y certbot python3-certbot-nginx
-
-# Get SSL certificate
-sudo certbot --nginx -d rahnavard.co -d www.rahnavard.co
-
-# Follow the prompts and choose to redirect HTTP to HTTPS
-```
-
-## Step 4: Deploy the Application
+SSL is handled by Arvan Cloud (free Let's Encrypt certificate that auto-renews). No server-side SSL setup needed.
 
 ```bash
 cd /var/www/rahnavard

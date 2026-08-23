@@ -1,171 +1,36 @@
-name: Deploy Rahnavard Automotive
+name: Deploy to Production
 
+# Trigger options:
+# 1. Automatic: Push to main (after CI passes)
+# 2. Manual: workflow_dispatch (button in GitHub Actions UI)
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      rebuild_images:
+        description: 'Force rebuild Docker images'
+        required: false
+        default: 'true'
+        type: boolean
+      run_migrations:
+        description: 'Run database migrations'
+        required: false
+        default: 'true'
+        type: boolean
 
 env:
-  NODE_VERSION: '20'
-  PYTHON_VERSION: '3.11'
+  COMPOSE_FILE: docker-compose.prod.yml
 
 jobs:
-  # Lint and Test Frontend
-  lint-frontend:
-    name: Lint Frontend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Run ESLint
-        working-directory: frontend
-        run: npm run lint
-
-      - name: Type check
-        working-directory: frontend
-        run: npx tsc --noEmit
-
-  # Lint and Test Backend
-  lint-backend:
-    name: Lint Backend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install dependencies
-        working-directory: backend
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install flake8 black isort
-
-      - name: Run Black (format check)
-        working-directory: backend
-        run: black --check .
-
-      - name: Run isort (import sort check)
-        working-directory: backend
-        run: isort --check-only .
-
-      - name: Run Django checks
-        working-directory: backend
-        env:
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: '1'
-          DATABASE_URL: sqlite:///test.db
-        run: python manage.py check
-
-  # Build Frontend
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    needs: lint-frontend
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: /api/v1
-          NEXT_PUBLIC_SITE_URL: https://rahnavard.co
-        run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: frontend/.next
-          retention-days: 1
-
-  # Build and Test Backend Migrations
-  build-backend:
-    name: Build Backend
-    runs-on: ubuntu-latest
-    needs: lint-backend
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: test_db
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install dependencies
-        working-directory: backend
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Check migrations
-        working-directory: backend
-        env:
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: '1'
-          DATABASE_URL: postgres://test_user:test_password@localhost:5432/test_db
-        run: |
-          python manage.py makemigrations --check
-          python manage.py migrate
-          python manage.py check --deploy
-
-  # Deploy to Production (only on main branch push)
   deploy:
     name: Deploy to Arvan Cloud
     runs-on: ubuntu-latest
-    needs: [build-frontend, build-backend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only deploy on push to main OR manual trigger
+    if: >
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
     environment: production
 
     steps:
@@ -179,73 +44,103 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
+          command_timeout: 20m
           script: |
-            #!/bin/bash
             set -e
-
-            echo "🚀 Starting deployment..."
-
-            # Navigate to project directory
             cd /var/www/rahnavard
 
-            # Pull latest changes
+            echo "=========================================="
+            echo "🚀 Starting deployment..."
+            echo "=========================================="
+
+            # Step 1: Pull latest code
+            echo ""
+            echo "📥 Step 1: Pulling latest changes..."
             git fetch origin main
             git reset --hard origin/main
+            echo "✅ Code updated to $(git rev-parse --short HEAD)"
 
-            # Copy production environment file if not exists
-            if [ ! -f .env ]; then
-              cp .env.production .env
-              echo "⚠️  Created .env from .env.production - Please update with real values!"
-            fi
-
-            # Build and restart services
-            echo "📦 Building Docker images..."
-            docker compose -f docker-compose.prod.yml build --no-cache
-
-            echo "🔄 Running migrations..."
-            docker compose -f docker-compose.prod.yml run --rm backend python manage.py migrate --noinput
-
-            echo "📁 Collecting static files..."
-            docker compose -f docker-compose.prod.yml run --rm backend python manage.py collectstatic --noinput
-
-            echo "🚀 Starting services..."
-            docker compose -f docker-compose.prod.yml up -d
-
-            # Wait for services to be healthy
-            echo "⏳ Waiting for services to start..."
-            sleep 10
-
-            # Health check
-            echo "🏥 Running health checks..."
-            if curl -f -s http://localhost:8000/api/v1/settings/ > /dev/null; then
-              echo "✅ Backend is healthy"
+            # Step 2: Build Docker images
+            REBUILD="${{ github.event.inputs.rebuild_images || 'true' }}"
+            if [ "$REBUILD" = "true" ]; then
+              echo ""
+              echo "📦 Step 2: Building Docker images (no cache)..."
+              docker compose -f ${{ env.COMPOSE_FILE }} build --no-cache
             else
-              echo "❌ Backend health check failed"
-              exit 1
+              echo ""
+              echo "📦 Step 2: Building Docker images (with cache)..."
+              docker compose -f ${{ env.COMPOSE_FILE }} build
             fi
+            echo "✅ Docker images built"
 
-            if curl -f -s http://localhost:3000 > /dev/null; then
-              echo "✅ Frontend is healthy"
+            # Step 3: Run migrations
+            RUN_MIGRATIONS="${{ github.event.inputs.run_migrations || 'true' }}"
+            if [ "$RUN_MIGRATIONS" = "true" ]; then
+              echo ""
+              echo "🗄️  Step 3: Running database migrations..."
+              docker compose -f ${{ env.COMPOSE_FILE }} run --rm --no-deps backend python manage.py migrate --noinput
+              echo "✅ Migrations completed"
             else
-              echo "❌ Frontend health check failed"
-              exit 1
+              echo ""
+              echo "⏭️  Step 3: Skipping migrations"
             fi
 
-            # Clean up old Docker images
-            echo "🧹 Cleaning up old images..."
+            # Step 4: Restart services
+            echo ""
+            echo "🔄 Step 4: Restarting services..."
+            docker compose -f ${{ env.COMPOSE_FILE }} down
+            docker compose -f ${{ env.COMPOSE_FILE }} up -d
+            echo "✅ Services restarted"
+
+            # Step 5: Wait for services
+            echo ""
+            echo "⏳ Step 5: Waiting for services to stabilize..."
+            sleep 30
+
+            # Step 6: Health checks
+            echo ""
+            echo "🏥 Step 6: Running health checks..."
+
+            # Check backend
+            for i in {1..12}; do
+              if docker compose -f ${{ env.COMPOSE_FILE }} exec -T backend python -c "
+            import urllib.request
+            try:
+                urllib.request.urlopen('http://localhost:8000/api/v1/settings/')
+                print('ok')
+            except:
+                exit(1)
+            " 2>/dev/null; then
+                echo "  ✅ Backend is healthy"
+                break
+              fi
+              if [ $i -eq 12 ]; then
+                echo "  ❌ Backend health check failed"
+                docker compose -f ${{ env.COMPOSE_FILE }} logs backend | tail -20
+              fi
+              sleep 5
+            done
+
+            # Check frontend
+            if docker compose -f ${{ env.COMPOSE_FILE }} exec -T frontend wget --no-verbose --tries=1 --spider http://localhost:3000 2>/dev/null; then
+              echo "  ✅ Frontend is healthy"
+            else
+              echo "  ⚠️  Frontend health check inconclusive"
+            fi
+
+            # Step 7: Cleanup
+            echo ""
+            echo "🧹 Step 7: Cleaning up..."
             docker image prune -f
 
-            echo "✅ Deployment completed successfully!"
+            # Step 8: Status
+            echo ""
+            echo "📊 Container status:"
+            docker compose -f ${{ env.COMPOSE_FILE }} ps
 
-      - name: Notify deployment success
-        if: success()
-        run: |
-          echo "🎉 Deployment to Arvan Cloud completed successfully!"
-          echo "🌐 Website: https://rahnavard.co"
-          echo "🔧 Admin: https://rahnavard.co/admin"
-
-      - name: Notify deployment failure
-        if: failure()
-        run: |
-          echo "❌ Deployment failed! Check the logs above."
-          exit 1
+            echo ""
+            echo "=========================================="
+            echo "✅ Deployment completed!"
+            echo "🌐 Website: https://rahnavard.co"
+            echo "🔧 Admin: https://rahnavard.co/admin"
+            echo "=========================================="

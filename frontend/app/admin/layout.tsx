@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 const sidebarLinks = [
   { href: '/admin', label: 'داشبورد', icon: '📊' },
@@ -20,6 +21,36 @@ export default function AdminLayout({
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, isAuthenticated, loading, logout, isSuperUser } = useAuth()
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated && pathname !== '/admin/login') {
+      router.push('/admin/login')
+    }
+  }, [isAuthenticated, loading, pathname, router])
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">در حال بارگذاری...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show login page without admin layout
+  if (pathname === '/admin/login') {
+    return <>{children}</>
+  }
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -39,6 +70,29 @@ export default function AdminLayout({
           >
             {isSidebarOpen ? '✕' : '☰'}
           </button>
+        </div>
+
+        {/* User info */}
+        <div className="p-4 border-b">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold">
+                {user?.first_name?.[0] || user?.username?.[0]?.toUpperCase()}
+              </span>
+            </div>
+            {isSidebarOpen && (
+              <div>
+                <p className="font-medium text-sm">
+                  {user?.first_name
+                    ? `${user.first_name} ${user.last_name || ''}`
+                    : user?.username}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {isSuperUser ? 'مدیر ارشد' : 'مدیر محتوا'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <nav className="p-4">
@@ -61,14 +115,30 @@ export default function AdminLayout({
           </ul>
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t space-y-2">
+          {isSuperUser && (
+            <Link
+              href="/django-admin/"
+              className="flex items-center gap-2 text-gray-600 hover:text-dark transition-colors text-sm"
+            >
+              <span>🔧</span>
+              {isSidebarOpen && <span>مدیریت پیشرفته</span>}
+            </Link>
+          )}
           <Link
             href="/"
-            className="flex items-center gap-2 text-gray-600 hover:text-dark transition-colors"
+            className="flex items-center gap-2 text-gray-600 hover:text-dark transition-colors text-sm"
           >
             <span>🏠</span>
             {isSidebarOpen && <span>مشاهده سایت</span>}
           </Link>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors text-sm"
+          >
+            <span>🚪</span>
+            {isSidebarOpen && <span>خروج</span>}
+          </button>
         </div>
       </aside>
 
@@ -83,8 +153,13 @@ export default function AdminLayout({
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold">پنل مدیریت راهنورد خودرو</h2>
             <div className="flex items-center gap-4">
-              <span className="text-gray-600">مدیر</span>
-              <button className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 transition-colors">
+              <span className="text-gray-600">
+                {user?.first_name || user?.username}
+              </span>
+              <button
+                onClick={logout}
+                className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 transition-colors"
+              >
                 خروج
               </button>
             </div>

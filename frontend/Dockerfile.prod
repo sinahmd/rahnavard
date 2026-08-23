@@ -8,6 +8,9 @@ ARG NEXT_PUBLIC_SITE_URL=https://rahnavard.co
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 
+# Use accessible npm mirror (Arvan mirror blocks some packages)
+RUN npm config set registry https://registry.npmmirror.com/
+
 # Install dependencies
 COPY package*.json ./
 RUN npm ci

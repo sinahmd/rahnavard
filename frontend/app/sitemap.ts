@@ -1,6 +1,13 @@
 import { MetadataRoute } from 'next'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
+
+// Build absolute API URL for server-side fetching
+function getAbsoluteApiUrl(path: string): string {
+  if (API_URL.startsWith('http')) return `${API_URL}${path}`
+  return `${BASE_URL}${API_URL}${path}`
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static pages
@@ -40,7 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Dynamic car pages
   let carPages: MetadataRoute.Sitemap = []
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cars/`, {
+    const response = await fetch(getAbsoluteApiUrl('/cars/'), {
       next: { revalidate: 3600 }, // Revalidate every hour
     })
     if (response.ok) {
@@ -59,7 +66,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Dynamic article pages
   let articlePages: MetadataRoute.Sitemap = []
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/articles/`, {
+    const response = await fetch(getAbsoluteApiUrl('/articles/'), {
       next: { revalidate: 3600 },
     })
     if (response.ok) {

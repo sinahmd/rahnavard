@@ -47,3 +47,22 @@ build/
 
 # Temp files
 ubuntu@ubuntu---1-vcpu---1-gb-ram~$.txt
+
+# Secrets - CRITICAL
+*.key
+*.crt
+*.p12
+*.pfx
+*password*
+*secret*
+*credential*
+
+# Database files
+*.sql
+*.sql.gz
+*.dump
+
+# Backup files
+*.bak
+*.backup
+*.old

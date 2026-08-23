@@ -1,11 +1,14 @@
-from rest_framework import generics
+from rest_framework import generics, permissions
+
 from .models import Branch
-from .serializers import BranchSerializer, BranchAdminSerializer
+from .serializers import BranchAdminSerializer, BranchSerializer
 
 
 class BranchListView(generics.ListAPIView):
     """Public endpoint for listing active branches."""
+
     serializer_class = BranchSerializer
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         return Branch.objects.filter(is_active=True)
@@ -13,11 +16,15 @@ class BranchListView(generics.ListAPIView):
 
 class BranchAdminListView(generics.ListCreateAPIView):
     """Admin endpoint for listing and creating branches."""
+
     serializer_class = BranchAdminSerializer
     queryset = Branch.objects.all()
+    permission_classes = [permissions.IsAdminUser]
 
 
 class BranchAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Admin endpoint for branch detail, update, and delete."""
+
     serializer_class = BranchAdminSerializer
     queryset = Branch.objects.all()
+    permission_classes = [permissions.IsAdminUser]

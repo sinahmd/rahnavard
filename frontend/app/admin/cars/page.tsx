@@ -25,7 +25,7 @@ export default function AdminCarsPage() {
 
   const fetchCars = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/cars/`)
+      const response = await fetch(`/api/v1/admin/cars/`)
       if (response.ok) {
         const data = await response.json()
         setCars(data.results || data)
@@ -39,7 +39,7 @@ export default function AdminCarsPage() {
 
   const toggleActive = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/cars/${id}/`, {
+      const response = await fetch(`/api/v1/admin/cars/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus }),
@@ -54,7 +54,7 @@ export default function AdminCarsPage() {
 
   const toggleFeatured = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/cars/${id}/`, {
+      const response = await fetch(`/api/v1/admin/cars/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_featured: !currentStatus }),
@@ -71,7 +71,7 @@ export default function AdminCarsPage() {
     if (!confirm('آیا از حذف این خودرو اطمینان دارید؟')) return
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/cars/${id}/`, {
+      const response = await fetch(`/api/v1/admin/cars/${id}/`, {
         method: 'DELETE',
       })
       if (response.ok) {
@@ -112,7 +112,9 @@ export default function AdminCarsPage() {
             </tr>
           </thead>
           <tbody>
-            {cars.map((car) => (
+            {cars.length === 0 ? (
+              <tr><td colSpan={7} className="p-4 text-center text-gray-500">خودرویی وجود ندارد</td></tr>
+            ) : cars.map((car) => (
               <tr key={car.id} className="border-t hover:bg-gray-50">
                 <td className="p-4">{car.brand}</td>
                 <td className="p-4">{car.model}</td>

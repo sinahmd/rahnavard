@@ -5,23 +5,20 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
+        protocol: 'https',
+        hostname: 'rahnavard.co',
+        pathname: '/media/**',
+      },
+      {
         protocol: 'http',
         hostname: 'localhost',
         port: '8000',
         pathname: '/media/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'rahnavard.co',
-        pathname: '/media/**',
-      },
     ],
   },
-  // Enable RTL support
-  i18n: {
-    locales: ['fa'],
-    defaultLocale: 'fa',
-  },
+  // i18n is handled via <html lang="fa" dir="rtl"> in layout.tsx
+  // Do NOT use i18n config here — it's Pages Router only
 }
 
 module.exports = nextConfig

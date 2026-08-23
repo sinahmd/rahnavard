@@ -1,18 +1,34 @@
 #!/bin/bash
-# Manual deployment script for Rahnavard Automotive
-# Use this for manual deployments or troubleshooting
+# Production deployment script for Rahnavard Automotive
+# Zero-downtime deployment with health checks
 
 set -e
 
-echo "🚀 Starting manual deployment..."
+PROJECT_DIR="/var/www/rahnavard"
+COMPOSE_FILE="docker-compose.prod.yml"
 
-# Navigate to project directory
-cd /var/www/rahnavard
+echo "🚀 Starting deployment..."
 
-# Check if .env exists
+cd "$PROJECT_DIR"
+
+# Check .env exists
 if [ ! -f ".env" ]; then
     echo "❌ Error: .env file not found!"
-    echo "Please copy .env.production to .env and update with real values."
+    echo "Copy .env.production to .env and configure it."
+    exit 1
+fi
+
+# Source .env for validation
+source .env
+
+# Validate critical variables
+if [ -z "$SECRET_KEY" ] || [ "$SECRET_KEY" = "CHANGE-THIS-TO-A-STRONG-RANDOM-KEY" ]; then
+    echo "❌ Error: SECRET_KEY not set in .env!"
+    exit 1
+fi
+
+if [ -z "$POSTGRES_PASSWORD" ] || [ "$POSTGRES_PASSWORD" = "CHANGE-PASSWORD" ]; then
+    echo "❌ Error: POSTGRES_PASSWORD not set in .env!"
     exit 1
 fi
 
@@ -21,67 +37,91 @@ echo "📥 Pulling latest changes..."
 git fetch origin main
 git reset --hard origin/main
 
-# Build images
+# Build images (no cache for clean build)
 echo "📦 Building Docker images..."
-docker compose -f docker-compose.prod.yml build --no-cache
+docker compose -f "$COMPOSE_FILE" build --no-cache
 
-# Stop existing containers
-echo "🛑 Stopping existing containers..."
-docker compose -f docker-compose.prod.yml down
-
-# Run migrations
+# Run migrations BEFORE restarting (using a temporary container)
 echo "🗄️  Running database migrations..."
-docker compose -f docker-compose.prod.yml run --rm backend python manage.py migrate --noinput
+docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend python manage.py migrate --noinput
 
-# Collect static files
-echo "📁 Collecting static files..."
-docker compose -f docker-compose.prod.yml run --rm backend python manage.py collectstatic --noinput
+# Rolling restart: backend first, then frontend, then nginx
+echo "🔄 Rolling restart..."
 
-# Start services
-echo "🚀 Starting services..."
-docker compose -f docker-compose.prod.yml up -d
+# Restart backend
+echo "  → Restarting backend..."
+docker compose -f "$COMPOSE_FILE" up -d --no-deps backend
+sleep 10
 
-# Wait for services
-echo "⏳ Waiting for services to start..."
-sleep 15
+# Wait for backend health
+echo "  → Waiting for backend health..."
+for i in $(seq 1 30); do
+    if docker compose -f "$COMPOSE_FILE" exec -T backend python -c "
+import urllib.request
+try:
+    urllib.request.urlopen('http://localhost:8000/api/v1/settings/')
+    print('ok')
+except:
+    exit(1)
+" 2>/dev/null; then
+        echo "  ✅ Backend is healthy"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo "  ❌ Backend failed health check"
+        docker compose -f "$COMPOSE_FILE" logs backend | tail -30
+        exit 1
+    fi
+    sleep 5
+done
 
-# Health checks
-echo "🏥 Running health checks..."
+# Restart frontend
+echo "  → Restarting frontend..."
+docker compose -f "$COMPOSE_FILE" up -d --no-deps frontend
+sleep 10
 
-# Check backend
-if curl -f -s http://localhost:8000/api/v1/settings/ > /dev/null 2>&1; then
-    echo "✅ Backend is healthy"
+# Restart nginx last
+echo "  → Restarting nginx..."
+docker compose -f "$COMPOSE_FILE" up -d --no-deps nginx
+
+# Final health check
+echo ""
+echo "🏥 Final health checks..."
+sleep 5
+
+HEALTH_OK=true
+
+if curl -f -s -o /dev/null https://rahnavard.co/api/v1/settings/; then
+    echo "  ✅ API is healthy"
 else
-    echo "⚠️  Backend health check failed - checking logs..."
-    docker compose -f docker-compose.prod.yml logs backend | tail -20
+    echo "  ⚠️  API health check failed"
+    HEALTH_OK=false
 fi
 
-# Check frontend
-if curl -f -s http://localhost:3000 > /dev/null 2>&1; then
-    echo "✅ Frontend is healthy"
+if curl -f -s -o /dev/null https://rahnavard.co; then
+    echo "  ✅ Frontend is healthy"
 else
-    echo "⚠️  Frontend health check failed - checking logs..."
-    docker compose -f docker-compose.prod.yml logs frontend | tail -20
-fi
-
-# Check nginx
-if curl -f -s http://localhost > /dev/null 2>&1; then
-    echo "✅ Nginx is healthy"
-else
-    echo "⚠️  Nginx health check failed"
+    echo "  ⚠️  Frontend health check failed"
+    HEALTH_OK=false
 fi
 
 # Show running containers
 echo ""
 echo "📊 Running containers:"
-docker compose -f docker-compose.prod.yml ps
+docker compose -f "$COMPOSE_FILE" ps
 
-# Cleanup
+# Cleanup old images
 echo ""
 echo "🧹 Cleaning up old Docker images..."
 docker image prune -f
 
-echo ""
-echo "✅ Deployment completed!"
-echo "🌐 Website: https://rahnavard.co"
-echo "🔧 Admin: https://rahnavard.co/admin"
+if [ "$HEALTH_OK" = true ]; then
+    echo ""
+    echo "✅ Deployment completed successfully!"
+    echo "🌐 Website: https://rahnavard.co"
+    echo "🔧 Admin: https://rahnavard.co/admin"
+else
+    echo ""
+    echo "⚠️  Deployment completed with warnings. Check logs above."
+    echo "🔧 Admin: https://rahnavard.co/admin"
+fi
