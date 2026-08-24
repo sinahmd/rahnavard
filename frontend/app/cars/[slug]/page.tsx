@@ -5,76 +5,51 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import JsonLd from '@/components/seo/JsonLd'
 
-// This will be fetched from API based on slug
-const carsData: Record<string, any> = {
-  'hyundai-elantra': {
-    brand: 'Hyundai',
-    model: 'Elantra',
-    persianName: 'هیوندای النترا',
-    image: '/images/cars/hyundai-elantra.webp',
-    year: 2025,
-    fuelType: 'بنزینی',
-    transmission: 'اتوماتیک',
-    engine: '2.0L 4-Cylinder',
-    description: 'هیوندای النترا یکی از محبوب‌ترین سدان‌های کلاس C بازار ایران است. این خودرو با طراحی مدرن، مصرف سوخت بهینه و امکانات رفاهی مناسب، انتخابی ایده‌آل برای خانواده‌ها و جوانان است.',
-    slug: 'hyundai-elantra',
-  },
-  'kia-k4': {
-    brand: 'Kia',
-    model: 'K4',
-    persianName: 'کیا K4',
-    image: '/images/cars/kia-k4.webp',
-    year: 2025,
-    fuelType: 'بنزینی',
-    transmission: 'اتوماتیک',
-    engine: '2.0L 4-Cylinder',
-    description: 'کیا K4 با طراحی جسورانه و امکانات پیشرفته، یکی از جدیدترین محصولات کیا در بازار ایران است.',
-    slug: 'kia-k4',
-  },
-  'toyota-rav4-hybrid': {
-    brand: 'Toyota',
-    model: 'RAV4 Hybrid',
-    persianName: 'تویوتا راو۴ هیبرید',
-    image: '/images/cars/toyota-rav4-hybrid.webp',
-    year: 2025,
-    fuelType: 'هیبریدی',
-    transmission: 'اتوماتیک',
-    engine: '2.5L Hybrid',
-    description: 'تویوتا RAV4 هیبرید یکی از محبوب‌ترین کراس‌اوورهای هیبریدی جهان است. با مصرف سوخت فوق‌العاده پایین و فضای داخلی جادار، انتخابی عالی برای خانواده‌ها.',
-    slug: 'toyota-rav4-hybrid',
-  },
-  'toyota-corolla-cross-hybrid': {
-    brand: 'Toyota',
-    model: 'Corolla Cross Hybrid',
-    persianName: 'تویوتا کرولا کراس هیبرید',
-    image: '/images/cars/toyota-corolla-cross-hybrid.webp',
-    year: 2025,
-    fuelType: 'هیبریدی',
-    transmission: 'اتوماتیک',
-    engine: '2.0L Hybrid',
-    description: 'تویوتا کرولا کراس هیبرید ترکیبی از محبوبیت کرولا و کاربردی بودن یک کراس‌اوور است.',
-    slug: 'toyota-corolla-cross-hybrid',
-  },
-  'toyota-corolla-hybrid': {
-    brand: 'Toyota',
-    model: 'Corolla Hybrid',
-    persianName: 'تویوتا کرولا هیبرید',
-    image: '/images/cars/toyota-corolla-hybrid.webp',
-    year: 2025,
-    fuelType: 'هیبریدی',
-    transmission: 'اتوماتیک',
-    engine: '1.8L Hybrid',
-    description: 'تویوتا کرولا هیبرید با بیش از 50 میلیون فروش در جهان، پرفروش‌ترین خودروی تاریخ است.',
-    slug: 'toyota-corolla-hybrid',
-  },
+interface Car {
+  id: number
+  brand: string
+  model: string
+  persian_name: string
+  slug: string
+  description: string
+  year: number
+  fuel_type: string
+  fuel_type_display: string
+  transmission: string
+  transmission_display: string
+  engine: string
+  price: string | null
+  main_image: string
+  gallery: string[]
+  is_active: boolean
+  is_featured: boolean
+  seo_title: string
+  seo_description: string
+  og_image: string
+  created_at: string
+  updated_at: string
 }
 
 type Props = {
   params: { slug: string }
 }
 
+async function getCar(slug: string): Promise<Car | null> {
+  try {
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+    const res = await fetch(`${backendUrl}/api/v1/cars/${slug}/`, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const car = carsData[params.slug]
+  const car = await getCar(params.slug)
 
   if (!car) {
     return {
@@ -82,26 +57,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
+  const title = car.seo_title || `${car.persian_name} | راهنورد خودرو`
+  const description = car.seo_description || car.description || `${car.brand} ${car.model} - راهنورد خودرو`
+
   return {
-    title: `${car.persianName} | راهنورد خودرو`,
-    description: car.description,
+    title,
+    description,
     openGraph: {
-      title: `${car.persianName} | راهنورد خودرو`,
-      description: car.description,
-      images: [
-        {
-          url: car.image,
-          width: 800,
-          height: 600,
-          alt: car.persianName,
-        },
-      ],
+      title,
+      description,
+      images: car.og_image
+        ? [{ url: car.og_image, width: 800, height: 600, alt: car.persian_name }]
+        : car.main_image
+          ? [{ url: car.main_image, width: 800, height: 600, alt: car.persian_name }]
+          : [],
     },
   }
 }
 
-export default function CarDetailPage({ params }: Props) {
-  const car = carsData[params.slug]
+export default async function CarDetailPage({ params }: Props) {
+  const car = await getCar(params.slug)
 
   if (!car) {
     return (
@@ -121,22 +96,24 @@ export default function CarDetailPage({ params }: Props) {
     )
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'
+
   return (
     <>
       <JsonLd
         data={{
           '@context': 'https://schema.org',
           '@type': 'Car',
-          name: car.persianName,
+          name: car.persian_name,
           brand: {
             '@type': 'Brand',
             name: car.brand,
           },
           model: car.model,
-          image: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'}${car.image}`,
+          image: car.main_image ? `${siteUrl}${car.main_image}` : undefined,
           vehicleConfiguration: car.engine,
-          fuelType: car.fuelType,
-          vehicleTransmission: car.transmission,
+          fuelType: car.fuel_type_display,
+          vehicleTransmission: car.transmission_display,
           modelDate: car.year.toString(),
         }}
       />
@@ -158,21 +135,32 @@ export default function CarDetailPage({ params }: Props) {
                 </Link>
               </li>
               <li>/</li>
-              <li className="text-dark font-medium">{car.persianName}</li>
+              <li className="text-dark font-medium">{car.persian_name}</li>
             </ol>
           </nav>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Car Image */}
             <div className="bg-white rounded-[14px] p-8 shadow-card flex items-center justify-center aspect-[4/3]">
-              <Image
-                src={car.image}
-                alt={car.persianName}
-                width={600}
-                height={450}
-                className="max-w-full max-h-full object-contain"
-                priority
-              />
+              {car.main_image ? (
+                <Image
+                  src={car.main_image}
+                  alt={car.persian_name}
+                  width={600}
+                  height={450}
+                  className="max-w-full max-h-full object-contain"
+                  priority
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray">
+                  <div className="text-center">
+                    <svg className="w-16 h-16 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p>تصویری آپلود نشده</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Car Info */}
@@ -183,9 +171,11 @@ export default function CarDetailPage({ params }: Props) {
               <h1 className="font-poppins text-3xl md:text-4xl font-bold mt-2 mb-6">
                 {car.model}
               </h1>
-              <p className="text-gray text-lg leading-relaxed mb-8">
-                {car.description}
-              </p>
+              {car.description && (
+                <p className="text-gray text-lg leading-relaxed mb-8">
+                  {car.description}
+                </p>
+              )}
 
               {/* Specifications */}
               <div className="grid grid-cols-2 gap-4 mb-8">
@@ -195,16 +185,18 @@ export default function CarDetailPage({ params }: Props) {
                 </div>
                 <div className="bg-bg rounded-xl p-4">
                   <span className="text-sm text-gray block mb-1">نوع سوخت</span>
-                  <span className="font-bold">{car.fuelType}</span>
+                  <span className="font-bold">{car.fuel_type_display}</span>
                 </div>
                 <div className="bg-bg rounded-xl p-4">
                   <span className="text-sm text-gray block mb-1">گیربکس</span>
-                  <span className="font-bold">{car.transmission}</span>
+                  <span className="font-bold">{car.transmission_display}</span>
                 </div>
-                <div className="bg-bg rounded-xl p-4">
-                  <span className="text-sm text-gray block mb-1">موتور</span>
-                  <span className="font-bold">{car.engine}</span>
-                </div>
+                {car.engine && (
+                  <div className="bg-bg rounded-xl p-4">
+                    <span className="text-sm text-gray block mb-1">موتور</span>
+                    <span className="font-bold">{car.engine}</span>
+                  </div>
+                )}
               </div>
 
               {/* CTA */}
@@ -212,7 +204,7 @@ export default function CarDetailPage({ params }: Props) {
                 <a href="#consult" className="btn btn-primary flex-1">
                   درخواست مشاوره
                 </a>
-                <a href="tel:+989112100800" className="btn btn-dark flex-1">
+                <a href="#consult" className="btn btn-dark flex-1">
                   تماس با ما
                 </a>
               </div>

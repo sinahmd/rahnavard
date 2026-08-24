@@ -1,85 +1,46 @@
 import { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import JsonLd from '@/components/seo/JsonLd'
 
-// This will be fetched from API based on slug
-const articlesData: Record<string, any> = {
-  'hybrid-car-buying-guide': {
-    title: 'راهنمای خرید خودروی هیبریدی',
-    excerpt: 'بررسی مزایای خودروهای هیبریدی و نکات مهم پیش از خرید.',
-    date: '۱۲ مرداد ۱۴۰۵',
-    publishedAt: '2025-08-03',
-    content: `
-      <h2>چرا خودروی هیبریدی؟</h2>
-      <p>خودروهای هیبریدی با ترکیب موتور بنزینی و الکتریکی، مصرف سوخت را به میزان قابل توجهی کاهش می‌دهند. این خودروها نه تنها به صرفه‌جویی در هزینه سوخت کمک می‌کنند، بلکه تأثیر کمتری بر محیط زیست دارند.</p>
-
-      <h2>مزایای خودروهای هیبریدی</h2>
-      <ul>
-        <li>مصرف سوخت پایین‌تر نسبت به خودروهای بنزینی</li>
-        <li>انتشار کمتر گازهای گلخانه‌ای</li>
-        <li>عملکرد بهتر در ترافیک شهری</li>
-        <li>عمر طولانی‌تر سیستم ترمز به دلیل بازیابی انرژی</li>
-      </ul>
-
-      <h2>نکات مهم پیش از خرید</h2>
-      <p>قبل از خرید خودروی هیبریدی، حتماً موارد زیر را در نظر بگیرید:</p>
-      <ol>
-        <li>نوع هیبرید (کامل، ملایم، پلاگین)</li>
-        <li>ظرفیت باتری و گارانتی آن</li>
-        <li>مصرف سوخت واقعی در شرایط مختلف</li>
-        <li>هزینه نگهداری و تعمیرات</li>
-      </ol>
-    `,
-    slug: 'hybrid-car-buying-guide',
-  },
-  'new-warranty-terms': {
-    title: 'شرایط جدید گارانتی محصولات',
-    excerpt: 'اطلاعیه به‌روزرسانی شرایط گارانتی و خدمات پس از فروش.',
-    date: '۳ مرداد ۱۴۰۵',
-    publishedAt: '2025-07-25',
-    content: `
-      <h2>شرایط جدید گارانتی</h2>
-      <p>راهنورد خودرو با هدف ارتقای رضایت مشتریان، شرایط گارانتی محصولات خود را به‌روزرسانی کرده است.</p>
-
-      <h2>تغییرات اصلی</h2>
-      <ul>
-        <li>افزایش مدت گارانتی به ۵ سال یا ۱۵۰,۰۰۰ کیلومتر</li>
-        <li>پوشش کامل سیستم هیبریدی</li>
-        <li>خدمات امداد جاده‌ای رایگان</li>
-        <li>سرویس دوره‌ای رایگان تا ۳ سال</li>
-      </ul>
-    `,
-    slug: 'new-warranty-terms',
-  },
-  'new-products-2025': {
-    title: 'معرفی محصولات جدید ۲۰۲۵',
-    excerpt: 'نگاهی به تازه‌ترین مدل‌های وارداتی راهنورد خودرو در سال جاری.',
-    date: '۲۰ تیر ۱۴۰۵',
-    publishedAt: '2025-07-11',
-    content: `
-      <h2>محصولات جدید ۲۰۲۵</h2>
-      <p>راهنورد خودرو در سال ۲۰۲۵ مجموعه‌ای از جدیدترین مدل‌های برندهای معتبر جهانی را به بازار ایران عرضه کرده است.</p>
-
-      <h2>Highlights</h2>
-      <ul>
-        <li>تویوتا RAV4 هیبرید ۲۰۲۵</li>
-        <li>هیوندای النترا ۲۰۲۵</li>
-        <li>کیا K4 ۲۰۲۵</li>
-        <li>تویوتا کرولا کراس هیبرید</li>
-      </ul>
-    `,
-    slug: 'new-products-2025',
-  },
+interface Article {
+  id: number
+  title: string
+  slug: string
+  excerpt: string
+  content: string
+  cover_image: string
+  is_published: boolean
+  published_at: string
+  seo_title: string
+  seo_description: string
+  og_image: string
+  created_at: string
+  updated_at: string
 }
 
 type Props = {
   params: { slug: string }
 }
 
+async function getArticle(slug: string): Promise<Article | null> {
+  try {
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+    const res = await fetch(`${backendUrl}/api/v1/articles/${slug}/`, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const article = articlesData[params.slug]
+  const article = await getArticle(params.slug)
 
   if (!article) {
     return {
@@ -87,20 +48,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
+  const title = article.seo_title || `${article.title} | راهنورد خودرو`
+  const description = article.seo_description || article.excerpt || article.title
+
   return {
-    title: `${article.title} | راهنورد خودرو`,
-    description: article.excerpt,
+    title,
+    description,
     openGraph: {
-      title: `${article.title} | راهنورد خودرو`,
-      description: article.excerpt,
+      title,
+      description,
       type: 'article',
-      publishedTime: article.publishedAt,
+      publishedTime: article.published_at || undefined,
+      images: article.og_image
+        ? [{ url: article.og_image, width: 800, height: 400, alt: article.title }]
+        : article.cover_image
+          ? [{ url: article.cover_image, width: 800, height: 400, alt: article.title }]
+          : [],
     },
   }
 }
 
-export default function ArticleDetailPage({ params }: Props) {
-  const article = articlesData[params.slug]
+export default async function ArticleDetailPage({ params }: Props) {
+  const article = await getArticle(params.slug)
 
   if (!article) {
     return (
@@ -120,6 +89,15 @@ export default function ArticleDetailPage({ params }: Props) {
     )
   }
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ''
+    try {
+      return new Date(dateString).toLocaleDateString('fa-IR')
+    } catch {
+      return ''
+    }
+  }
+
   return (
     <>
       <JsonLd
@@ -127,8 +105,9 @@ export default function ArticleDetailPage({ params }: Props) {
           '@context': 'https://schema.org',
           '@type': 'Article',
           headline: article.title,
-          description: article.excerpt,
-          datePublished: article.publishedAt,
+          description: article.excerpt || article.title,
+          datePublished: article.published_at,
+          image: article.cover_image || article.og_image || undefined,
           author: {
             '@type': 'Organization',
             name: 'راهنورد خودرو',
@@ -161,17 +140,35 @@ export default function ArticleDetailPage({ params }: Props) {
             </ol>
           </nav>
 
+          {/* Cover Image */}
+          {article.cover_image && (
+            <div className="mb-8 rounded-[14px] overflow-hidden">
+              <Image
+                src={article.cover_image}
+                alt={article.title}
+                width={800}
+                height={400}
+                className="w-full h-auto object-cover"
+                priority
+              />
+            </div>
+          )}
+
           {/* Article Header */}
           <header className="mb-8">
-            <span className="text-sm text-accent-dark font-bold mb-3 block">
-              {article.date}
-            </span>
+            {article.published_at && (
+              <span className="text-sm text-accent-dark font-bold mb-3 block">
+                {formatDate(article.published_at)}
+              </span>
+            )}
             <h1 className="text-3xl md:text-4xl font-bold mb-4">
               {article.title}
             </h1>
-            <p className="text-gray text-lg">
-              {article.excerpt}
-            </p>
+            {article.excerpt && (
+              <p className="text-gray text-lg">
+                {article.excerpt}
+              </p>
+            )}
           </header>
 
           {/* Article Content */}

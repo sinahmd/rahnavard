@@ -56,3 +56,52 @@ class HomepageDataView(generics.GenericAPIView):
                 "why_features": WhyFeatureSerializer(why_features, many=True).data,
             }
         )
+
+
+# ==========================================================================
+# Admin Endpoints
+# ==========================================================================
+
+
+class SiteSettingsAdminView(generics.RetrieveUpdateAPIView):
+    """Admin endpoint for site settings."""
+
+    serializer_class = SiteSettingsSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_object(self):
+        return SiteSettings.load()
+
+
+class HeroSlideAdminListView(generics.ListCreateAPIView):
+    """Admin endpoint for listing and creating hero slides."""
+
+    serializer_class = HeroSlideSerializer
+    queryset = HeroSlide.objects.all()
+    permission_classes = [permissions.IsAdminUser]
+    ordering_fields = ["display_order"]
+
+
+class HeroSlideAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin endpoint for hero slide detail, update, and delete."""
+
+    serializer_class = HeroSlideSerializer
+    queryset = HeroSlide.objects.all()
+    permission_classes = [permissions.IsAdminUser]
+
+
+class WhyFeatureAdminListView(generics.ListCreateAPIView):
+    """Admin endpoint for listing and creating why features."""
+
+    serializer_class = WhyFeatureSerializer
+    queryset = WhyFeature.objects.all()
+    permission_classes = [permissions.IsAdminUser]
+    ordering_fields = ["display_order"]
+
+
+class WhyFeatureAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin endpoint for why feature detail, update, and delete."""
+
+    serializer_class = WhyFeatureSerializer
+    queryset = WhyFeature.objects.all()
+    permission_classes = [permissions.IsAdminUser]

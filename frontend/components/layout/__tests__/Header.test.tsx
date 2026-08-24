@@ -29,12 +29,25 @@ describe('Header', () => {
   beforeEach(() => {
     // Reset scroll position
     Object.defineProperty(window, 'scrollY', { value: 0, writable: true })
+
+    // Mock fetch for settings API
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ logo: null, site_name: 'Test' }),
+      })
+    ) as jest.Mock
   })
 
-  it('should render the logo', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('should render the logo or brand name', () => {
     render(<Header />)
-    const logo = screen.getByAltText('راهنورد خودرو')
-    expect(logo).toBeInTheDocument()
+    // When API returns no logo, shows text fallback
+    const brandText = screen.getByText('راهنورد')
+    expect(brandText).toBeInTheDocument()
   })
 
   it('should render all navigation links', () => {

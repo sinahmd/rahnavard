@@ -17,6 +17,7 @@ const navLinks = [
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,6 +28,15 @@ export default function Header() {
     handleScroll()
 
     return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/v1/settings/')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.logo) setLogoUrl(data.logo)
+      })
+      .catch(() => {}) // keep fallback
   }, [])
 
   return (
@@ -43,16 +53,24 @@ export default function Header() {
           href="#top"
           className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center h-[44px] z-10"
         >
-          <Image
-            src="/images/branding/logo.png"
-            alt="راهنورد خودرو"
-            width={150}
-            height={38}
-            className={`h-[38px] w-auto max-w-none object-contain transition-all duration-300 ${
-              isScrolled ? 'brightness-0' : 'brightness-0 invert'
-            }`}
-            priority
-          />
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt="راهنورد خودرو"
+              width={150}
+              height={38}
+              className={`h-[38px] w-auto max-w-none object-contain transition-all duration-300 ${
+                isScrolled ? 'brightness-0' : 'brightness-0 invert'
+              }`}
+              priority
+            />
+          ) : (
+            <span className={`text-xl font-black transition-all duration-300 ${
+              isScrolled ? 'text-dark' : 'text-white'
+            }`}>
+              راهنورد
+            </span>
+          )}
         </Link>
 
         {/* Desktop Navigation */}

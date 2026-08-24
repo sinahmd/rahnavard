@@ -10,8 +10,10 @@ const sidebarLinks = [
   { href: '/admin/cars', label: 'خودروها', icon: '🚗' },
   { href: '/admin/articles', label: 'مقالات', icon: '📝' },
   { href: '/admin/branches', label: 'شعب', icon: '📍' },
-  { href: '/admin/inquiries', label: 'استعلامات', icon: '💬' },
-  { href: '/admin/settings', label: 'تنظیمات', icon: '⚙️' },
+  { href: '/admin/hero-slides', label: 'اسلایدها', icon: '🖼️' },
+  { href: '/admin/features', label: 'ویژگی‌ها', icon: '✨' },
+  { href: '/admin/inquiries', label: 'استعلام‌ها', icon: '💬' },
+  { href: '/admin/settings', label: 'تنظیمات سایت', icon: '⚙️' },
 ]
 
 export default function AdminLayout({

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.core.validators import ImageValidator
 from .models import Car
 
 
@@ -68,3 +69,7 @@ class CarAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Car
         fields = "__all__"
+        extra_kwargs = {
+            "main_image": {"validators": [ImageValidator()]},
+            "og_image": {"validators": [ImageValidator()]},
+        }

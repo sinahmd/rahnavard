@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.core.validators import ImageValidator
 from .models import Article
 
 
@@ -47,3 +48,7 @@ class ArticleAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = "__all__"
+        extra_kwargs = {
+            "cover_image": {"validators": [ImageValidator()]},
+            "og_image": {"validators": [ImageValidator()]},
+        }

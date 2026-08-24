@@ -22,20 +22,13 @@ export const metadata: Metadata = {
     siteName: 'راهنورد خودرو',
     title: 'راهنورد خودرو | وارد کننده خودرو',
     description: 'راهنورد خودرو، واردکننده رسمی خودروهای هیوندای، کیا و تویوتا با بیش از یک دهه تجربه در خدمت مشتریان.',
-    images: [
-      {
-        url: '/images/og/default.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'راهنورد خودرو',
-      },
-    ],
+    images: [],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'راهنورد خودرو | وارد کننده خودرو',
     description: 'راهنورد خودرو، واردکننده رسمی خودروهای هیوندای، کیا و تویوتا.',
-    images: ['/images/og/default.jpg'],
+    images: [],
   },
   robots: {
     index: true,

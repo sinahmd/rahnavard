@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.core.validators import ImageValidator
 from .models import Branch
 
 
@@ -28,3 +29,6 @@ class BranchAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
         fields = "__all__"
+        extra_kwargs = {
+            "map_image": {"validators": [ImageValidator()]},
+        }

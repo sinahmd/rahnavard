@@ -1,63 +1,495 @@
 'use client'
 
-import Link from 'next/link'
+import { useState, useEffect, FormEvent } from 'react'
+import { authFetch } from '@/lib/authFetch'
+import ImageUpload from '@/components/admin/ImageUpload'
+
+interface SiteSettingsData {
+  site_name: string
+  site_description: string
+  logo: string | null
+  phone: string
+  address: string
+  instagram: string
+  telegram: string
+  whatsapp: string
+  hero_cta_primary_text: string
+  hero_cta_primary_link: string
+  hero_cta_secondary_text: string
+  hero_cta_secondary_link: string
+  why_title: string
+  why_description: string
+  cars_section_title: string
+  cars_section_description: string
+  articles_section_title: string
+  articles_section_description: string
+  branches_section_title: string
+  form_title: string
+  form_description: string
+  footer_description: string
+  footer_copyright: string
+}
+
+const defaultSettings: SiteSettingsData = {
+  site_name: '',
+  site_description: '',
+  logo: null,
+  phone: '',
+  address: '',
+  instagram: '',
+  telegram: '',
+  whatsapp: '',
+  hero_cta_primary_text: '',
+  hero_cta_primary_link: '',
+  hero_cta_secondary_text: '',
+  hero_cta_secondary_link: '',
+  why_title: '',
+  why_description: '',
+  cars_section_title: '',
+  cars_section_description: '',
+  articles_section_title: '',
+  articles_section_description: '',
+  branches_section_title: '',
+  form_title: '',
+  form_description: '',
+  footer_description: '',
+  footer_copyright: '',
+}
 
 export default function AdminSettingsPage() {
+  const [settings, setSettings] = useState<SiteSettingsData>(defaultSettings)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetchSettings()
+  }, [])
+
+  const fetchSettings = async () => {
+    try {
+      const response = await authFetch('/api/v1/admin/settings/')
+      if (response.ok) {
+        const data = await response.json()
+        setSettings(data)
+      }
+    } catch {
+      setError('خطا در بارگذاری تنظیمات')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleChange = (name: string, value: string) => {
+    setSettings((prev) => ({ ...prev, [name]: value }))
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev }
+        delete next[name]
+        return next
+      })
+    }
+  }
+
+  const validate = (): boolean => {
+    const errors: Record<string, string> = {}
+    if (!settings.site_name.trim()) {
+      errors.site_name = 'نام سایت الزامی است.'
+    }
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+
+    if (!validate()) {
+      setError('لطفاً خطاهای فرم را برطرف کنید.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(false)
+
+    const submitData = new FormData()
+
+    // Append all text fields
+    Object.entries(settings).forEach(([key, value]) => {
+      if (key !== 'logo' && value !== null && value !== undefined) {
+        submitData.append(key, String(value))
+      }
+    })
+
+    // Append logo file if changed
+    if (logoFile) {
+      submitData.append('logo', logoFile)
+    }
+
+    try {
+      const response = await authFetch('/api/v1/admin/settings/', {
+        method: 'PATCH',
+        body: submitData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSettings(data)
+        setLogoFile(null)
+        setSuccess(true)
+        setTimeout(() => setSuccess(false), 3000)
+      } else {
+        const errorData = await response.json().catch(() => null)
+        if (errorData) {
+          const errors: Record<string, string> = {}
+          Object.entries(errorData).forEach(([key, val]) => {
+            if (Array.isArray(val) && val.length > 0) {
+              errors[key] = String(val[0])
+            }
+          })
+          if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors)
+            setError('لطفاً خطاهای فرم را برطرف کنید.')
+          } else {
+            setError(errorData.detail || 'خطا در ذخیره‌سازی')
+          }
+        }
+      }
+    } catch {
+      setError('خطا در اتصال به سرور')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="text-center py-8">در حال بارگذاری...</div>
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">تنظیمات سایت</h1>
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-600 mb-4">
-          تنظیمات اصلی سایت شامل اطلاعات تماس، لوگو، متن‌های بخش‌ها و تنظیمات SEO از طریق پنل مدیریت پیشرفته قابل ویرایش است.
-        </p>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
-        <div className="space-y-4">
-          <div className="border rounded-lg p-4">
-            <h3 className="font-bold mb-2">تنظیمات عمومی</h3>
-            <p className="text-sm text-gray-500 mb-3">نام سایت، لوگو، تلفن، آدرس، شبکه‌های اجتماعی</p>
-            <Link
-              href="/django-admin/core/sitesettings/"
-              className="bg-accent text-dark px-4 py-2 rounded font-bold hover:bg-accent-dark transition-colors inline-block"
-            >
-              ویرایش تنظیمات
-            </Link>
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
+          تنظیمات با موفقیت ذخیره شد.
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        {/* General Settings */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">تنظیمات عمومی</h2>
           </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold mb-2">
+                  نام سایت <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={settings.site_name}
+                  onChange={(e) => handleChange('site_name', e.target.value)}
+                  className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent ${fieldErrors.site_name ? 'border-red-500' : ''}`}
+                />
+                {fieldErrors.site_name && (
+                  <p className="text-red-500 text-sm mt-1">{fieldErrors.site_name}</p>
+                )}
+              </div>
 
-          <div className="border rounded-lg p-4">
-            <h3 className="font-bold mb-2">اسلایدهای هیرو</h3>
-            <p className="text-sm text-gray-500 mb-3">مدیریت تصاویر اسلایدر صفحه اصلی</p>
-            <Link
-              href="/django-admin/core/heroslide/"
-              className="bg-accent text-dark px-4 py-2 rounded font-bold hover:bg-accent-dark transition-colors inline-block"
-            >
-              مدیریت اسلایدها
-            </Link>
-          </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">تلفن</label>
+                <input
+                  type="text"
+                  value={settings.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  placeholder="۰۹۱۱ ۲۱۰ ۰۸ ۰۰"
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
 
-          <div className="border rounded-lg p-4">
-            <h3 className="font-bold mb-2">ویژگی‌های چرا ما</h3>
-            <p className="text-sm text-gray-500 mb-3">مدیریت ویژگی‌های بخش &quot;چرا راهنورد خودرو&quot;</p>
-            <Link
-              href="/django-admin/core/whyfeature/"
-              className="bg-accent text-dark px-4 py-2 rounded font-bold hover:bg-accent-dark transition-colors inline-block"
-            >
-              مدیریت ویژگی‌ها
-            </Link>
-          </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold mb-2">توضیحات سایت</label>
+                <textarea
+                  value={settings.site_description}
+                  onChange={(e) => handleChange('site_description', e.target.value)}
+                  rows={3}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
 
-          <div className="border rounded-lg p-4">
-            <h3 className="font-bold mb-2">ریدایرکت‌ها</h3>
-            <p className="text-sm text-gray-500 mb-3">مدیریت تغییر مسیر URL‌ها</p>
-            <Link
-              href="/django-admin/core/redirect/"
-              className="bg-accent text-dark px-4 py-2 rounded font-bold hover:bg-accent-dark transition-colors inline-block"
-            >
-              مدیریت ریدایرکت‌ها
-            </Link>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold mb-2">آدرس</label>
+                <textarea
+                  value={settings.address}
+                  onChange={(e) => handleChange('address', e.target.value)}
+                  rows={2}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Logo */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">لوگو</h2>
+          </div>
+          <div className="p-6">
+            <ImageUpload
+              name="logo"
+              label="لوگوی سایت"
+              value={logoFile}
+              onChange={setLogoFile}
+              existingUrl={settings.logo}
+              helpText="فرمت‌های مجاز: jpg، png، webp — حداکثر 5MB"
+            />
+          </div>
+        </div>
+
+        {/* Social Links */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">شبکه‌های اجتماعی</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-bold mb-2">اینستاگرام</label>
+                <input
+                  type="url"
+                  value={settings.instagram}
+                  onChange={(e) => handleChange('instagram', e.target.value)}
+                  placeholder="https://instagram.com/..."
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">تلگرام</label>
+                <input
+                  type="url"
+                  value={settings.telegram}
+                  onChange={(e) => handleChange('telegram', e.target.value)}
+                  placeholder="https://t.me/..."
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">واتساپ</label>
+                <input
+                  type="text"
+                  value={settings.whatsapp}
+                  onChange={(e) => handleChange('whatsapp', e.target.value)}
+                  placeholder="۰۹۱۱۲۱۰۰۸۰۰"
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Hero Section */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">بخش هیرو</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold mb-2">متن دکمه اصلی</label>
+                <input
+                  type="text"
+                  value={settings.hero_cta_primary_text}
+                  onChange={(e) => handleChange('hero_cta_primary_text', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">لینک دکمه اصلی</label>
+                <input
+                  type="text"
+                  value={settings.hero_cta_primary_link}
+                  onChange={(e) => handleChange('hero_cta_primary_link', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">متن دکمه فرعی</label>
+                <input
+                  type="text"
+                  value={settings.hero_cta_secondary_text}
+                  onChange={(e) => handleChange('hero_cta_secondary_text', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">لینک دکمه فرعی</label>
+                <input
+                  type="text"
+                  value={settings.hero_cta_secondary_link}
+                  onChange={(e) => handleChange('hero_cta_secondary_link', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section Titles */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">عناوین بخش‌ها</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold mb-2">عنوان بخش «چرا ما»</label>
+                <input
+                  type="text"
+                  value={settings.why_title}
+                  onChange={(e) => handleChange('why_title', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold mb-2">توضیحات بخش «چرا ما»</label>
+                <textarea
+                  value={settings.why_description}
+                  onChange={(e) => handleChange('why_description', e.target.value)}
+                  rows={3}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">عنوان بخش خودروها</label>
+                <input
+                  type="text"
+                  value={settings.cars_section_title}
+                  onChange={(e) => handleChange('cars_section_title', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold mb-2">توضیحات بخش خودروها</label>
+                <textarea
+                  value={settings.cars_section_description}
+                  onChange={(e) => handleChange('cars_section_description', e.target.value)}
+                  rows={2}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">عنوان بخش مقالات</label>
+                <input
+                  type="text"
+                  value={settings.articles_section_title}
+                  onChange={(e) => handleChange('articles_section_title', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold mb-2">توضیحات بخش مقالات</label>
+                <textarea
+                  value={settings.articles_section_description}
+                  onChange={(e) => handleChange('articles_section_description', e.target.value)}
+                  rows={2}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">عنوان بخش شعب</label>
+                <input
+                  type="text"
+                  value={settings.branches_section_title}
+                  onChange={(e) => handleChange('branches_section_title', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Consultation Form */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">فرم مشاوره</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold mb-2">عنوان فرم</label>
+                <input
+                  type="text"
+                  value={settings.form_title}
+                  onChange={(e) => handleChange('form_title', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold mb-2">توضیحات فرم</label>
+                <textarea
+                  value={settings.form_description}
+                  onChange={(e) => handleChange('form_description', e.target.value)}
+                  rows={2}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">فوتر</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold mb-2">توضیحات فوتر</label>
+                <textarea
+                  value={settings.footer_description}
+                  onChange={(e) => handleChange('footer_description', e.target.value)}
+                  rows={3}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">متن کپی‌رایت</label>
+                <input
+                  type="text"
+                  value={settings.footer_copyright}
+                  onChange={(e) => handleChange('footer_copyright', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-4 justify-end">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'در حال ذخیره...' : 'ذخیره تنظیمات'}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

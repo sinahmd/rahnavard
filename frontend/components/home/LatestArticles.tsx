@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface Article {
   id: number
   title: string
   slug: string
   excerpt: string
+  cover_image: string
   published_at: string
 }
 
@@ -22,8 +24,8 @@ export default function LatestArticles() {
     const fetchData = async () => {
       try {
         const [settingsRes, articlesRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/articles/`)
+          fetch('/api/v1/settings/'),
+          fetch('/api/v1/articles/')
         ])
 
         if (settingsRes.ok) {
@@ -97,8 +99,24 @@ export default function LatestArticles() {
                 href={`/articles/${article.slug}`}
                 className="article-card reveal-scale bg-white rounded-[14px] overflow-hidden shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1"
               >
-                <div className="h-40 bg-gradient-to-br from-[#ffeca1] to-white flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-gradient-to-[120deg] from-accent/12 to-transparent" />
+                <div className="h-40 bg-gradient-to-br from-[#ffeca1] to-white flex items-center justify-center relative overflow-hidden">
+                  {article.cover_image ? (
+                    <Image
+                      src={article.cover_image}
+                      alt={article.title}
+                      width={400}
+                      height={160}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 bg-gradient-to-[120deg] from-accent/12 to-transparent" />
+                      <svg className="w-10 h-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </>
+                  )}
                 </div>
                 <div className="p-[22px] pb-6">
                   {article.published_at && (

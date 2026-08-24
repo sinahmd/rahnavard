@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.core.validators import ImageValidator
 from .models import HeroSlide, Redirect, SiteSettings, WhyFeature
 
 
@@ -30,19 +31,30 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             "form_description",
             "footer_description",
             "footer_copyright",
+            "default_og_image",
         ]
+        extra_kwargs = {
+            "logo": {"validators": [ImageValidator()]},
+            "default_og_image": {"validators": [ImageValidator()]},
+        }
 
 
 class HeroSlideSerializer(serializers.ModelSerializer):
     class Meta:
         model = HeroSlide
         fields = ["id", "title", "image", "alt_text", "is_active", "display_order"]
+        extra_kwargs = {
+            "image": {"validators": [ImageValidator()]},
+        }
 
 
 class WhyFeatureSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhyFeature
         fields = ["id", "title", "description", "icon", "is_active", "display_order"]
+        extra_kwargs = {
+            "icon": {"validators": [ImageValidator()]},
+        }
 
 
 class RedirectSerializer(serializers.ModelSerializer):

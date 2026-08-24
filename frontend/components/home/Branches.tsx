@@ -22,8 +22,8 @@ export default function Branches() {
     const fetchData = async () => {
       try {
         const [settingsRes, branchesRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/branches/`)
+          fetch('/api/v1/settings/'),
+          fetch('/api/v1/branches/')
         ])
 
         if (settingsRes.ok) {

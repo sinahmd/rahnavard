@@ -6,6 +6,7 @@ import Image from 'next/image'
 
 interface SiteSettings {
   site_name: string
+  logo: string | null
   footer_description: string
   footer_copyright: string
   phone: string
@@ -22,6 +23,7 @@ const quickLinks = [
 export default function Footer() {
   const [settings, setSettings] = useState<SiteSettings>({
     site_name: 'راهنورد خودرو',
+    logo: null,
     footer_description: 'راهنورد خودرو ، واردکننده رسمی خودروهای هیوندای، کیا و تویوتا با بیش از یک دهه تجربه در خدمت مشتریان.',
     footer_copyright: 'راهنورد خودرو. تمامی حقوق محفوظ است.',
     phone: '۰۹۱۱ ۲۱۰ ۰۸ ۰۰',
@@ -31,7 +33,7 @@ export default function Footer() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/`)
+        const response = await fetch('/api/v1/settings/')
         if (response.ok) {
           const data = await response.json()
           setSettings(data)
@@ -50,13 +52,17 @@ export default function Footer() {
           {/* Logo & Description */}
           <div>
             <Link href="#top" className="inline-block mb-4">
-              <Image
-                src="/images/branding/logo.png"
-                alt={settings.site_name}
-                width={150}
-                height={34}
-                className="h-[34px] w-auto brightness-0 invert"
-              />
+              {settings.logo ? (
+                <Image
+                  src={settings.logo}
+                  alt={settings.site_name}
+                  width={150}
+                  height={34}
+                  className="h-[34px] w-auto brightness-0 invert"
+                />
+              ) : (
+                <span className="text-xl font-black text-white">راهنورد</span>
+              )}
             </Link>
             <p className="text-white/60 text-[14px] max-w-[320px]">
               {settings.footer_description}

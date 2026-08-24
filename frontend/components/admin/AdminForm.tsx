@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
+import { useState, useEffect, FormEvent, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authFetch } from '@/lib/authFetch'
+import ImageUpload from './ImageUpload'
 
 export interface FormField {
   name: string
@@ -15,6 +16,7 @@ export interface FormField {
   section?: string
   accept?: string
   helpText?: string
+  validate?: (value: string | boolean | File | null) => string | null
 }
 
 interface AdminFormProps {
@@ -24,6 +26,60 @@ interface AdminFormProps {
   id?: string
   fields: FormField[]
   backUrl: string
+}
+
+// Default validators for common field types
+function getDefaultValidator(field: FormField): ((value: string | boolean | File | null) => string | null) | null {
+  if (!field.required) return null
+
+  switch (field.type) {
+    case 'text':
+    case 'textarea':
+      return (value) => {
+        if (!value || (typeof value === 'string' && !value.trim())) {
+          return `${field.label} الزامی است.`
+        }
+        return null
+      }
+    case 'number':
+      return (value) => {
+        if (value === null || value === undefined || value === '') {
+          return `${field.label} الزامی است.`
+        }
+        if (typeof value === 'string' && isNaN(Number(value))) {
+          return `${field.label} باید عدد باشد.`
+        }
+        return null
+      }
+    case 'select':
+      return (value) => {
+        if (!value || (typeof value === 'string' && !value.trim())) {
+          return `${field.label} را انتخاب کنید.`
+        }
+        return null
+      }
+    case 'file':
+      return (value) => {
+        // File validation is handled by ImageUpload component
+        return null
+      }
+    case 'url':
+      return (value) => {
+        if (!value || (typeof value === 'string' && !value.trim())) {
+          return `${field.label} الزامی است.`
+        }
+        if (typeof value === 'string' && value.trim()) {
+          try {
+            new URL(value.trim())
+          } catch {
+            return `${field.label} معتبر نیست.`
+          }
+        }
+        return null
+      }
+    default:
+      return null
+  }
 }
 
 export default function AdminForm({
@@ -42,13 +98,14 @@ export default function AdminForm({
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (isEdit) {
       fetchItem()
     }
-  }, [id])
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchItem = async () => {
     try {
@@ -67,7 +124,6 @@ export default function AdminForm({
             }
             initial[field.name] = null
           } else if (field.type === 'datetime-local' && data[field.name]) {
-            // Convert ISO string to datetime-local format
             const dt = new Date(data[field.name])
             initial[field.name] = dt.toISOString().slice(0, 16)
           } else {
@@ -87,9 +143,61 @@ export default function AdminForm({
     }
   }
 
+  // Validate a single field
+  const validateField = useCallback(
+    (name: string, value: string | boolean | File | null): string | null => {
+      const field = fields.find((f) => f.name === name)
+      if (!field) return null
+
+      // Custom validator takes priority
+      if (field.validate) {
+        const customError = field.validate(value)
+        if (customError) return customError
+      }
+
+      // Default required/type validation
+      const defaultValidator = getDefaultValidator(field)
+      if (defaultValidator) {
+        return defaultValidator(value)
+      }
+
+      return null
+    },
+    [fields]
+  )
+
+  // Validate all fields
+  const validateAll = useCallback((): boolean => {
+    const errors: Record<string, string> = {}
+    let isValid = true
+
+    fields.forEach((field) => {
+      // For file fields on edit: skip validation if no new file and existing image exists
+      if (field.type === 'file' && !formData[field.name] && existingImages[field.name]) {
+        return
+      }
+
+      // For file fields on create: skip if not required
+      if (field.type === 'file' && !field.required && !formData[field.name]) {
+        return
+      }
+
+      const error = validateField(field.name, formData[field.name])
+      if (error) {
+        errors[field.name] = error
+        isValid = false
+      }
+    })
+
+    setFieldErrors(errors)
+    return isValid
+  }, [fields, formData, existingImages, validateField])
+
   const handleChange = (name: string, value: string | boolean | File | null) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
-    // Clear field error when user starts typing
+    setTouched((prev) => ({ ...prev, [name]: true }))
+
+    // Clear field error on change
     if (fieldErrors[name]) {
       setFieldErrors((prev) => {
         const next = { ...prev }
@@ -99,11 +207,32 @@ export default function AdminForm({
     }
   }
 
+  const handleBlur = (name: string) => {
+    setTouched((prev) => ({ ...prev, [name]: true }))
+
+    // Validate on blur
+    const error = validateField(name, formData[name])
+    if (error) {
+      setFieldErrors((prev) => ({ ...prev, [name]: error }))
+    }
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+
+    // Mark all fields as touched
+    const allTouched: Record<string, boolean> = {}
+    fields.forEach((f) => (allTouched[f.name] = true))
+    setTouched(allTouched)
+
+    // Validate all
+    if (!validateAll()) {
+      setError('لطفاً خطاهای فرم را برطرف کنید.')
+      return
+    }
+
     setSaving(true)
     setError(null)
-    setFieldErrors({})
 
     const submitData = new FormData()
 
@@ -114,7 +243,7 @@ export default function AdminForm({
         if (value instanceof File) {
           submitData.append(field.name, value)
         }
-        // Don't append null/undefined file fields on edit (keeps existing)
+        // Don't append null file fields on edit (keeps existing)
       } else if (field.type === 'checkbox') {
         submitData.append(field.name, value ? 'true' : 'false')
       } else if (value !== null && value !== undefined) {
@@ -137,12 +266,16 @@ export default function AdminForm({
       } else {
         const errorData = await response.json().catch(() => null)
         if (errorData && typeof errorData === 'object') {
-          const errors: Record<string, string[]> = {}
+          // Handle field-level errors from backend
+          const errors: Record<string, string> = {}
           Object.entries(errorData).forEach(([key, val]) => {
-            if (Array.isArray(val)) {
-              errors[key] = val as string[]
+            if (Array.isArray(val) && val.length > 0) {
+              errors[key] = String(val[0])
+            } else if (typeof val === 'string') {
+              errors[key] = val
             }
           })
+
           if (Object.keys(errors).length > 0) {
             setFieldErrors(errors)
             setError('لطفاً خطاهای فرم را برطرف کنید.')
@@ -206,7 +339,8 @@ export default function AdminForm({
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {sectionFields.map((field) => {
-                  const fieldError = fieldErrors[field.name]
+                  const fieldError = touched[field.name] ? fieldErrors[field.name] : undefined
+                  const hasError = !!fieldError
 
                   if (field.type === 'checkbox') {
                     return (
@@ -226,60 +360,25 @@ export default function AdminForm({
                   }
 
                   if (field.type === 'file') {
-                    const previewUrl = existingImages[field.name]
-                      ? existingImages[field.name]
-                      : formData[field.name] instanceof File
-                        ? URL.createObjectURL(formData[field.name] as File)
-                        : null
-
                     return (
                       <div
                         key={field.name}
-                        className={field.name === 'content' || field.name === 'description' || field.name === 'excerpt' || field.name === 'seo_description' || field.name === 'address' ? 'md:col-span-2' : ''}
+                        className={
+                          field.name === 'content' || field.name === 'description' || field.name === 'excerpt' || field.name === 'seo_description' || field.name === 'address'
+                            ? 'md:col-span-2'
+                            : ''
+                        }
                       >
-                        <label className="block text-sm font-bold mb-2">
-                          {field.label}
-                          {field.required && <span className="text-red-500 mr-1">*</span>}
-                        </label>
-                        {previewUrl && (
-                          <div className="mb-3">
-                            <img
-                              src={previewUrl}
-                              alt={field.label}
-                              className="w-40 h-28 object-cover rounded border"
-                            />
-                            {formData[field.name] instanceof File && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleChange(field.name, null)
-                                  if (existingImages[field.name]) {
-                                    // Keep existing image reference
-                                  }
-                                }}
-                                className="text-red-500 text-sm mt-1 hover:underline"
-                              >
-                                حذف تصویر جدید
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          id={field.name}
-                          accept={field.accept || 'image/*'}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null
-                            handleChange(field.name, file)
-                          }}
-                          className="w-full border rounded-lg px-3 py-2 file:ml-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-accent file:text-dark file:font-bold file:cursor-pointer"
+                        <ImageUpload
+                          name={field.name}
+                          label={field.label}
+                          value={formData[field.name] instanceof File ? formData[field.name] as File : null}
+                          onChange={(file) => handleChange(field.name, file)}
+                          existingUrl={existingImages[field.name]}
+                          required={field.required}
+                          helpText={field.helpText}
+                          error={fieldError}
                         />
-                        {field.helpText && (
-                          <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>
-                        )}
-                        {fieldError && (
-                          <p className="text-red-500 text-sm mt-1">{fieldError[0]}</p>
-                        )}
                       </div>
                     )
                   }
@@ -299,13 +398,14 @@ export default function AdminForm({
                         <textarea
                           value={String(formData[field.name] ?? '')}
                           onChange={(e) => handleChange(field.name, e.target.value)}
+                          onBlur={() => handleBlur(field.name)}
                           placeholder={field.placeholder}
                           required={field.required}
                           rows={field.name === 'content' ? 12 : 4}
-                          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                          className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent ${hasError ? 'border-red-500' : ''}`}
                         />
                         {fieldError && (
-                          <p className="text-red-500 text-sm mt-1">{fieldError[0]}</p>
+                          <p className="text-red-500 text-sm mt-1">{fieldError}</p>
                         )}
                       </div>
                     )
@@ -321,8 +421,9 @@ export default function AdminForm({
                         <select
                           value={String(formData[field.name] ?? '')}
                           onChange={(e) => handleChange(field.name, e.target.value)}
+                          onBlur={() => handleBlur(field.name)}
                           required={field.required}
-                          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                          className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent ${hasError ? 'border-red-500' : ''}`}
                         >
                           <option value="">انتخاب کنید</option>
                           {field.options?.map((opt) => (
@@ -332,7 +433,7 @@ export default function AdminForm({
                           ))}
                         </select>
                         {fieldError && (
-                          <p className="text-red-500 text-sm mt-1">{fieldError[0]}</p>
+                          <p className="text-red-500 text-sm mt-1">{fieldError}</p>
                         )}
                       </div>
                     )
@@ -348,12 +449,13 @@ export default function AdminForm({
                         type={field.type}
                         value={String(formData[field.name] ?? '')}
                         onChange={(e) => handleChange(field.name, e.target.value)}
+                        onBlur={() => handleBlur(field.name)}
                         placeholder={field.placeholder}
                         required={field.required}
-                        className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
+                        className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent ${hasError ? 'border-red-500' : ''}`}
                       />
                       {fieldError && (
-                        <p className="text-red-500 text-sm mt-1">{fieldError[0]}</p>
+                        <p className="text-red-500 text-sm mt-1">{fieldError}</p>
                       )}
                     </div>
                   )
@@ -374,7 +476,7 @@ export default function AdminForm({
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark transition-colors disabled:opacity-50"
+            className="px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
           >
             {saving ? 'در حال ذخیره...' : isEdit ? 'بروزرسانی' : 'ایجاد'}
           </button>

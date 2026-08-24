@@ -9,6 +9,8 @@ import Footer from '@/components/layout/Footer'
 import JsonLd from '@/components/seo/JsonLd'
 
 export default function HomePage() {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'
+
   return (
     <>
       <JsonLd
@@ -16,8 +18,7 @@ export default function HomePage() {
           '@context': 'https://schema.org',
           '@type': 'Organization',
           name: 'راهنورد خودرو',
-          url: process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co',
-          logo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'}/images/branding/logo.png`,
+          url: siteUrl,
           description: 'راهنورد خودرو، واردکننده رسمی خودروهای هیوندای، کیا و تویوتا با بیش از یک دهه تجربه در خدمت مشتریان.',
           contactPoint: {
             '@type': 'ContactPoint',
