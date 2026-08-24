@@ -11,7 +11,10 @@ export const metadata: Metadata = {
 
 async function getCars() {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cars/`, { next: { revalidate: 60 } })
+    const res = await fetch('/api/v1/cars/', {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(5000),
+    })
     if (!res.ok) return []
     const data = await res.json()
     return data.results || data || []

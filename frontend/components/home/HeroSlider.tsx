@@ -21,7 +21,7 @@ export default function HeroSlider() {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/hero-slides/`)
+        const response = await fetch('/api/v1/hero-slides/')
         if (response.ok) {
           const data = await response.json()
           setSlides(data.results || data || [])

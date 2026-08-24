@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { authFetch } from '@/lib/authFetch'
 
 interface Branch {
   id: number
@@ -22,7 +23,7 @@ export default function AdminBranchesPage() {
 
   const fetchBranches = async () => {
     try {
-      const response = await fetch('/api/v1/admin/branches/')
+      const response = await authFetch('/api/v1/admin/branches/')
       if (response.ok) {
         const data = await response.json()
         setBranches(data.results || data || [])
@@ -36,7 +37,7 @@ export default function AdminBranchesPage() {
 
   const toggleActive = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await fetch(`/api/v1/admin/branches/${id}/`, {
+      const response = await authFetch(`/api/v1/admin/branches/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus }),
@@ -50,7 +51,7 @@ export default function AdminBranchesPage() {
   const deleteBranch = async (id: number) => {
     if (!confirm('آیا از حذف این شعبه اطمینان دارید؟')) return
     try {
-      const response = await fetch(`/api/v1/admin/branches/${id}/`, { method: 'DELETE' })
+      const response = await authFetch(`/api/v1/admin/branches/${id}/`, { method: 'DELETE' })
       if (response.ok) fetchBranches()
     } catch (error) {
       console.error('Error deleting branch:', error)

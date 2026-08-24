@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { authFetch } from '@/lib/authFetch'
 
 interface Inquiry {
   id: number
@@ -23,7 +24,7 @@ export default function AdminInquiriesPage() {
 
   const fetchInquiries = async () => {
     try {
-      const response = await fetch('/api/v1/admin/inquiries/')
+      const response = await authFetch('/api/v1/admin/inquiries/')
       if (response.ok) {
         const data = await response.json()
         setInquiries(data.results || data || [])
@@ -37,7 +38,7 @@ export default function AdminInquiriesPage() {
 
   const updateStatus = async (id: number, field: string, value: boolean) => {
     try {
-      const response = await fetch(`/api/v1/admin/inquiries/${id}/`, {
+      const response = await authFetch(`/api/v1/admin/inquiries/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: value }),

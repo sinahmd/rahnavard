@@ -23,6 +23,12 @@ python manage.py migrate --noinput
 echo "📁 Collecting static files..."
 python manage.py collectstatic --noinput
 
+# If a command is passed (e.g. "python manage.py migrate"), run it and exit
+# Don't start Gunicorn — it's only needed for the long-running container
+if [ "$#" -gt 0 ]; then
+    exec "$@"
+fi
+
 echo "🚀 Starting Gunicorn..."
 exec gunicorn config.wsgi:application \
     --bind 0.0.0.0:8000 \

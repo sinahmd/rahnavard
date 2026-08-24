@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { authFetch } from '@/lib/authFetch'
 
 export interface FormField {
   name: string
@@ -51,7 +52,7 @@ export default function AdminForm({
 
   const fetchItem = async () => {
     try {
-      const response = await fetch(`${apiBase}${id}/`)
+      const response = await authFetch(`${apiBase}${id}/`)
       if (response.ok) {
         const data = await response.json()
         const initial: Record<string, string | boolean | File | null> = {}
@@ -125,7 +126,7 @@ export default function AdminForm({
       const url = isEdit ? `${apiBase}${id}/` : apiBase
       const method = isEdit ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
         body: submitData,
       })

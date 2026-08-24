@@ -24,8 +24,8 @@ export default function FeaturedCars() {
     const fetchData = async () => {
       try {
         const [settingsRes, carsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/`, { next: { revalidate: 60 } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/cars/?is_featured=true`, { next: { revalidate: 60 } })
+          fetch('/api/v1/settings/'),
+          fetch('/api/v1/cars/?is_featured=true')
         ])
 
         if (settingsRes.ok) {

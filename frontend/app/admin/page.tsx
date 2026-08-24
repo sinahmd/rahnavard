@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { authFetch } from '@/lib/authFetch'
 
 interface Stats {
   cars: number
@@ -26,10 +27,10 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         const [carsRes, articlesRes, inquiriesRes, branchesRes] = await Promise.all([
-          fetch('/api/v1/cars/'),
-          fetch('/api/v1/articles/'),
-          fetch('/api/v1/admin/inquiries/'),
-          fetch('/api/v1/branches/'),
+          authFetch('/api/v1/cars/'),
+          authFetch('/api/v1/articles/'),
+          authFetch('/api/v1/admin/inquiries/'),
+          authFetch('/api/v1/branches/'),
         ])
 
         const cars = carsRes.ok ? await carsRes.json() : { results: [] }

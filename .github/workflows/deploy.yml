@@ -1,8 +1,6 @@
 name: Deploy to Production
 
-# Trigger options:
-# 1. Automatic: Push to main (after CI passes)
-# 2. Manual: workflow_dispatch (button in GitHub Actions UI)
+# Trigger: push to main (auto) OR manual workflow_dispatch
 on:
   push:
     branches:
@@ -10,14 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       rebuild_images:
-        description: 'Force rebuild Docker images'
+        description: 'Force rebuild Docker images (no cache)'
         required: false
-        default: 'true'
-        type: boolean
-      run_migrations:
-        description: 'Run database migrations'
-        required: false
-        default: 'true'
+        default: 'false'
         type: boolean
 
 env:
@@ -27,7 +20,6 @@ jobs:
   deploy:
     name: Deploy to Arvan Cloud
     runs-on: ubuntu-latest
-    # Only deploy on push to main OR manual trigger
     if: >
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.event_name == 'workflow_dispatch'
@@ -44,103 +36,47 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          command_timeout: 20m
+          command_timeout: 30m
           script: |
             set -e
             cd /var/www/rahnavard
 
-            echo "=========================================="
-            echo "🚀 Starting deployment..."
-            echo "=========================================="
+            echo "🚀 Deployment started — $(date)"
 
             # Step 1: Pull latest code
-            echo ""
-            echo "📥 Step 1: Pulling latest changes..."
+            echo "📥 Pulling code..."
             git fetch origin main
             git reset --hard origin/main
-            echo "✅ Code updated to $(git rev-parse --short HEAD)"
+            echo "✅ Code at $(git rev-parse --short HEAD)"
 
             # Step 2: Build Docker images
-            REBUILD="${{ github.event.inputs.rebuild_images || 'true' }}"
+            REBUILD="${{ github.event.inputs.rebuild_images || 'false' }}"
             if [ "$REBUILD" = "true" ]; then
-              echo ""
-              echo "📦 Step 2: Building Docker images (no cache)..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build --no-cache
+              echo "📦 Building images (no cache)..."
+              docker compose -f ${{ env.COMPOSE_FILE }} build --pull --no-cache
             else
-              echo ""
-              echo "📦 Step 2: Building Docker images (with cache)..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build
-            fi
-            echo "✅ Docker images built"
-
-            # Step 3: Run migrations
-            RUN_MIGRATIONS="${{ github.event.inputs.run_migrations || 'true' }}"
-            if [ "$RUN_MIGRATIONS" = "true" ]; then
-              echo ""
-              echo "🗄️  Step 3: Running database migrations..."
-              docker compose -f ${{ env.COMPOSE_FILE }} run --rm --no-deps backend python manage.py migrate --noinput
-              echo "✅ Migrations completed"
-            else
-              echo ""
-              echo "⏭️  Step 3: Skipping migrations"
+              echo "📦 Building images (with cache)..."
+              docker compose -f ${{ env.COMPOSE_FILE }} build --pull
             fi
 
-            # Step 4: Restart services
-            echo ""
-            echo "🔄 Step 4: Restarting services..."
+            # Step 3: Restart services
+            # entrypoint.sh handles: wait for DB → migrate → collectstatic → start Gunicorn
+            echo "🔄 Restarting services..."
             docker compose -f ${{ env.COMPOSE_FILE }} down
             docker compose -f ${{ env.COMPOSE_FILE }} up -d
-            echo "✅ Services restarted"
 
-            # Step 5: Wait for services
-            echo ""
-            echo "⏳ Step 5: Waiting for services to stabilize..."
-            sleep 30
-
-            # Step 6: Health checks
-            echo ""
-            echo "🏥 Step 6: Running health checks..."
-
-            # Check backend
-            for i in {1..12}; do
-              if docker compose -f ${{ env.COMPOSE_FILE }} exec -T backend python -c "
-            import urllib.request
-            try:
-                urllib.request.urlopen('http://localhost:8000/api/v1/settings/')
-                print('ok')
-            except:
-                exit(1)
-            " 2>/dev/null; then
-                echo "  ✅ Backend is healthy"
+            # Step 4: Health check (max 30s)
+            echo "🏥 Health check..."
+            for i in {1..6}; do
+              if curl -sf http://localhost/api/v1/settings/ > /dev/null 2>&1; then
+                echo "✅ Backend healthy"
                 break
               fi
-              if [ $i -eq 12 ]; then
-                echo "  ❌ Backend health check failed"
-                docker compose -f ${{ env.COMPOSE_FILE }} logs backend | tail -20
-              fi
+              [ $i -eq 6 ] && echo "❌ Backend health check failed" && docker compose -f ${{ env.COMPOSE_FILE }} logs backend | tail -20
               sleep 5
             done
 
-            # Check frontend
-            if docker compose -f ${{ env.COMPOSE_FILE }} exec -T frontend wget --no-verbose --tries=1 --spider http://localhost:3000 2>/dev/null; then
-              echo "  ✅ Frontend is healthy"
-            else
-              echo "  ⚠️  Frontend health check inconclusive"
-            fi
-
-            # Step 7: Cleanup
-            echo ""
-            echo "🧹 Step 7: Cleaning up..."
-            docker image prune -f
-
-            # Step 8: Status
-            echo ""
-            echo "📊 Container status:"
+            # Step 5: Status
+            echo "📊 Status:"
             docker compose -f ${{ env.COMPOSE_FILE }} ps
-
-            echo ""
-            echo "=========================================="
-            echo "✅ Deployment completed!"
-            echo "🌐 Website: https://rahnavard.co"
-            echo "🔧 Admin: https://rahnavard.co/admin"
-            echo "=========================================="
+            echo "✅ Done — https://rahnavard.co"

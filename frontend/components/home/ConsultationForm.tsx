@@ -25,7 +25,7 @@ export default function ConsultationForm() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/`)
+        const response = await fetch('/api/v1/settings/')
         if (response.ok) {
           const data = await response.json()
           setSettings(data)
@@ -43,7 +43,7 @@ export default function ConsultationForm() {
     setError(null)
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/inquiries/`, {
+      const response = await fetch('/api/v1/inquiries/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

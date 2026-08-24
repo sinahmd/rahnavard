@@ -3,6 +3,9 @@ import { MetadataRoute } from 'next'
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
+// Timeout for fetch during build (prevents hanging if API is unreachable)
+const FETCH_TIMEOUT = 5000
+
 // Build absolute API URL for server-side fetching
 function getAbsoluteApiUrl(path: string): string {
   if (API_URL.startsWith('http')) return `${API_URL}${path}`
@@ -48,13 +51,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let carPages: MetadataRoute.Sitemap = []
   try {
     const response = await fetch(getAbsoluteApiUrl('/cars/'), {
-      next: { revalidate: 3600 }, // Revalidate every hour
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
     })
     if (response.ok) {
-      const cars = await response.json()
+      const carsData = await response.json()
+      const cars = carsData.results || []
       carPages = cars.map((car: any) => ({
         url: `${BASE_URL}/cars/${car.slug}`,
-        lastModified: new Date(car.updated_at),
+        lastModified: car.updated_at ? new Date(car.updated_at) : new Date(),
         changeFrequency: 'weekly' as const,
         priority: 0.8,
       }))
@@ -68,12 +73,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const response = await fetch(getAbsoluteApiUrl('/articles/'), {
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
     })
     if (response.ok) {
-      const articles = await response.json()
+      const articlesData = await response.json()
+      const articles = articlesData.results || []
       articlePages = articles.map((article: any) => ({
         url: `${BASE_URL}/articles/${article.slug}`,
-        lastModified: new Date(article.updated_at),
+        lastModified: article.updated_at ? new Date(article.updated_at) : new Date(),
         changeFrequency: 'monthly' as const,
         priority: 0.7,
       }))

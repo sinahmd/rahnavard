@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { authFetch } from '@/lib/authFetch'
 
 interface Car {
   id: number
@@ -25,7 +26,7 @@ export default function AdminCarsPage() {
 
   const fetchCars = async () => {
     try {
-      const response = await fetch(`/api/v1/admin/cars/`)
+      const response = await authFetch(`/api/v1/admin/cars/`)
       if (response.ok) {
         const data = await response.json()
         setCars(data.results || data)
@@ -39,7 +40,7 @@ export default function AdminCarsPage() {
 
   const toggleActive = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await fetch(`/api/v1/admin/cars/${id}/`, {
+      const response = await authFetch(`/api/v1/admin/cars/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentStatus }),
@@ -54,7 +55,7 @@ export default function AdminCarsPage() {
 
   const toggleFeatured = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await fetch(`/api/v1/admin/cars/${id}/`, {
+      const response = await authFetch(`/api/v1/admin/cars/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_featured: !currentStatus }),
@@ -71,7 +72,7 @@ export default function AdminCarsPage() {
     if (!confirm('آیا از حذف این خودرو اطمینان دارید؟')) return
 
     try {
-      const response = await fetch(`/api/v1/admin/cars/${id}/`, {
+      const response = await authFetch(`/api/v1/admin/cars/${id}/`, {
         method: 'DELETE',
       })
       if (response.ok) {

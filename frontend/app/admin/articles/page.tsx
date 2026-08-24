@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { authFetch } from '@/lib/authFetch'
 
 interface Article {
   id: number
@@ -22,7 +23,7 @@ export default function AdminArticlesPage() {
 
   const fetchArticles = async () => {
     try {
-      const response = await fetch('/api/v1/admin/articles/')
+      const response = await authFetch('/api/v1/admin/articles/')
       if (response.ok) {
         const data = await response.json()
         setArticles(data.results || data || [])
@@ -36,7 +37,7 @@ export default function AdminArticlesPage() {
 
   const togglePublished = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await fetch(`/api/v1/admin/articles/${id}/`, {
+      const response = await authFetch(`/api/v1/admin/articles/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_published: !currentStatus }),
@@ -50,7 +51,7 @@ export default function AdminArticlesPage() {
   const deleteArticle = async (id: number) => {
     if (!confirm('آیا از حذف این مقاله اطمینان دارید؟')) return
     try {
-      const response = await fetch(`/api/v1/admin/articles/${id}/`, { method: 'DELETE' })
+      const response = await authFetch(`/api/v1/admin/articles/${id}/`, { method: 'DELETE' })
       if (response.ok) fetchArticles()
     } catch (error) {
       console.error('Error deleting article:', error)

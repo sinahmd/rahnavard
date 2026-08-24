@@ -37,7 +37,7 @@ export default function AdminSettingsPage() {
 
           <div className="border rounded-lg p-4">
             <h3 className="font-bold mb-2">ویژگی‌های چرا ما</h3>
-            <p className="text-sm text-gray-500 mb-3">مدیریت ویژگی‌های بخش "چرا راهنورد خودرو"</p>
+            <p className="text-sm text-gray-500 mb-3">مدیریت ویژگی‌های بخش &quot;چرا راهنورد خودرو&quot;</p>
             <Link
               href="/django-admin/core/whyfeature/"
               className="bg-accent text-dark px-4 py-2 rounded font-bold hover:bg-accent-dark transition-colors inline-block"
