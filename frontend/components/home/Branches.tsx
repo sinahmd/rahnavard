@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
+import { useSettings } from '@/contexts/SettingsContext'
 
 interface Branch {
   id: number
@@ -14,25 +15,16 @@ interface Branch {
 
 export default function Branches() {
   const sectionRef = useRef<HTMLElement>(null)
+  const settings = useSettings()
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
-  const [sectionTitle, setSectionTitle] = useState('شعب راهنورد خودرو')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [settingsRes, branchesRes] = await Promise.all([
-          fetch('/api/v1/settings/'),
-          fetch('/api/v1/branches/')
-        ])
-
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json()
-          if (settings.branches_section_title) setSectionTitle(settings.branches_section_title)
-        }
-
-        if (branchesRes.ok) {
-          const data = await branchesRes.json()
+        const res = await fetch('/api/v1/branches/')
+        if (res.ok) {
+          const data = await res.json()
           setBranches(data.results || data || [])
         }
       } catch (error) {
@@ -68,7 +60,7 @@ export default function Branches() {
       <div className="wrap">
         <div className="section-head reveal-left">
           <span className="eyebrow">دفاتر ما</span>
-          <h2 className="section-title">{sectionTitle}</h2>
+          <h2 className="section-title">{settings.branches_section_title}</h2>
         </div>
 
         {loading ? (
@@ -104,10 +96,10 @@ export default function Branches() {
                 {branch.map_image && (
                   <>
                     <a href={branch.map_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-[180px] h-[180px] rounded-4 overflow-hidden border border-gray-light cursor-pointer transition-all hover:scale-[1.02] hover:shadow-card-hover md:block hidden" title="مشاهده در نقشه">
-                      <Image src={branch.map_image} alt={`موقعیت ${branch.name}`} width={180} height={180} className="w-full h-full object-cover" loading="lazy" />
+                      <OptimizedImage src={branch.map_image} alt={`موقعیت ${branch.name}`} width={180} height={180} className="w-full h-full object-cover" loading="lazy" />
                     </a>
                     <a href={branch.map_url} target="_blank" rel="noopener noreferrer" className="md:hidden w-full h-[200px] rounded-[14px] overflow-hidden border border-gray-light cursor-pointer mt-4" title="مشاهده در نقشه">
-                      <Image src={branch.map_image} alt={`موقعیت ${branch.name}`} width={400} height={200} className="w-full h-full object-cover" loading="lazy" />
+                      <OptimizedImage src={branch.map_image} alt={`موقعیت ${branch.name}`} width={400} height={200} className="w-full h-full object-cover" loading="lazy" />
                     </a>
                   </>
                 )}

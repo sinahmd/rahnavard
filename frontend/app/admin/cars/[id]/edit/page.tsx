@@ -8,7 +8,7 @@ const carFields: FormField[] = [
   { name: 'brand', label: 'برند', type: 'text', required: true, placeholder: 'مثال: Hyundai', section: 'اطلاعات اصلی' },
   { name: 'model', label: 'مدل', type: 'text', required: true, placeholder: 'مثال: Elantra', section: 'اطلاعات اصلی' },
   { name: 'persian_name', label: 'نام فارسی', type: 'text', required: true, placeholder: 'مثال: هیوندای النترا', section: 'اطلاعات اصلی' },
-  { name: 'slug', label: 'اسلاگ', type: 'text', section: 'اطلاعات اصلی' },
+  { name: 'slug', label: 'اسلاگ', type: 'text', placeholder: 'خالی بگذارید تا خودکار ساخته شود', helpText: 'اگر خالی بگذارید، بر اساس برند و مدل ساخته می‌شود.', section: 'اطلاعات اصلی' },
   { name: 'year', label: 'سال ساخت', type: 'number', required: true, placeholder: '1403', section: 'اطلاعات اصلی' },
   { name: 'description', label: 'توضیحات', type: 'textarea', section: 'اطلاعات اصلی' },
 
@@ -44,7 +44,7 @@ const carFields: FormField[] = [
   { name: 'main_image', label: 'تصویر اصلی', type: 'file', accept: 'image/*', section: 'تصاویر', helpText: 'خالی بگذارید تا تصویر قبلی حفظ شود.' },
 
   // Section: وضعیت و نمایش
-  { name: 'is_active', label: 'فعال', type: 'checkbox', section: 'وضعیت و نمایش' },
+  { name: 'is_active', label: 'فعال', type: 'checkbox', defaultValue: true, section: 'وضعیت و نمایش' },
   { name: 'is_featured', label: 'ویژه', type: 'checkbox', section: 'وضعیت و نمایش' },
   { name: 'display_order', label: 'ترتیب نمایش', type: 'number', section: 'وضعیت و نمایش' },
 

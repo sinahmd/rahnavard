@@ -5,7 +5,7 @@ import AdminForm, { FormField } from '@/components/admin/AdminForm'
 const articleFields: FormField[] = [
   // Section: محتوا
   { name: 'title', label: 'عنوان', type: 'text', required: true, placeholder: 'عنوان مقاله', section: 'محتوا' },
-  { name: 'slug', label: 'اسلاگ', type: 'text', placeholder: 'خالی بگذارید تا خودکار ساخته شود', section: 'محتوا' },
+  { name: 'slug', label: 'اسلاگ', type: 'text', placeholder: 'خالی بگذارید تا خودکار ساخته شود', helpText: 'اگر خالی بگذارید، بر اساس عنوان ساخته می‌شود.', section: 'محتوا' },
   { name: 'excerpt', label: 'خلاصه', type: 'textarea', section: 'محتوا', placeholder: 'خلاصه کوتاه مقاله (اختیاری)' },
   { name: 'content', label: 'محتوا', type: 'textarea', required: true, section: 'محتوا' },
   { name: 'cover_image', label: 'تصویر کاور', type: 'file', accept: 'image/*', section: 'محتوا' },

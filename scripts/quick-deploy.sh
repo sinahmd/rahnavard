@@ -45,7 +45,7 @@ echo "=========================================="
 # Step 1: Pull latest code
 echo ""
 echo "📥 Pulling latest code..."
-git fetch origin main
+git fetch --depth 1 origin main
 git reset --hard origin/main
 echo "✅ Code updated to $(git rev-parse --short HEAD)"
 

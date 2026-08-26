@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { SettingsProvider } from '@/contexts/SettingsContext'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -60,7 +61,9 @@ export default function RootLayout({
       </head>
       <body className="font-vazir antialiased">
         <AuthProvider>
-          {children}
+          <SettingsProvider>
+            {children}
+          </SettingsProvider>
         </AuthProvider>
       </body>
     </html>

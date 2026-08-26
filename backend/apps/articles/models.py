@@ -9,7 +9,7 @@ class Article(models.Model):
 
     title = models.CharField(max_length=300, verbose_name="عنوان")
     slug = models.SlugField(
-        unique=True, db_index=True, allow_unicode=True, verbose_name="اسلاگ"
+        unique=True, db_index=True, allow_unicode=True, blank=True, verbose_name="اسلاگ"
     )
     excerpt = models.TextField(blank=True, verbose_name="خلاصه")
     content = models.TextField(verbose_name="محتوا")
@@ -43,8 +43,8 @@ class Article(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-        # Auto-generate slug if not provided
-        if not self.slug:
+        # Auto-generate slug if not provided or blank
+        if not self.slug or not self.slug.strip():
             self.slug = self._generate_slug()
 
         # Check if slug changed and create redirect

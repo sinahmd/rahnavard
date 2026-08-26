@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -10,17 +10,23 @@ export const metadata: Metadata = {
 }
 
 async function getArticles() {
-  try {
-    const res = await fetch('/api/v1/articles/', {
-      next: { revalidate: 60 },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.results || data || []
-  } catch {
-    return []
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+
+  // Retry up to 2 times to handle cold starts
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/articles/`, {
+        next: { revalidate: 60 },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = await res.json()
+      return data.results || data || []
+    } catch {
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
+    }
   }
+  return []
 }
 
 export default async function ArticlesPage() {
@@ -60,7 +66,7 @@ export default async function ArticlesPage() {
                 >
                   <div className="h-40 bg-gradient-to-br from-[#ffeca1] to-white flex items-center justify-center relative overflow-hidden">
                     {article.cover_image ? (
-                      <Image
+                      <OptimizedImage
                         src={article.cover_image}
                         alt={article.title}
                         width={400}

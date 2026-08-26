@@ -45,9 +45,26 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
 class ArticleAdminSerializer(serializers.ModelSerializer):
     """Serializer for admin article management."""
 
+    slug = serializers.SlugField(required=False, allow_blank=True)
+
     class Meta:
         model = Article
-        fields = "__all__"
+        fields = [
+            "id",
+            "title",
+            "slug",
+            "excerpt",
+            "content",
+            "cover_image",
+            "is_published",
+            "published_at",
+            "seo_title",
+            "seo_description",
+            "og_image",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
         extra_kwargs = {
             "cover_image": {"validators": [ImageValidator()]},
             "og_image": {"validators": [ImageValidator()]},

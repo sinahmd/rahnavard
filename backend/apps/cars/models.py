@@ -24,7 +24,7 @@ class Car(models.Model):
     model = models.CharField(max_length=100, verbose_name="مدل")
     persian_name = models.CharField(max_length=200, verbose_name="نام فارسی")
     slug = models.SlugField(
-        unique=True, db_index=True, allow_unicode=True, verbose_name="اسلاگ"
+        unique=True, db_index=True, allow_unicode=True, blank=True, verbose_name="اسلاگ"
     )
     description = models.TextField(blank=True, verbose_name="توضیحات")
     year = models.IntegerField(verbose_name="سال ساخت")
@@ -68,8 +68,8 @@ class Car(models.Model):
         return f"{self.brand} {self.model}"
 
     def save(self, *args, **kwargs):
-        # Auto-generate slug if not provided
-        if not self.slug:
+        # Auto-generate slug if not provided or blank
+        if not self.slug or not self.slug.strip():
             self.slug = self._generate_slug()
 
         # Check if slug changed and create redirect

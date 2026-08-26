@@ -6,7 +6,7 @@ urlpatterns = [
     # Public endpoints
     path("articles/", views.ArticleListView.as_view(), name="article-list"),
     path(
-        "articles/<slug:slug>/",
+        "articles/<str:slug>/",
         views.ArticleDetailView.as_view(),
         name="article-detail",
     ),

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import MobileNav from './MobileNav'
+import { useSettings } from '@/contexts/SettingsContext'
 
 const navLinks = [
   { href: '#top', label: 'خانه' },
@@ -17,7 +18,7 @@ const navLinks = [
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const settings = useSettings()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,15 +29,6 @@ export default function Header() {
     handleScroll()
 
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  useEffect(() => {
-    fetch('/api/v1/settings/')
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
-        if (data?.logo) setLogoUrl(data.logo)
-      })
-      .catch(() => {}) // keep fallback
   }, [])
 
   return (
@@ -53,9 +45,9 @@ export default function Header() {
           href="#top"
           className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center h-[44px] z-10"
         >
-          {logoUrl ? (
-            <Image
-              src={logoUrl}
+          {settings.logo ? (
+            <OptimizedImage
+              src={settings.logo}
               alt="راهنورد خودرو"
               width={150}
               height={38}
@@ -98,18 +90,24 @@ export default function Header() {
           aria-label={isMobileMenuOpen ? 'بستن منو' : 'باز کردن منو'}
         >
           <span
-            className={`w-6 h-0.5 rounded-sm transition-colors ${
-              isScrolled ? 'bg-dark' : 'bg-white'
+            className={`w-6 h-0.5 rounded-sm transition-all duration-300 origin-center ${
+              isMobileMenuOpen
+                ? `translate-y-[5.5px] rotate-45 ${isScrolled ? 'bg-dark' : 'bg-white'}`
+                : isScrolled ? 'bg-dark' : 'bg-white'
             }`}
           />
           <span
-            className={`w-6 h-0.5 rounded-sm transition-colors ${
-              isScrolled ? 'bg-dark' : 'bg-white'
+            className={`w-6 h-0.5 rounded-sm transition-all duration-300 ${
+              isMobileMenuOpen
+                ? 'opacity-0 scale-0'
+                : isScrolled ? 'bg-dark' : 'bg-white'
             }`}
           />
           <span
-            className={`w-6 h-0.5 rounded-sm transition-colors ${
-              isScrolled ? 'bg-dark' : 'bg-white'
+            className={`w-6 h-0.5 rounded-sm transition-all duration-300 origin-center ${
+              isMobileMenuOpen
+                ? `-translate-y-[5.5px] -rotate-45 ${isScrolled ? 'bg-dark' : 'bg-white'}`
+                : isScrolled ? 'bg-dark' : 'bg-white'
             }`}
           />
         </button>

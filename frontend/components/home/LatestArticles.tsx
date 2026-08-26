@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
+import { useSettings } from '@/contexts/SettingsContext'
 
 interface Article {
   id: number
@@ -15,27 +16,16 @@ interface Article {
 
 export default function LatestArticles() {
   const sectionRef = useRef<HTMLElement>(null)
+  const settings = useSettings()
   const [articles, setArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
-  const [sectionTitle, setSectionTitle] = useState('مقاله و اطلاعیه')
-  const [sectionDescription, setSectionDescription] = useState('آخرین اخبار، اطلاعیه‌ها و راهنماهای خرید خودرو را دنبال کنید.')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [settingsRes, articlesRes] = await Promise.all([
-          fetch('/api/v1/settings/'),
-          fetch('/api/v1/articles/')
-        ])
-
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json()
-          if (settings.articles_section_title) setSectionTitle(settings.articles_section_title)
-          if (settings.articles_section_description) setSectionDescription(settings.articles_section_description)
-        }
-
-        if (articlesRes.ok) {
-          const data = await articlesRes.json()
+        const res = await fetch('/api/v1/articles/')
+        if (res.ok) {
+          const data = await res.json()
           setArticles((data.results || data || []).slice(0, 3))
         }
       } catch (error) {
@@ -81,8 +71,8 @@ export default function LatestArticles() {
       <div className="wrap">
         <div className="section-head reveal-right">
           <span className="eyebrow">اخبار</span>
-          <h2 className="section-title">{sectionTitle}</h2>
-          <p>{sectionDescription}</p>
+          <h2 className="section-title">{settings.articles_section_title}</h2>
+          <p>{settings.articles_section_description}</p>
         </div>
 
         {loading ? (
@@ -101,7 +91,7 @@ export default function LatestArticles() {
               >
                 <div className="h-40 bg-gradient-to-br from-[#ffeca1] to-white flex items-center justify-center relative overflow-hidden">
                   {article.cover_image ? (
-                    <Image
+                    <OptimizedImage
                       src={article.cover_image}
                       alt={article.title}
                       width={400}

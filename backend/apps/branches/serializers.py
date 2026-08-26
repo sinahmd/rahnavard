@@ -28,7 +28,18 @@ class BranchAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Branch
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "address",
+            "phone",
+            "map_url",
+            "map_image",
+            "latitude",
+            "longitude",
+            "is_active",
+            "display_order",
+        ]
         extra_kwargs = {
             "map_image": {"validators": [ImageValidator()]},
         }

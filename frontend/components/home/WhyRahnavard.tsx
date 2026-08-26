@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
+import { useSettings } from '@/contexts/SettingsContext'
 
 interface WhyFeature {
   id: number
@@ -12,27 +13,16 @@ interface WhyFeature {
 
 export default function WhyRahnavard() {
   const sectionRef = useRef<HTMLElement>(null)
+  const settings = useSettings()
   const [features, setFeatures] = useState<WhyFeature[]>([])
   const [loading, setLoading] = useState(true)
-  const [title, setTitle] = useState('چرا راهنورد خودرو؟')
-  const [description, setDescription] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [settingsRes, featuresRes] = await Promise.all([
-          fetch('/api/v1/settings/'),
-          fetch('/api/v1/why-features/')
-        ])
-
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json()
-          if (settings.why_title) setTitle(settings.why_title)
-          if (settings.why_description) setDescription(settings.why_description)
-        }
-
-        if (featuresRes.ok) {
-          const data = await featuresRes.json()
+        const res = await fetch('/api/v1/why-features/')
+        if (res.ok) {
+          const data = await res.json()
           setFeatures(data.results || data || [])
         }
       } catch (error) {
@@ -73,11 +63,11 @@ export default function WhyRahnavard() {
 
       <div className="relative z-[2] text-center max-w-[900px] mx-auto px-8">
         <h2 className="text-[42px] font-black text-dark mb-7 opacity-0 scale-95 animate-fade-in-up">
-          {title}
+          {settings.why_title}
         </h2>
-        {description && (
+        {settings.why_description && (
           <p className="text-[17.5px] leading-[1.9] text-gray opacity-0 scale-95 animate-fade-in-up [animation-delay:200ms]">
-            {description}
+            {settings.why_description}
           </p>
         )}
 
@@ -86,12 +76,12 @@ export default function WhyRahnavard() {
         ) : features.length === 0 ? (
           <div className="mt-12 text-gray">ویژگی‌ای یافت نشد. از پنل مدیریت ویژگی اضافه کنید.</div>
         ) : (
-          <div className={`grid grid-cols-1 md:grid-cols-3 gap-10 ${description ? 'mt-12' : 'mt-8'}`}>
+          <div className={`grid grid-cols-1 md:grid-cols-3 gap-10 ${settings.why_description ? 'mt-12' : 'mt-8'}`}>
             {features.map((feature) => (
               <div key={feature.id} className="why-feature reveal flex flex-col items-center text-center p-6">
                 <div className="w-12 h-12 mx-auto mb-5 flex items-center justify-center">
                   {feature.icon ? (
-                    <Image
+                    <OptimizedImage
                       src={feature.icon}
                       alt={feature.title}
                       width={48}

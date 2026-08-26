@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import { authFetch } from '@/lib/authFetch'
 
 interface WhyFeature {
@@ -97,7 +97,7 @@ export default function AdminFeaturesPage() {
                 <tr key={feature.id} className="border-t hover:bg-gray-50">
                   <td className="p-4">
                     {feature.icon ? (
-                      <Image
+                      <OptimizedImage
                         src={feature.icon}
                         alt={feature.title}
                         width={40}

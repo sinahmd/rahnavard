@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
+import { useSettings } from '@/contexts/SettingsContext'
 
 interface Car {
   id: number
@@ -15,29 +16,25 @@ interface Car {
 
 export default function FeaturedCars() {
   const sectionRef = useRef<HTMLElement>(null)
+  const settings = useSettings()
   const [cars, setCars] = useState<Car[]>([])
   const [loading, setLoading] = useState(true)
-  const [sectionTitle, setSectionTitle] = useState('خودروهای ما')
-  const [sectionDescription, setSectionDescription] = useState('مجموعه‌ای منتخب از خودروهای وارداتی راهنورد خودرو، آماده تحویل با گارانتی رسمی.')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [settingsRes, carsRes] = await Promise.all([
-          fetch('/api/v1/settings/'),
-          fetch('/api/v1/cars/?is_featured=true')
-        ])
+        // Try featured cars first, fall back to all active cars
+        let res = await fetch('/api/v1/cars/?is_featured=true')
+        let data = await res.json()
+        let carsList = data.results || data || []
 
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json()
-          if (settings.cars_section_title) setSectionTitle(settings.cars_section_title)
-          if (settings.cars_section_description) setSectionDescription(settings.cars_section_description)
+        if (carsList.length === 0) {
+          res = await fetch('/api/v1/cars/')
+          data = await res.json()
+          carsList = data.results || data || []
         }
 
-        if (carsRes.ok) {
-          const data = await carsRes.json()
-          setCars(data.results || data || [])
-        }
+        setCars(carsList)
       } catch (error) {
         console.error('Error fetching cars:', error)
       } finally {
@@ -71,8 +68,8 @@ export default function FeaturedCars() {
       <div className="wrap">
         <div className="section-head reveal-left">
           <span className="eyebrow">محصولات</span>
-          <h2 className="section-title">{sectionTitle}</h2>
-          <p>{sectionDescription}</p>
+          <h2 className="section-title">{settings.cars_section_title}</h2>
+          <p>{settings.cars_section_description}</p>
         </div>
 
         {loading ? (
@@ -90,7 +87,7 @@ export default function FeaturedCars() {
               >
                 <div className="w-full aspect-[4/3] flex items-center justify-center mb-[18px] overflow-hidden">
                   {car.main_image ? (
-                    <Image
+                    <OptimizedImage
                       src={car.main_image}
                       alt={car.persian_name}
                       width={400}

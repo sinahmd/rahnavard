@@ -2,6 +2,13 @@ import '@testing-library/jest-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import FeaturedCars from '../FeaturedCars'
 
+jest.mock('@/contexts/SettingsContext', () => ({
+  useSettings: jest.fn(() => ({
+    cars_section_title: 'خودروهای ما',
+    cars_section_description: 'مجموعه‌ای منتخب از خودروهای وارداتی.',
+  })),
+}))
+
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
@@ -36,15 +43,10 @@ describe('FeaturedCars', () => {
   })
 
   it('should render cars after loading', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ cars_section_title: 'محصولات ما' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: mockCars }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: mockCars }),
+    })
 
     render(<FeaturedCars />)
 
@@ -58,15 +60,10 @@ describe('FeaturedCars', () => {
   })
 
   it('should render car links with correct href', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: mockCars }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: mockCars }),
+    })
 
     render(<FeaturedCars />)
 
@@ -80,10 +77,11 @@ describe('FeaturedCars', () => {
   })
 
   it('should show empty state when no cars', async () => {
+    // Featured returns empty, fallback to all cars also returns empty
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({}),
+        json: async () => ({ results: [] }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -98,15 +96,16 @@ describe('FeaturedCars', () => {
   })
 
   it('should use custom section title from settings', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ cars_section_title: 'عنوان سفارشی' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [] }),
-      })
+    const { useSettings } = require('@/contexts/SettingsContext')
+    useSettings.mockReturnValueOnce({
+      cars_section_title: 'عنوان سفارشی',
+      cars_section_description: 'توضیحات سفارشی',
+    })
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    })
 
     render(<FeaturedCars />)
 
@@ -116,15 +115,10 @@ describe('FeaturedCars', () => {
   })
 
   it('should use default section title when settings unavailable', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [] }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    })
 
     render(<FeaturedCars />)
 
@@ -145,15 +139,10 @@ describe('FeaturedCars', () => {
   })
 
   it('should render car images when main_image is provided', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [mockCars[0]] }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [mockCars[0]] }),
+    })
 
     render(<FeaturedCars />)
 
@@ -164,15 +153,10 @@ describe('FeaturedCars', () => {
   })
 
   it('should handle cars array without results wrapper', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockCars, // Direct array, no results wrapper
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockCars, // Direct array, no results wrapper
+    })
 
     render(<FeaturedCars />)
 

@@ -2,6 +2,13 @@ import '@testing-library/jest-dom'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import ConsultationForm from '../ConsultationForm'
 
+jest.mock('@/contexts/SettingsContext', () => ({
+  useSettings: jest.fn(() => ({
+    form_title: 'عنوان سفارشی',
+    form_description: 'توضیحات سفارشی',
+  })),
+}))
+
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
@@ -10,24 +17,15 @@ describe('ConsultationForm', () => {
     jest.clearAllMocks()
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({
-        form_title: 'عنوان سفارشی',
-        form_description: 'توضیحات سفارشی',
-      }),
+      json: async () => ({}),
     })
   })
 
   it('should render the form with default title', async () => {
-    // Override to return settings without custom values
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
-
     render(<ConsultationForm />)
 
     await waitFor(() => {
-      expect(screen.getByText('درخواست خود را برای ما ارسال نمایید')).toBeInTheDocument()
+      expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
     })
   })
 
@@ -57,7 +55,6 @@ describe('ConsultationForm', () => {
   })
 
   it('should submit form and show success message', async () => {
-    // beforeEach fallback handles both settings and submission (ok: true)
     render(<ConsultationForm />)
 
     await waitFor(() => {
@@ -83,21 +80,14 @@ describe('ConsultationForm', () => {
   })
 
   it('should show loading state while submitting', async () => {
-    // Settings fetch succeeds first, then submission hangs
     let resolveFetch: (value: any) => void
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ form_title: 'عنوان سفارشی', form_description: 'توضیحات سفارشی' }) })
-      .mockReturnValueOnce(
-        new Promise((resolve) => {
-          resolveFetch = resolve
-        })
-      )
+    mockFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve
+      })
+    )
 
     render(<ConsultationForm />)
-
-    await waitFor(() => {
-      expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
-    })
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
@@ -116,16 +106,9 @@ describe('ConsultationForm', () => {
   })
 
   it('should show error message on submission failure', async () => {
-    // First call: settings (ok: true with title), Second call: submission (ok: false)
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ form_title: 'عنوان سفارشی', form_description: 'توضیحات سفارشی' }) })
-      .mockResolvedValueOnce({ ok: false, json: async () => ({ detail: 'Error' }) })
+    mockFetch.mockResolvedValueOnce({ ok: false, json: async () => ({ detail: 'Error' }) })
 
     render(<ConsultationForm />)
-
-    await waitFor(() => {
-      expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
-    })
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
@@ -140,16 +123,9 @@ describe('ConsultationForm', () => {
   })
 
   it('should show error message on network failure', async () => {
-    // First call: settings succeeds, Second call: network error
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ form_title: 'عنوان سفارشی', form_description: 'توضیحات سفارشی' }) })
-      .mockRejectedValueOnce(new Error('Network error'))
+    mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
     render(<ConsultationForm />)
-
-    await waitFor(() => {
-      expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
-    })
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
@@ -166,12 +142,7 @@ describe('ConsultationForm', () => {
   it('should hide success message after timeout', async () => {
     jest.useFakeTimers()
 
-    // beforeEach fallback handles both settings and submission (ok: true)
     render(<ConsultationForm />)
-
-    await waitFor(() => {
-      expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
-    })
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
@@ -197,12 +168,7 @@ describe('ConsultationForm', () => {
   })
 
   it('should send POST request with correct data', async () => {
-    // beforeEach fallback handles both settings and submission (ok: true)
     render(<ConsultationForm />)
-
-    await waitFor(() => {
-      expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
-    })
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })

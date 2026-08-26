@@ -2,6 +2,13 @@ import '@testing-library/jest-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import LatestArticles from '../LatestArticles'
 
+jest.mock('@/contexts/SettingsContext', () => ({
+  useSettings: jest.fn(() => ({
+    articles_section_title: 'مقاله و اطلاعیه',
+    articles_section_description: 'آخرین اخبار، اطلاعیه‌ها و راهنماهای خرید خودرو را دنبال کنید.',
+  })),
+}))
+
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
@@ -34,15 +41,10 @@ describe('LatestArticles', () => {
   })
 
   it('should render articles after loading', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: mockArticles }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: mockArticles }),
+    })
 
     render(<LatestArticles />)
 
@@ -54,15 +56,10 @@ describe('LatestArticles', () => {
   })
 
   it('should render article excerpts', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: mockArticles }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: mockArticles }),
+    })
 
     render(<LatestArticles />)
 
@@ -74,15 +71,10 @@ describe('LatestArticles', () => {
   })
 
   it('should render article links with correct href', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: mockArticles }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: mockArticles }),
+    })
 
     render(<LatestArticles />)
 
@@ -96,15 +88,10 @@ describe('LatestArticles', () => {
   })
 
   it('should show empty state when no articles', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [] }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    })
 
     render(<LatestArticles />)
 
@@ -122,15 +109,10 @@ describe('LatestArticles', () => {
       published_at: '2025-01-15T10:00:00Z',
     }))
 
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: manyArticles }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: manyArticles }),
+    })
 
     render(<LatestArticles />)
 
@@ -144,15 +126,16 @@ describe('LatestArticles', () => {
   })
 
   it('should use custom section title from settings', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ articles_section_title: 'اخبار جدید' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [] }),
-      })
+    const { useSettings } = require('@/contexts/SettingsContext')
+    useSettings.mockReturnValueOnce({
+      articles_section_title: 'اخبار جدید',
+      articles_section_description: 'توضیحات سفارشی',
+    })
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    })
 
     render(<LatestArticles />)
 
@@ -162,15 +145,10 @@ describe('LatestArticles', () => {
   })
 
   it('should use default section title when settings unavailable', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [] }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    })
 
     render(<LatestArticles />)
 
@@ -190,15 +168,10 @@ describe('LatestArticles', () => {
   })
 
   it('should handle articles without results wrapper', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockArticles, // Direct array
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockArticles, // Direct array
+    })
 
     render(<LatestArticles />)
 

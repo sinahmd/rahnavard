@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import { authFetch } from '@/lib/authFetch'
 
 interface HeroSlide {
@@ -97,7 +97,7 @@ export default function AdminHeroSlidesPage() {
                 <tr key={slide.id} className="border-t hover:bg-gray-50">
                   <td className="p-4">
                     {slide.image ? (
-                      <Image
+                      <OptimizedImage
                         src={slide.image}
                         alt={slide.alt_text}
                         width={80}

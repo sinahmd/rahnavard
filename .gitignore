@@ -66,3 +66,21 @@ ubuntu@ubuntu---1-vcpu---1-gb-ram~$.txt
 *.bak
 *.backup
 *.old
+
+# Coverage & build artifacts
+backend/.coverage
+frontend/coverage/
+frontend/tsconfig.tsbuildinfo
+
+# Assets
+assets/webp/
+
+# Docs & reports
+docs/
+CI_CD_IMPLEMENTATION_PLAN.md
+FINAL_PRODUCTION_REPORT.md
+IMPLEMENTATION_REPORT.md
+PHASE1_IMPLEMENTATION_COMPLETE.md
+PRODUCTION_DEPLOYMENT_CHECKLIST.md
+PRODUCTION_READINESS_CHECKLIST.md
+STEP_BY_STEP_ROADMAP.md

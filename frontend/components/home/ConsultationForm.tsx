@@ -1,13 +1,10 @@
 'use client'
 
-import { useState, useEffect, FormEvent } from 'react'
-
-interface SiteSettings {
-  form_title: string
-  form_description: string
-}
+import { useState, FormEvent } from 'react'
+import { useSettings } from '@/contexts/SettingsContext'
 
 export default function ConsultationForm() {
+  const settings = useSettings()
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -17,25 +14,6 @@ export default function ConsultationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [settings, setSettings] = useState<SiteSettings>({
-    form_title: 'درخواست خود را برای ما ارسال نمایید',
-    form_description: 'همکاران ما در کوتاه‌ترین زمان ممکن با شما تماس خواهند گرفت.',
-  })
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const response = await fetch('/api/v1/settings/')
-        if (response.ok) {
-          const data = await response.json()
-          setSettings(data)
-        }
-      } catch (error) {
-        console.error('Error fetching settings:', error)
-      }
-    }
-    fetchSettings()
-  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()

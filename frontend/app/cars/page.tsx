@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 
@@ -10,17 +10,23 @@ export const metadata: Metadata = {
 }
 
 async function getCars() {
-  try {
-    const res = await fetch('/api/v1/cars/', {
-      next: { revalidate: 60 },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.results || data || []
-  } catch {
-    return []
+  const baseUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+
+  // Retry up to 2 times to handle cold starts
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/cars/`, {
+        next: { revalidate: 60 },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = await res.json()
+      return data.results || data || []
+    } catch {
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
+    }
   }
+  return []
 }
 
 export default async function CarsPage() {
@@ -51,7 +57,7 @@ export default async function CarsPage() {
                 >
                   <div className="w-full aspect-[4/3] flex items-center justify-center mb-[18px] overflow-hidden">
                     {car.main_image ? (
-                      <Image
+                      <OptimizedImage
                         src={car.main_image}
                         alt={car.persian_name}
                         width={400}

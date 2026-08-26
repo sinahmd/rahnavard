@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 
 interface HeroSlide {
   id: number
@@ -52,22 +52,22 @@ export default function HeroSlider() {
   }, [next, slides.length])
 
   if (loading) {
-    return <div className="relative w-full max-h-screen aspect-[1540/860] bg-[#111]" />
+    return <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] bg-[#111]" />
   }
 
   if (slides.length === 0) {
     return (
-      <div className="relative w-full max-h-screen aspect-[1540/860] bg-[#111] flex items-center justify-center">
+      <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] bg-[#111] flex items-center justify-center">
         <p className="text-white/50 text-lg">اسلایدی یافت نشد. از پنل مدیریت اسلاید اضافه کنید.</p>
       </div>
     )
   }
 
   return (
-    <div className="relative w-full max-h-screen aspect-[1540/860] overflow-hidden bg-[#111]">
+    <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] overflow-hidden bg-[#111]">
       {slides.map((slide, index) => (
         <div key={slide.id} className={`absolute inset-0 transition-opacity duration-[900ms] ease-in-out ${index === current ? 'opacity-100' : 'opacity-0'}`}>
-          <Image
+          <OptimizedImage
             src={slide.image}
             alt={slide.alt_text}
             fill
@@ -80,16 +80,16 @@ export default function HeroSlider() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-black/15 pointer-events-none" />
 
-      <div className="absolute top-1/2 right-6 left-6 -translate-y-1/2 flex justify-between z-10 pointer-events-none">
-        <button onClick={prev} className="pointer-events-auto w-[46px] h-[46px] rounded-full bg-white/16 border border-white/40 text-white flex items-center justify-center cursor-pointer transition-colors hover:bg-white/30 backdrop-blur-sm" aria-label="اسلاید قبلی">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" /></svg>
+      <div className="absolute top-1/2 right-4 md:right-6 left-4 md:left-6 -translate-y-1/2 flex justify-between z-10 pointer-events-none">
+        <button onClick={prev} className="pointer-events-auto w-[38px] h-[38px] md:w-[46px] md:h-[46px] rounded-full bg-white/16 border border-white/40 text-white flex items-center justify-center cursor-pointer transition-colors hover:bg-white/30 backdrop-blur-sm" aria-label="اسلاید قبلی">
+          <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" /></svg>
         </button>
-        <button onClick={next} className="pointer-events-auto w-[46px] h-[46px] rounded-full bg-white/16 border border-white/40 text-white flex items-center justify-center cursor-pointer transition-colors hover:bg-white/30 backdrop-blur-sm" aria-label="اسلاید بعدی">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" /></svg>
+        <button onClick={next} className="pointer-events-auto w-[38px] h-[38px] md:w-[46px] md:h-[46px] rounded-full bg-white/16 border border-white/40 text-white flex items-center justify-center cursor-pointer transition-colors hover:bg-white/30 backdrop-blur-sm" aria-label="اسلاید بعدی">
+          <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" /></svg>
         </button>
       </div>
 
-      <div className="absolute bottom-16 right-0 left-0 z-10">
+      <div className="absolute bottom-16 right-0 left-0 z-10 hidden md:block">
         <div className="wrap flex items-end justify-between gap-5">
           <div className="flex gap-3.5 flex-wrap">
             <a href="#cars" className="btn btn-primary">مشاهده خودروها</a>

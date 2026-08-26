@@ -15,6 +15,11 @@ const nextConfig = {
       },
       {
         protocol: 'http',
+        hostname: 'rahnavard.co',
+        pathname: '/media/**',
+      },
+      {
+        protocol: 'http',
         hostname: 'localhost',
         port: '8000',
         pathname: '/media/**',

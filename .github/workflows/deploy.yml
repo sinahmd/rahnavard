@@ -13,6 +13,11 @@ on:
         default: 'false'
         type: boolean
 
+# Cancel any in-progress deploy when a new one starts
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
 env:
   COMPOSE_FILE: docker-compose.prod.yml
 
@@ -20,10 +25,11 @@ jobs:
   deploy:
     name: Deploy to Arvan Cloud
     runs-on: ubuntu-latest
-    if: >
+    if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.event_name == 'workflow_dispatch'
     environment: production
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -36,16 +42,16 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          command_timeout: 30m
+          command_timeout: 15m
           script: |
             set -e
             cd /var/www/rahnavard
 
             echo "🚀 Deployment started — $(date)"
 
-            # Step 1: Pull latest code
+            # Step 1: Pull latest code (shallow fetch avoids SSH hang on diverged history)
             echo "📥 Pulling code..."
-            git fetch origin main
+            git fetch --depth 1 origin main
             git reset --hard origin/main
             echo "✅ Code at $(git rev-parse --short HEAD)"
 

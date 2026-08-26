@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -26,17 +26,21 @@ type Props = {
 }
 
 async function getArticle(slug: string): Promise<Article | null> {
-  try {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
-    const res = await fetch(`${backendUrl}/api/v1/articles/${slug}/`, {
-      next: { revalidate: 60 },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!res.ok) return null
-    return res.json()
-  } catch {
-    return null
+  const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${backendUrl}/api/v1/articles/${slug}/`, {
+        next: { revalidate: 60 },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return null
+      return res.json()
+    } catch {
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
+    }
   }
+  return null
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -143,7 +147,7 @@ export default async function ArticleDetailPage({ params }: Props) {
           {/* Cover Image */}
           {article.cover_image && (
             <div className="mb-8 rounded-[14px] overflow-hidden">
-              <Image
+              <OptimizedImage
                 src={article.cover_image}
                 alt={article.title}
                 width={800}

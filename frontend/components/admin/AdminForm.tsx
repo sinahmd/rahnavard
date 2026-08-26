@@ -16,6 +16,7 @@ export interface FormField {
   section?: string
   accept?: string
   helpText?: string
+  defaultValue?: string | boolean
   validate?: (value: string | boolean | File | null) => string | null
 }
 
@@ -93,7 +94,20 @@ export default function AdminForm({
   const router = useRouter()
   const isEdit = !!id
 
-  const [formData, setFormData] = useState<Record<string, string | boolean | File | null>>({})
+  const [formData, setFormData] = useState<Record<string, string | boolean | File | null>>(() => {
+    // Initialize with default values for new items
+    const initial: Record<string, string | boolean | File | null> = {}
+    if (!id) {
+      fields.forEach((field) => {
+        if (field.defaultValue !== undefined) {
+          initial[field.name] = field.defaultValue
+        } else if (field.type === 'checkbox') {
+          initial[field.name] = false
+        }
+      })
+    }
+    return initial
+  })
   const [existingImages, setExistingImages] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
@@ -404,6 +418,9 @@ export default function AdminForm({
                           rows={field.name === 'content' ? 12 : 4}
                           className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent ${hasError ? 'border-red-500' : ''}`}
                         />
+                        {field.helpText && (
+                          <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>
+                        )}
                         {fieldError && (
                           <p className="text-red-500 text-sm mt-1">{fieldError}</p>
                         )}
@@ -432,6 +449,9 @@ export default function AdminForm({
                             </option>
                           ))}
                         </select>
+                        {field.helpText && (
+                          <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>
+                        )}
                         {fieldError && (
                           <p className="text-red-500 text-sm mt-1">{fieldError}</p>
                         )}
@@ -454,6 +474,9 @@ export default function AdminForm({
                         required={field.required}
                         className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent ${hasError ? 'border-red-500' : ''}`}
                       />
+                      {field.helpText && (
+                        <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>
+                      )}
                       {fieldError && (
                         <p className="text-red-500 text-sm mt-1">{fieldError}</p>
                       )}

@@ -1,17 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-
-interface SiteSettings {
-  site_name: string
-  logo: string | null
-  footer_description: string
-  footer_copyright: string
-  phone: string
-  address: string
-}
+import OptimizedImage from '@/components/ui/OptimizedImage'
+import { useSettings } from '@/contexts/SettingsContext'
 
 const quickLinks = [
   { href: '#why', label: 'درباره ما' },
@@ -21,29 +12,7 @@ const quickLinks = [
 ]
 
 export default function Footer() {
-  const [settings, setSettings] = useState<SiteSettings>({
-    site_name: 'راهنورد خودرو',
-    logo: null,
-    footer_description: 'راهنورد خودرو ، واردکننده رسمی خودروهای هیوندای، کیا و تویوتا با بیش از یک دهه تجربه در خدمت مشتریان.',
-    footer_copyright: 'راهنورد خودرو. تمامی حقوق محفوظ است.',
-    phone: '۰۹۱۱ ۲۱۰ ۰۸ ۰۰',
-    address: 'مازندران، ساری، میدان خزر ،کمربندی شرقی ، ابتدای کوی دادگستری',
-  })
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const response = await fetch('/api/v1/settings/')
-        if (response.ok) {
-          const data = await response.json()
-          setSettings(data)
-        }
-      } catch (error) {
-        console.error('Error fetching settings:', error)
-      }
-    }
-    fetchSettings()
-  }, [])
+  const settings = useSettings()
 
   return (
     <footer className="bg-dark text-white pt-16 pb-6">
@@ -53,7 +22,7 @@ export default function Footer() {
           <div>
             <Link href="#top" className="inline-block mb-4">
               {settings.logo ? (
-                <Image
+                <OptimizedImage
                   src={settings.logo}
                   alt={settings.site_name}
                   width={150}

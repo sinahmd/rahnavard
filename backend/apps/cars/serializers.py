@@ -7,6 +7,8 @@ from .models import Car
 class CarListSerializer(serializers.ModelSerializer):
     """Serializer for car list view."""
 
+    main_image = serializers.ImageField(read_only=True)
+
     class Meta:
         model = Car
         fields = [
@@ -66,9 +68,34 @@ class CarDetailSerializer(serializers.ModelSerializer):
 class CarAdminSerializer(serializers.ModelSerializer):
     """Serializer for admin car management."""
 
+    slug = serializers.SlugField(required=False, allow_blank=True)
+
     class Meta:
         model = Car
-        fields = "__all__"
+        fields = [
+            "id",
+            "brand",
+            "model",
+            "persian_name",
+            "slug",
+            "description",
+            "year",
+            "fuel_type",
+            "transmission",
+            "engine",
+            "price",
+            "main_image",
+            "gallery",
+            "is_active",
+            "is_featured",
+            "display_order",
+            "seo_title",
+            "seo_description",
+            "og_image",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["gallery", "created_at", "updated_at"]
         extra_kwargs = {
             "main_image": {"validators": [ImageValidator()]},
             "og_image": {"validators": [ImageValidator()]},

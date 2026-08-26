@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import Image from 'next/image'
+import OptimizedImage from '@/components/ui/OptimizedImage'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -35,17 +35,21 @@ type Props = {
 }
 
 async function getCar(slug: string): Promise<Car | null> {
-  try {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
-    const res = await fetch(`${backendUrl}/api/v1/cars/${slug}/`, {
-      next: { revalidate: 60 },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!res.ok) return null
-    return res.json()
-  } catch {
-    return null
+  const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${backendUrl}/api/v1/cars/${slug}/`, {
+        next: { revalidate: 60 },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return null
+      return res.json()
+    } catch {
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
+    }
   }
+  return null
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -143,7 +147,7 @@ export default async function CarDetailPage({ params }: Props) {
             {/* Car Image */}
             <div className="bg-white rounded-[14px] p-8 shadow-card flex items-center justify-center aspect-[4/3]">
               {car.main_image ? (
-                <Image
+                <OptimizedImage
                   src={car.main_image}
                   alt={car.persian_name}
                   width={600}
