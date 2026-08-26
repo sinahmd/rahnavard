@@ -18,6 +18,28 @@ A full-stack web application for Rahnavard Automotive, a car import company.
 - **Docker** & **Docker Compose**
 - **Nginx** reverse proxy (production)
 
+## Branching Strategy
+
+| Branch | Purpose | Deploys? |
+|--------|---------|----------|
+| `main` | Production code | ✅ Auto-deploys to rahnavard.co |
+| `develop` | Local dev & integration | ❌ CI only |
+| `feature/*` | Individual features | ❌ CI only |
+
+**Quick start:**
+```bash
+git checkout develop      # Switch to dev branch
+git pull origin develop   # Get latest changes
+# ... make changes ...
+git push origin develop   # Push to develop
+# When ready for production:
+git checkout main && git merge develop && git push origin main
+```
+
+👉 See [DEVELOPMENT.md](./DEVELOPMENT.md) for the full workflow guide.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
@@ -142,6 +164,9 @@ rahnavard/
 - RTL layout
 
 ## Production Deployment
+
+> **Note:** Production deploys automatically when you push/merge to `main`. See [DEVELOPMENT.md](./DEVELOPMENT.md) for the full workflow.
+
 
 1. Update environment variables in `.env`:
 ```bash
