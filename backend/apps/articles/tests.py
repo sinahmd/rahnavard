@@ -47,6 +47,11 @@ def sample_articles(db):
     return articles
 
 
+# ============================================================================
+# Article Model Tests
+# ============================================================================
+
+
 @pytest.mark.django_db
 class TestArticleModel:
     """Tests for Article model."""
@@ -75,6 +80,107 @@ class TestArticleModel:
         articles = list(Article.objects.filter(is_published=True))
         # Should be ordered by published_at descending
         assert articles[0].published_at >= articles[1].published_at
+
+
+# ============================================================================
+# Article Soft Delete Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestArticleSoftDelete:
+    """Tests for Article soft delete functionality."""
+
+    def test_soft_delete_article(self, published_article):
+        """Test soft deleting an article."""
+        published_article.soft_delete()
+
+        published_article.refresh_from_db()
+        assert published_article.is_deleted is True
+        assert published_article.deleted_at is not None
+
+    def test_soft_delete_hides_from_api(self, api_client, published_article):
+        """Test that soft-deleted articles don't appear in public API."""
+        response = api_client.get('/api/v1/articles/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+        published_article.soft_delete()
+
+        response = api_client.get('/api/v1/articles/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 0
+
+    def test_soft_delete_still_appears_in_admin_api(self, admin_client, published_article):
+        """Test that soft-deleted articles still appear in admin API (for management)."""
+        response = admin_client.get('/api/v1/admin/articles/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+        published_article.soft_delete()
+
+        # Admin should still see soft-deleted items for management
+        response = admin_client.get('/api/v1/admin/articles/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+    def test_restore_article(self, published_article):
+        """Test restoring a soft-deleted article."""
+        published_article.soft_delete()
+        published_article.restore()
+
+        published_article.refresh_from_db()
+        assert published_article.is_deleted is False
+        assert published_article.deleted_at is None
+
+    def test_restore_makes_visible_in_api(self, api_client, published_article):
+        """Test that restored articles appear in public API."""
+        published_article.soft_delete()
+
+        response = api_client.get('/api/v1/articles/')
+        assert len(response.data['results']) == 0
+
+        published_article.restore()
+
+        response = api_client.get('/api/v1/articles/')
+        assert len(response.data['results']) == 1
+
+    def test_hard_delete_article(self, published_article):
+        """Test hard deleting an article."""
+        pk = published_article.pk
+        published_article.hard_delete()
+
+        assert not Article.objects.with_deleted().filter(pk=pk).exists()
+
+    def test_soft_deleted_article_detail_404(self, api_client, published_article):
+        """Test that soft-deleted article returns 404 on detail."""
+        response = api_client.get(f'/api/v1/articles/{published_article.slug}/')
+        assert response.status_code == 200
+
+        published_article.soft_delete()
+
+        response = api_client.get(f'/api/v1/articles/{published_article.slug}/')
+        assert response.status_code == 404
+
+    def test_multiple_articles_soft_delete(self, sample_articles):
+        """Test soft deleting multiple articles."""
+        # Soft delete first 2 articles
+        sample_articles[0].soft_delete()
+        sample_articles[1].soft_delete()
+
+        # Only 3 should remain visible
+        assert Article.objects.count() == 3
+
+        # 2 should be in deleted_only
+        assert Article.objects.deleted_only().count() == 2
+
+        # All 5 should be in with_deleted
+        assert Article.objects.with_deleted().count() == 5
+
+
+# ============================================================================
+# Article API Tests
+# ============================================================================
 
 
 @pytest.mark.django_db
@@ -160,8 +266,30 @@ class TestArticleAdminAPI:
         assert response.status_code == 200
         assert response.data['title'] == 'Updated Title'
 
-    def test_admin_delete_article(self, admin_client, published_article):
-        """Test deleting an article via admin API."""
+    def test_admin_soft_delete_article(self, admin_client, published_article):
+        """Test soft deleting an article via admin API."""
         response = admin_client.delete(f'/api/v1/admin/articles/{published_article.pk}/')
         assert response.status_code == 204
-        assert Article.objects.count() == 0
+
+        # Article should still exist but be soft deleted
+        assert Article.objects.with_deleted().filter(pk=published_article.pk).exists()
+        assert not Article.objects.filter(pk=published_article.pk).exists()
+
+    def test_admin_restore_article(self, admin_client, published_article):
+        """Test restoring a soft-deleted article via admin API."""
+        # First soft delete
+        published_article.soft_delete()
+
+        # Verify it's soft deleted
+        assert published_article.is_deleted is True
+
+        # Restore via PATCH
+        response = admin_client.patch(
+            f'/api/v1/admin/articles/{published_article.pk}/',
+            {'is_deleted': False},
+            format='json'
+        )
+        assert response.status_code == 200
+
+        # Article should be visible again in public API
+        assert Article.objects.filter(pk=published_article.pk).exists()

@@ -70,6 +70,11 @@ def sample_cars(db):
     return cars
 
 
+# ============================================================================
+# Car Model Tests
+# ============================================================================
+
+
 @pytest.mark.django_db
 class TestCarModel:
     """Tests for Car model."""
@@ -116,6 +121,107 @@ class TestCarModel:
         """Test ordering by display_order."""
         cars = list(Car.objects.all())
         assert cars[0].display_order <= cars[1].display_order
+
+
+# ============================================================================
+# Car Soft Delete Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestCarSoftDelete:
+    """Tests for Car soft delete functionality."""
+
+    def test_soft_delete_car(self, sample_car):
+        """Test soft deleting a car."""
+        sample_car.soft_delete()
+
+        sample_car.refresh_from_db()
+        assert sample_car.is_deleted is True
+        assert sample_car.deleted_at is not None
+
+    def test_soft_delete_hides_from_api(self, api_client, sample_car):
+        """Test that soft-deleted cars don't appear in public API."""
+        response = api_client.get('/api/v1/cars/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+        sample_car.soft_delete()
+
+        response = api_client.get('/api/v1/cars/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 0
+
+    def test_soft_delete_still_appears_in_admin_api(self, admin_client, sample_car):
+        """Test that soft-deleted cars still appear in admin API (for management)."""
+        response = admin_client.get('/api/v1/admin/cars/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+        sample_car.soft_delete()
+
+        # Admin should still see soft-deleted items for management
+        response = admin_client.get('/api/v1/admin/cars/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+    def test_restore_car(self, sample_car):
+        """Test restoring a soft-deleted car."""
+        sample_car.soft_delete()
+        sample_car.restore()
+
+        sample_car.refresh_from_db()
+        assert sample_car.is_deleted is False
+        assert sample_car.deleted_at is None
+
+    def test_restore_makes_visible_in_api(self, api_client, sample_car):
+        """Test that restored cars appear in public API."""
+        sample_car.soft_delete()
+
+        response = api_client.get('/api/v1/cars/')
+        assert len(response.data['results']) == 0
+
+        sample_car.restore()
+
+        response = api_client.get('/api/v1/cars/')
+        assert len(response.data['results']) == 1
+
+    def test_hard_delete_car(self, sample_car):
+        """Test hard deleting a car."""
+        pk = sample_car.pk
+        sample_car.hard_delete()
+
+        assert not Car.objects.with_deleted().filter(pk=pk).exists()
+
+    def test_soft_deleted_car_detail_404(self, api_client, sample_car):
+        """Test that soft-deleted car returns 404 on detail."""
+        response = api_client.get(f'/api/v1/cars/{sample_car.slug}/')
+        assert response.status_code == 200
+
+        sample_car.soft_delete()
+
+        response = api_client.get(f'/api/v1/cars/{sample_car.slug}/')
+        assert response.status_code == 404
+
+    def test_multiple_cars_soft_delete(self, sample_cars):
+        """Test soft deleting multiple cars."""
+        # Soft delete first 2 cars
+        sample_cars[0].soft_delete()
+        sample_cars[1].soft_delete()
+
+        # Only 3 should remain visible
+        assert Car.objects.count() == 3
+
+        # 2 should be in deleted_only
+        assert Car.objects.deleted_only().count() == 2
+
+        # All 5 should be in with_deleted
+        assert Car.objects.with_deleted().count() == 5
+
+
+# ============================================================================
+# Car API Tests
+# ============================================================================
 
 
 @pytest.mark.django_db
@@ -206,8 +312,30 @@ class TestCarAdminAPI:
         assert response.status_code == 200
         assert response.data['brand'] == 'Updated Brand'
 
-    def test_admin_delete_car(self, admin_client, sample_car):
-        """Test deleting a car via admin API."""
+    def test_admin_soft_delete_car(self, admin_client, sample_car):
+        """Test soft deleting a car via admin API (DELETE now does soft delete)."""
         response = admin_client.delete(f'/api/v1/admin/cars/{sample_car.pk}/')
         assert response.status_code == 204
-        assert Car.objects.count() == 0
+
+        # Car should still exist but be soft deleted
+        assert Car.objects.with_deleted().filter(pk=sample_car.pk).exists()
+        assert not Car.objects.filter(pk=sample_car.pk).exists()
+
+    def test_admin_restore_car(self, admin_client, sample_car):
+        """Test restoring a soft-deleted car via admin API."""
+        # First soft delete
+        sample_car.soft_delete()
+
+        # Verify it's soft deleted
+        assert sample_car.is_deleted is True
+
+        # Restore via PATCH
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {'is_deleted': False},
+            format='json'
+        )
+        assert response.status_code == 200
+
+        # Car should be visible again in public API
+        assert Car.objects.filter(pk=sample_car.pk).exists()

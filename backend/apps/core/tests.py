@@ -1,8 +1,196 @@
 import pytest
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.cars.models import Car
+from .mixins import SoftDeleteManager, SoftDeleteMixin
 from .models import HeroSlide, Redirect, SiteSettings, WhyFeature
+
+
+# ============================================================================
+# SoftDeleteMixin Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestSoftDeleteMixin:
+    """Tests for SoftDeleteMixin functionality."""
+
+    def test_soft_delete_sets_flags(self, sample_car):
+        """Test that soft_delete sets is_deleted and deleted_at."""
+        assert sample_car.is_deleted is False
+        assert sample_car.deleted_at is None
+
+        sample_car.soft_delete()
+
+        sample_car.refresh_from_db()
+        assert sample_car.is_deleted is True
+        assert sample_car.deleted_at is not None
+
+    def test_soft_delete_hides_from_default_manager(self, sample_car):
+        """Test that soft-deleted items are hidden from default manager."""
+        assert Car.objects.filter(pk=sample_car.pk).exists()
+
+        sample_car.soft_delete()
+
+        # Should not appear in default queryset
+        assert not Car.objects.filter(pk=sample_car.pk).exists()
+
+    def test_soft_delete_visible_in_with_deleted(self, sample_car):
+        """Test that soft-deleted items appear in with_deleted()."""
+        sample_car.soft_delete()
+
+        # Should appear in with_deleted queryset
+        assert Car.objects.with_deleted().filter(pk=sample_car.pk).exists()
+
+    def test_soft_delete_only_in_deleted_only(self, sample_car):
+        """Test that soft-deleted items appear in deleted_only()."""
+        sample_car.soft_delete()
+
+        # Should appear in deleted_only queryset
+        assert Car.objects.deleted_only().filter(pk=sample_car.pk).exists()
+
+    def test_restore_removes_flags(self, sample_car):
+        """Test that restore clears is_deleted and deleted_at."""
+        sample_car.soft_delete()
+        sample_car.restore()
+
+        sample_car.refresh_from_db()
+        assert sample_car.is_deleted is False
+        assert sample_car.deleted_at is None
+
+    def test_restore_makes_visible_again(self, sample_car):
+        """Test that restore makes item visible in default manager."""
+        sample_car.soft_delete()
+        assert not Car.objects.filter(pk=sample_car.pk).exists()
+
+        sample_car.restore()
+        assert Car.objects.filter(pk=sample_car.pk).exists()
+
+    def test_hard_delete_removes_permanently(self, sample_car):
+        """Test that hard_delete permanently removes the record."""
+        pk = sample_car.pk
+        sample_car.hard_delete()
+
+        # Should not appear in any queryset
+        assert not Car.objects.filter(pk=pk).exists()
+        assert not Car.objects.with_deleted().filter(pk=pk).exists()
+
+    def test_soft_delete_preserves_data(self, sample_car):
+        """Test that soft delete preserves all original data."""
+        original_brand = sample_car.brand
+        original_model = sample_car.model
+
+        sample_car.soft_delete()
+
+        # Data should still be accessible via with_deleted
+        retrieved = Car.objects.with_deleted().get(pk=sample_car.pk)
+        assert retrieved.brand == original_brand
+        assert retrieved.model == original_model
+
+    def test_multiple_soft_deletes_are_idempotent(self, sample_car):
+        """Test that calling soft_delete multiple times doesn't break."""
+        sample_car.soft_delete()
+        first_deleted_at = sample_car.deleted_at
+
+        sample_car.soft_delete()
+        sample_car.refresh_from_db()
+
+        # Should still be soft deleted
+        assert sample_car.is_deleted is True
+        # deleted_at should be updated to the latest call
+        assert sample_car.deleted_at >= first_deleted_at
+
+    def test_restore_on_non_deleted_item(self, sample_car):
+        """Test that restore on non-deleted item is safe."""
+        # Should not raise any errors
+        sample_car.restore()
+        sample_car.refresh_from_db()
+
+        assert sample_car.is_deleted is False
+        assert sample_car.deleted_at is None
+
+
+# ============================================================================
+# SoftDeleteManager Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestSoftDeleteManager:
+    """Tests for SoftDeleteManager."""
+
+    def test_get_queryset_excludes_deleted(self, sample_cars):
+        """Test that get_queryset excludes soft-deleted items."""
+        # Soft delete one car
+        sample_cars[0].soft_delete()
+
+        # Default manager should exclude it
+        assert Car.objects.count() == len(sample_cars) - 1
+
+    def test_with_deleted_includes_all(self, sample_cars):
+        """Test that with_deleted includes all items."""
+        sample_cars[0].soft_delete()
+
+        # with_deleted should include all
+        assert Car.objects.with_deleted().count() == len(sample_cars)
+
+    def test_deleted_only_returns_only_deleted(self, sample_cars):
+        """Test that deleted_only returns only soft-deleted items."""
+        sample_cars[0].soft_delete()
+        sample_cars[1].soft_delete()
+
+        # deleted_only should return only deleted items
+        assert Car.objects.deleted_only().count() == 2
+        assert set(Car.objects.deleted_only()) == {sample_cars[0], sample_cars[1]}
+
+
+# ============================================================================
+# SoftDelete with Filtering Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestSoftDeleteWithFiltering:
+    """Tests for soft delete combined with filtering."""
+
+    def test_filter_active_excludes_deleted(self, sample_cars):
+        """Test that filtering active items excludes soft-deleted."""
+        # Soft delete an active car
+        active_car = next(c for c in sample_cars if c.is_active)
+        active_car.soft_delete()
+
+        # Active cars should exclude the soft-deleted one
+        active_cars = Car.objects.filter(is_active=True)
+        assert active_car not in active_cars
+
+    def test_filter_by_brand_excludes_deleted(self, sample_cars):
+        """Test that filtering by brand excludes soft-deleted."""
+        # Soft delete a car
+        sample_cars[0].soft_delete()
+
+        # Filter by brand should not include soft-deleted
+        brand_cars = Car.objects.filter(brand=sample_cars[0].brand)
+        assert sample_cars[0] not in brand_cars
+
+    def test_search_excludes_deleted(self, sample_cars):
+        """Test that search excludes soft-deleted items."""
+        # Soft delete a car
+        sample_cars[0].soft_delete()
+
+        # Search should not find soft-deleted car
+        from django.db.models import Q
+        search_results = Car.objects.filter(
+            Q(brand__icontains=sample_cars[0].brand) |
+            Q(model__icontains=sample_cars[0].model)
+        )
+        assert sample_cars[0] not in search_results
+
+
+# ============================================================================
+# Existing Core Model Tests
+# ============================================================================
 
 
 @pytest.mark.django_db

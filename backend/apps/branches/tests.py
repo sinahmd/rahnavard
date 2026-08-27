@@ -51,6 +51,11 @@ def sample_branches(db):
     return branches
 
 
+# ============================================================================
+# Branch Model Tests
+# ============================================================================
+
+
 @pytest.mark.django_db
 class TestBranchModel:
     """Tests for Branch model."""
@@ -68,6 +73,97 @@ class TestBranchModel:
         """Test ordering by display_order."""
         branches = list(Branch.objects.all())
         assert branches[0].display_order <= branches[1].display_order
+
+
+# ============================================================================
+# Branch Soft Delete Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestBranchSoftDelete:
+    """Tests for Branch soft delete functionality."""
+
+    def test_soft_delete_branch(self, sample_branch):
+        """Test soft deleting a branch."""
+        sample_branch.soft_delete()
+
+        sample_branch.refresh_from_db()
+        assert sample_branch.is_deleted is True
+        assert sample_branch.deleted_at is not None
+
+    def test_soft_delete_hides_from_api(self, api_client, sample_branch):
+        """Test that soft-deleted branches don't appear in public API."""
+        response = api_client.get('/api/v1/branches/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+        sample_branch.soft_delete()
+
+        response = api_client.get('/api/v1/branches/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 0
+
+    def test_soft_delete_still_appears_in_admin_api(self, admin_client, sample_branch):
+        """Test that soft-deleted branches still appear in admin API (for management)."""
+        response = admin_client.get('/api/v1/admin/branches/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+        sample_branch.soft_delete()
+
+        # Admin should still see soft-deleted items for management
+        response = admin_client.get('/api/v1/admin/branches/')
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+
+    def test_restore_branch(self, sample_branch):
+        """Test restoring a soft-deleted branch."""
+        sample_branch.soft_delete()
+        sample_branch.restore()
+
+        sample_branch.refresh_from_db()
+        assert sample_branch.is_deleted is False
+        assert sample_branch.deleted_at is None
+
+    def test_restore_makes_visible_in_api(self, api_client, sample_branch):
+        """Test that restored branches appear in public API."""
+        sample_branch.soft_delete()
+
+        response = api_client.get('/api/v1/branches/')
+        assert len(response.data['results']) == 0
+
+        sample_branch.restore()
+
+        response = api_client.get('/api/v1/branches/')
+        assert len(response.data['results']) == 1
+
+    def test_hard_delete_branch(self, sample_branch):
+        """Test hard deleting a branch."""
+        pk = sample_branch.pk
+        sample_branch.hard_delete()
+
+        assert not Branch.objects.with_deleted().filter(pk=pk).exists()
+
+    def test_multiple_branches_soft_delete(self, sample_branches):
+        """Test soft deleting multiple branches."""
+        # Soft delete first 2 branches
+        sample_branches[0].soft_delete()
+        sample_branches[1].soft_delete()
+
+        # Only 1 should remain visible
+        assert Branch.objects.count() == 1
+
+        # 2 should be in deleted_only
+        assert Branch.objects.deleted_only().count() == 2
+
+        # All 3 should be in with_deleted
+        assert Branch.objects.with_deleted().count() == 3
+
+
+# ============================================================================
+# Branch API Tests
+# ============================================================================
 
 
 @pytest.mark.django_db
@@ -126,8 +222,30 @@ class TestBranchAdminAPI:
         assert response.status_code == 200
         assert response.data['name'] == 'نام جدید'
 
-    def test_admin_delete_branch(self, admin_client, sample_branch):
-        """Test deleting a branch via admin API."""
+    def test_admin_soft_delete_branch(self, admin_client, sample_branch):
+        """Test soft deleting a branch via admin API."""
         response = admin_client.delete(f'/api/v1/admin/branches/{sample_branch.pk}/')
         assert response.status_code == 204
-        assert Branch.objects.count() == 0
+
+        # Branch should still exist but be soft deleted
+        assert Branch.objects.with_deleted().filter(pk=sample_branch.pk).exists()
+        assert not Branch.objects.filter(pk=sample_branch.pk).exists()
+
+    def test_admin_restore_branch(self, admin_client, sample_branch):
+        """Test restoring a soft-deleted branch via admin API."""
+        # First soft delete
+        sample_branch.soft_delete()
+
+        # Verify it's soft deleted
+        assert sample_branch.is_deleted is True
+
+        # Restore via PATCH
+        response = admin_client.patch(
+            f'/api/v1/admin/branches/{sample_branch.pk}/',
+            {'is_deleted': False},
+            format='json'
+        )
+        assert response.status_code == 200
+
+        # Branch should be visible again in public API
+        assert Branch.objects.filter(pk=sample_branch.pk).exists()
