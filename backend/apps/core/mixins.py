@@ -11,19 +11,41 @@ from django.db import models
 from django.utils import timezone
 
 
+class SoftDeleteQuerySet(models.QuerySet):
+    """QuerySet that prevents accidental hard deletes via .delete()."""
+
+    def delete(self):
+        """Override delete to perform soft delete instead.
+
+        This prevents accidental data loss from:
+        - MyModel.objects.filter(...).delete()
+        - MyModel.objects.all().delete()
+        """
+        # Soft delete all items in the queryset
+        from django.utils import timezone as tz
+        now = tz.now()
+        count = self.count()
+        self.update(is_deleted=True, deleted_at=now)
+        return count, {}
+
+    def hard_delete(self):
+        """Permanently delete all items in the queryset."""
+        return super().delete()
+
+
 class SoftDeleteManager(models.Manager):
     """Manager that excludes soft-deleted records by default."""
 
     def get_queryset(self):
-        return super().get_queryset().filter(is_deleted=False)
+        return SoftDeleteQuerySet(self.model, using=self._db).filter(is_deleted=False)
 
     def with_deleted(self):
         """Include soft-deleted records."""
-        return super().get_queryset()
+        return SoftDeleteQuerySet(self.model, using=self._db)
 
     def deleted_only(self):
         """Only soft-deleted records."""
-        return super().get_queryset().filter(is_deleted=True)
+        return SoftDeleteQuerySet(self.model, using=self._db).filter(is_deleted=True)
 
 
 class SoftDeleteMixin(models.Model):
@@ -38,6 +60,7 @@ class SoftDeleteMixin(models.Model):
         - soft_delete(): Mark as deleted without removing from database
         - restore(): Restore a soft-deleted record
         - hard_delete(): Permanently delete (use with caution!)
+        - delete(): Overridden to call soft_delete() instead
     """
 
     is_deleted = models.BooleanField(
@@ -55,6 +78,15 @@ class SoftDeleteMixin(models.Model):
 
     class Meta:
         abstract = True
+
+    def delete(self, *args, **kwargs):
+        """Override delete to perform soft delete.
+
+        This prevents accidental data loss from:
+        - instance.delete()
+        - Django admin 'Delete selected' action
+        """
+        self.soft_delete()
 
     def soft_delete(self):
         """Mark as deleted without removing from database."""

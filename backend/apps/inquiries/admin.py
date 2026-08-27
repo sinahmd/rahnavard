@@ -17,6 +17,13 @@ class InquiryAdmin(admin.ModelAdmin):
         """Include soft-deleted items in admin."""
         return self.model.objects.with_deleted()
 
+    def get_actions(self, request):
+        """Remove Django's default 'Delete selected' action to prevent hard deletes."""
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
     def deleted_status(self, obj):
         """Show delete status with color."""
         if obj.is_deleted:
