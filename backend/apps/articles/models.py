@@ -10,7 +10,7 @@ class Article(SoftDeleteMixin, models.Model):
 
     title = models.CharField(max_length=300, verbose_name="عنوان")
     slug = models.SlugField(
-        unique=True, db_index=True, allow_unicode=True, blank=True, verbose_name="اسلاگ"
+        max_length=300, db_index=True, allow_unicode=True, blank=True, verbose_name="اسلاگ"
     )
     excerpt = models.TextField(blank=True, verbose_name="خلاصه")
     content = models.TextField(verbose_name="محتوا")
@@ -39,6 +39,13 @@ class Article(SoftDeleteMixin, models.Model):
         verbose_name = "مقاله"
         verbose_name_plural = "مقالات"
         ordering = ["-published_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['slug'],
+                condition=models.Q(is_deleted=False),
+                name='article_slug_unique_when_not_deleted',
+            ),
+        ]
         indexes = [
             models.Index(fields=['is_published', 'published_at', 'is_deleted']),
         ]
@@ -52,9 +59,10 @@ class Article(SoftDeleteMixin, models.Model):
             self.slug = self._generate_slug()
 
         # Check if slug changed and create redirect
+        # Use with_deleted() to find the old instance even if soft-deleted
         if self.pk:
             try:
-                old_instance = Article.objects.get(pk=self.pk)
+                old_instance = Article.objects.with_deleted().get(pk=self.pk)
                 if old_instance.slug != self.slug:
                     Redirect.objects.create(
                         old_path=f"/articles/{old_instance.slug}",

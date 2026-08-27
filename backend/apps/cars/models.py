@@ -25,7 +25,7 @@ class Car(SoftDeleteMixin, models.Model):
     model = models.CharField(max_length=100, verbose_name="مدل")
     persian_name = models.CharField(max_length=200, verbose_name="نام فارسی")
     slug = models.SlugField(
-        unique=True, db_index=True, allow_unicode=True, blank=True, verbose_name="اسلاگ"
+        max_length=200, db_index=True, allow_unicode=True, blank=True, verbose_name="اسلاگ"
     )
     description = models.TextField(blank=True, verbose_name="توضیحات")
     year = models.IntegerField(verbose_name="سال ساخت")
@@ -64,6 +64,13 @@ class Car(SoftDeleteMixin, models.Model):
         verbose_name = "خودرو"
         verbose_name_plural = "خودروها"
         ordering = ["display_order", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['slug'],
+                condition=models.Q(is_deleted=False),
+                name='car_slug_unique_when_not_deleted',
+            ),
+        ]
         indexes = [
             models.Index(fields=['brand', 'is_active', 'is_deleted']),
             models.Index(fields=['year', 'is_active', 'is_deleted']),
@@ -82,9 +89,10 @@ class Car(SoftDeleteMixin, models.Model):
             self.slug = self._generate_slug()
 
         # Check if slug changed and create redirect
+        # Use with_deleted() to find the old instance even if soft-deleted
         if self.pk:
             try:
-                old_instance = Car.objects.get(pk=self.pk)
+                old_instance = Car.objects.with_deleted().get(pk=self.pk)
                 if old_instance.slug != self.slug:
                     Redirect.objects.create(
                         old_path=f"/cars/{old_instance.slug}",
