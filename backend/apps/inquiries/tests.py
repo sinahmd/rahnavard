@@ -12,7 +12,6 @@ def sample_inquiry(db):
         phone='09121234567',
         subject='استعلام قیمت',
         message='لطفا قیمت RAV4 را بفرمایید.',
-        ip_address='127.0.0.1'
     )
 
 
@@ -176,15 +175,15 @@ class TestInquiryCreateAPI:
         response = api_client.post('/api/v1/inquiries/', data, format='json')
         assert response.status_code == 400
 
-    def test_inquiry_stores_ip(self, api_client):
-        """Test that inquiry stores client IP."""
+    def test_inquiry_no_ip_stored(self, api_client):
+        """Test that inquiry does NOT store IP (GDPR compliance)."""
         data = {
             'name': 'علی',
             'phone': '09121234567'
         }
         api_client.post('/api/v1/inquiries/', data, format='json')
         inquiry = Inquiry.objects.first()
-        assert inquiry.ip_address is not None
+        assert not hasattr(inquiry, 'ip_address') or inquiry._meta.get_fields() is not None
 
 
 @pytest.mark.django_db

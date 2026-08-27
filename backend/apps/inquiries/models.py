@@ -15,12 +15,6 @@ class Inquiry(SoftDeleteMixin, models.Model):
     is_read = models.BooleanField(default=False, verbose_name="خوانده شده")
     is_contacted = models.BooleanField(default=False, verbose_name="تماس گرفته شده")
 
-    # Metadata
-    ip_address = models.GenericIPAddressField(
-        null=True, blank=True, verbose_name="آدرس IP"
-    )
-    user_agent = models.TextField(blank=True, verbose_name="User Agent")
-
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاریخ ایجاد")
 
