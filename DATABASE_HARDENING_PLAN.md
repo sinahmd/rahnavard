@@ -1,26 +1,38 @@
-# Database Hardening — Implementation Plan
+# Database Hardening — Implementation Report
 
 > **Purpose:** Fix critical database issues before production launch
-> **Estimated Time:** 3-4 hours
-> **Risk Level:** Medium (all changes are additive, no data loss)
+> **Status:** ✅ Phases 1-3 Complete, 4-6 Planned
+> **Tests:** 168/168 passing
 
 ---
 
-## Priority Overview
+## Implementation Status
 
-| Priority | Task | Risk | Time | Dependencies |
-|----------|------|------|------|--------------|
-| P0 | Add soft delete to Car | Low | 30 min | None |
-| P0 | Add soft delete to Article | Low | 20 min | None |
-| P1 | Add missing database indexes | Low | 20 min | None |
-| P1 | Remove IP/User-Agent storage (GDPR) | Medium | 15 min | None |
-| P2 | Add soft delete to Branch | Low | 15 min | None |
-| P2 | Add soft delete to Inquiry | Low | 15 min | None |
-| P2 | Fix SiteSettings singleton pattern | Low | 20 min | None |
-| P3 | Add audit logging | Medium | 45 min | P0 (soft delete) |
-| P3 | Add database backup script | Low | 20 min | None |
+| Phase | Status | Commits |
+|-------|--------|--------|
+| Phase 1: Soft Delete | ✅ Complete | `6783e0f`, `2023375`, `2ee006c`, `a8278fa`, `81ac352`, `bb1d1ce` |
+| Phase 2: Database Indexes | ✅ Complete | `a13bde7` |
+| Phase 3: GDPR Compliance | ✅ Complete | `cd28ca1` |
+| Phase 4: Accidental Hard Delete Prevention | ✅ Complete | `5dc80da` |
+| Phase 5: Unique Slug Fix | ✅ Complete | `084307b` |
+| Phase 6: Restore Endpoints | ✅ Complete | `46503ab` |
+| Phase 7: Comprehensive Tests | ✅ Complete | `fbfb651` |
+| Phase 8: Audit Logging | 🔲 Planned | — |
+| Phase 9: Database Backup | 🔲 Planned | — |
 
-**Total: ~3 hours**
+---
+
+## Quick Reference: Access Points
+
+| Service | Local URL | Production URL |
+|---------|-----------|----------------|
+| Frontend | http://localhost:3000 | https://rahnavard.co |
+| Backend API | http://localhost:8000/api/v1/ | https://rahnavard.co/api/v1/ |
+| Django Admin | http://localhost:8000/django-admin/ | https://rahnavard.co/django-admin/ |
+| PostgreSQL | localhost:5432 | — |
+
+> ⚠️ **Note:** Local django-admin is on port 8000 (backend), not 3000 (frontend).
+> In production, nginx routes `/django-admin/` to the backend automatically.
 
 ---
 
@@ -626,16 +638,22 @@ docker compose up --build -d
 
 ## Success Criteria
 
-After implementation:
+### ✅ Completed
+- [x] All models have soft delete capability (Car, Article, Branch, Inquiry)
+- [x] All critical queries have database indexes (10 indexes total)
+- [x] No IP addresses stored (GDPR compliant)
+- [x] `instance.delete()` performs soft delete (not hard delete)
+- [x] `QuerySet.delete()` performs soft delete (not hard delete)
+- [x] Django admin "Delete selected" removed (prevents hard delete)
+- [x] Slug uniqueness allows reuse after soft delete
+- [x] Explicit restore endpoint: `POST /admin/{resource}/{pk}/restore/`
+- [x] `is_deleted` is read-only in admin serializers
+- [x] 168 tests passing
 
-- [ ] All models have soft delete capability
-- [ ] All critical queries have database indexes
-- [ ] No IP addresses stored (GDPR compliant)
-- [ ] SiteSettings cannot be accidentally deleted
-- [ ] All changes are logged in AuditLog
-- [ ] Daily backups are configured
-- [ ] All tests pass
-- [ ] No breaking changes to existing API
+### 🔲 Planned
+- [ ] Audit logging (who deleted/restored)
+- [ ] Daily database backups
+- [ ] SiteSettings singleton protection
 
 ---
 
