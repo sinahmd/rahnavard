@@ -69,6 +69,8 @@ class Car(SoftDeleteMixin, models.Model):
             models.Index(fields=['year', 'is_active', 'is_deleted']),
             models.Index(fields=['is_featured', 'is_active', 'is_deleted']),
             models.Index(fields=['display_order', 'created_at']),
+            models.Index(fields=['fuel_type', 'is_active']),
+            models.Index(fields=['transmission', 'is_active']),
         ]
 
     def __str__(self):

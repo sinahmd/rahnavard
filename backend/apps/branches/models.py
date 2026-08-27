@@ -32,6 +32,9 @@ class Branch(SoftDeleteMixin, models.Model):
         verbose_name = "شعبه"
         verbose_name_plural = "شعب"
         ordering = ["display_order"]
+        indexes = [
+            models.Index(fields=['is_active', 'display_order']),
+        ]
 
     def __str__(self):
         return self.name
