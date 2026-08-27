@@ -126,7 +126,33 @@ docker compose up --build
 | Django Admin | http://localhost:8000/django-admin/ | Superuser access |
 | PostgreSQL | localhost:5432 | User: `user`, Pass: `pass` |
 
-### 3.3 Useful commands
+### 3.3 Hot Reloading — Changes Appear Instantly
+
+Your Docker setup uses **volume mounts**, which means your local files are synced into the containers in real-time:
+
+```yaml
+volumes:
+  - ./frontend:/app    # Local files → container
+  - ./backend:/app     # Local files → container
+```
+
+**What updates IMMEDIATELY (no rebuild needed):**
+| Change Type | Frontend | Backend |
+|-------------|----------|---------|
+| Edit `.tsx` / `.ts` / `.js` files | ✅ Instant (Next.js HMR) | — |
+| Edit `.css` / Tailwind classes | ✅ Instant | — |
+| Edit `.py` files | — | ✅ Instant (Django auto-reload) |
+| Edit API serializer / views | — | ✅ Instant |
+
+**What REQUIRES a rebuild:**
+| Change Type | Command |
+|-------------|---------|
+| Add new npm package | `docker compose exec frontend npm install <pkg>` |
+| Change `Dockerfile` | `docker compose up --build` |
+| Add new Python package | `docker compose exec backend pip install <pkg>` |
+| Change `.env` files | `docker compose restart` |
+
+### 3.4 Useful commands
 
 ```bash
 # Start / stop
@@ -291,6 +317,28 @@ docker compose build
 docker compose build --no-cache
 ```
 
+### "npm install fails with 403 Forbidden (npm mirror)"
+
+The frontend Dockerfiles use npm mirrors for faster installs. Each Dockerfile has a **different** mirror:
+
+| File | Mirror | Used by |
+|------|--------|----------|
+| `frontend/Dockerfile` | `npm.arvancloud.ir` (Iran) | Local dev | 
+| `frontend/Dockerfile.prod` | `registry.npmmirror.com` (China) | Production (Arvan Cloud) |
+
+**If you're outside Iran**, the Arvan mirror may return 403 Forbidden:
+```
+npm error 403 403 Forbidden - GET https://npm.arvancloud.ir/yocto-queue/-/yocto-queue-0.1.0.tgz
+```
+
+**Fix for local development:** Remove or comment out the line in `frontend/Dockerfile`:
+
+```dockerfile
+# RUN npm config set registry https://npm.arvancloud.ir/
+```
+
+> ⚠️ **Do NOT change `frontend/Dockerfile.prod`** — the production server uses `registry.npmmirror.com` and it works fine from Arvan Cloud. This fix is only for your local `Dockerfile`.
+
 ### "I accidentally committed to main"
 ```bash
 # Move the commit to develop
@@ -342,6 +390,34 @@ git push origin main
 - 🔲 Multi-language support (EN version)
 - 🔲 Performance optimization (caching, CDN)
 - 🔲 Accessibility audit and fixes
+
+---
+
+## 11. Local-Only Changes (develop branch)
+
+> ⚠️ **These changes exist ONLY on `develop` and should NOT be merged to `main`.**
+> They are for local development convenience only.
+
+| File | Change | Reason | Merge to main? |
+|------|--------|--------|----------------|
+| `frontend/Dockerfile` | Removed `npm.arvancloud.ir` mirror | Mirror returns 403 outside Iran | ❌ No |
+| `frontend/.dockerignore` | Created | Speeds up local Docker builds | ✅ Yes |
+| `backend/.dockerignore` | Created | Speeds up local Docker builds | ✅ Yes |
+| `backend/apps/core/mixins.py` | Created `SoftDeleteMixin` | Data safety feature | ✅ Yes |
+| `backend/apps/*/models.py` | Added soft delete fields | Data safety feature | ✅ Yes |
+| `backend/apps/*/views.py` | Admin views use `with_deleted()` | Admin needs to see deleted items | ✅ Yes |
+| `backend/apps/*/serializers.py` | Added `is_deleted` to admin serializers | Admin restore functionality | ✅ Yes |
+| `backend/apps/*/admin.py` | Added restore/delete actions | Admin UI improvement | ✅ Yes |
+
+### What to restore before merging to main:
+
+```bash
+# In frontend/Dockerfile, uncomment the Arvan mirror line:
+# RUN npm config set registry https://npm.arvancloud.ir/
+```
+
+> **Note:** The soft delete changes (mixins, models, views, serializers) are **safe to merge**.
+> Only the Dockerfile change needs to be restored.
 
 ---
 
