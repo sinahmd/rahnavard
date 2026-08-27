@@ -1,10 +1,11 @@
 from django.db import models
 from django.utils.text import slugify
 
+from apps.core.mixins import SoftDeleteMixin
 from apps.core.models import Redirect
 
 
-class Car(models.Model):
+class Car(SoftDeleteMixin, models.Model):
     """Model for cars."""
 
     FUEL_TYPE_CHOICES = [
@@ -63,6 +64,12 @@ class Car(models.Model):
         verbose_name = "خودرو"
         verbose_name_plural = "خودروها"
         ordering = ["display_order", "-created_at"]
+        indexes = [
+            models.Index(fields=['brand', 'is_active', 'is_deleted']),
+            models.Index(fields=['year', 'is_active', 'is_deleted']),
+            models.Index(fields=['is_featured', 'is_active', 'is_deleted']),
+            models.Index(fields=['display_order', 'created_at']),
+        ]
 
     def __str__(self):
         return f"{self.brand} {self.model}"

@@ -1,10 +1,11 @@
 from django.db import models
 from django.utils.text import slugify
 
+from apps.core.mixins import SoftDeleteMixin
 from apps.core.models import Redirect
 
 
-class Article(models.Model):
+class Article(SoftDeleteMixin, models.Model):
     """Model for articles."""
 
     title = models.CharField(max_length=300, verbose_name="عنوان")
@@ -38,6 +39,9 @@ class Article(models.Model):
         verbose_name = "مقاله"
         verbose_name_plural = "مقالات"
         ordering = ["-published_at"]
+        indexes = [
+            models.Index(fields=['is_published', 'published_at', 'is_deleted']),
+        ]
 
     def __str__(self):
         return self.title

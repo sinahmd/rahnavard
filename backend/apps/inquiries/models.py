@@ -1,7 +1,9 @@
 from django.db import models
 
+from apps.core.mixins import SoftDeleteMixin
 
-class Inquiry(models.Model):
+
+class Inquiry(SoftDeleteMixin, models.Model):
     """Model for customer inquiries."""
 
     name = models.CharField(max_length=200, verbose_name="نام")
@@ -26,6 +28,10 @@ class Inquiry(models.Model):
         verbose_name = "استعلام"
         verbose_name_plural = "استعلامات"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['is_read', 'created_at']),
+            models.Index(fields=['is_contacted', 'created_at']),
+        ]
 
     def __str__(self):
         return f'{self.name} - {self.subject or "بدون موضوع"}'
