@@ -250,47 +250,147 @@ Use descriptive names with a prefix:
 
 ---
 
-## 7. Release Process
+## 7. Full Merge Workflow (develop → main → develop)
 
-When `develop` has accumulated enough changes and is stable:
+> **This is the exact process for merging features to production and getting back to local dev.**
 
-### Step 1: Final checks on develop
+### Overview
+
+```
+develop (with local-only changes)
+    ↓
+Step 1: Revert local-only changes
+    ↓
+Step 2: Commit revert
+    ↓
+Step 3: git checkout main
+    ↓
+Step 4: git merge develop (fast-forward)
+    ↓
+Step 5: git push origin main (triggers deploy)
+    ↓
+Step 6: git checkout develop
+    ↓
+Step 7: git merge main (sync)
+    ↓
+Step 8: Re-apply local-only changes
+    ↓
+Step 9: git push origin develop
+    ↓
+develop ready for local dev again
+```
+
+---
+
+### Step-by-Step Commands
+
+#### Step 1: Make sure you're on develop and up to date
 ```bash
 git checkout develop
-cd frontend && npm run lint && npx tsc --noEmit && npm test
-cd backend && python manage.py check && pytest
+git pull origin develop
 ```
 
-### Step 2: Update version (if applicable)
+#### Step 2: Run final checks
 ```bash
-# Update version in package.json, etc.
+# Backend
+cd backend && python manage.py check && pytest --no-cov
+
+# Frontend
+cd frontend && npm run lint && npx tsc --noEmit
 ```
 
-### Step 3: Create PR → main
+#### Step 3: Revert local-only changes
+
+See [Section 11](#11-local-only-changes-develop-branch) for exact files.
+
 ```bash
-# On GitHub:
-# 1. Create PR: develop → main
-# 2. Title: "Release: <brief description>"
-# 3. Description: list all changes with links to commits
-# 4. Wait for CI to pass
-# 5. Review and merge
+# Revert Dockerfile (restore Arvan npm mirror)
+# Edit frontend/Dockerfile — uncomment the mirror line
+
+# Revert authFetch.ts (restore relative URLs)
+# Edit frontend/lib/authFetch.ts — remove API_BASE and fullUrl
 ```
 
-### Step 4: Verify deployment
+#### Step 4: Commit the revert
 ```bash
-# After merge to main:
-# 1. Check GitHub Actions for deploy status
-# 2. Visit https://rahnavard.co
-# 3. Check /api/v1/settings/ returns data
-# 4. Test admin panel at /admin
+git add frontend/Dockerfile frontend/lib/authFetch.ts
+git commit -m "revert: restore local-only changes for production merge"
 ```
 
-### Step 5: Sync develop
+#### Step 5: Switch to main and merge
+```bash
+git checkout main
+git merge develop --no-edit
+```
+
+#### Step 6: Push main (triggers deploy)
+```bash
+git push origin main
+# → GitHub Actions runs CI
+# → If CI passes, deploy triggers
+# → rahnavard.co updates in ~2-3 minutes
+```
+
+#### Step 7: Switch back to develop
 ```bash
 git checkout develop
-git merge main
+```
+
+#### Step 8: Sync develop with main
+```bash
+git merge main --no-edit
+# Usually "Already up to date" if only local-only changes were reverted
+```
+
+#### Step 9: Re-apply local-only changes
+
+```bash
+# Re-apply Dockerfile change (remove Arvan mirror for local dev)
+# Edit frontend/Dockerfile — remove the mirror line again
+
+# Re-apply authFetch change (use NEXT_PUBLIC_API_URL)
+# Edit frontend/lib/authFetch.ts — add API_BASE and fullUrl
+```
+
+#### Step 10: Commit and push
+```bash
+git add frontend/Dockerfile frontend/lib/authFetch.ts
+git commit -m "chore: re-apply local-only changes for Docker dev"
 git push origin develop
 ```
+
+---
+
+### Quick Reference (Copy-Paste)
+
+```bash
+# === MERGE TO PRODUCTION ===
+git checkout develop && git pull origin develop
+# [revert local-only changes]
+git add frontend/Dockerfile frontend/lib/authFetch.ts
+git commit -m "revert: restore local-only changes for production merge"
+git checkout main && git merge develop --no-edit && git push origin main
+
+# === BACK TO LOCAL DEV ===
+git checkout develop && git merge main --no-edit
+# [re-apply local-only changes]
+git add frontend/Dockerfile frontend/lib/authFetch.ts
+git commit -m "chore: re-apply local-only changes for Docker dev"
+git push origin develop
+```
+
+---
+
+### What Happens After Each Step
+
+| Step | What Happens | Risk |
+|------|-------------|------|
+| Revert local-only | Code matches production | 🟢 None |
+| Push main | GitHub Actions CI runs | 🟢 None |
+| CI passes | Deploy auto-triggers | 🟢 None |
+| Deploy completes | rahnavard.co updated | 🟢 None |
+| Back to develop | Local dev resumes | 🟢 None |
+| Re-apply local-only | Docker works locally again | 🟢 None |
 
 ---
 
@@ -436,4 +536,4 @@ return fetch(url, { ...options, headers })
 
 ---
 
-*Last updated: 2026-08-27*
+*Last updated: 2026-08-27 (updated merge workflow)*
