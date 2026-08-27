@@ -8,6 +8,9 @@ ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 
+# Use Arvan Cloud npm mirror (faster from Iran)
+RUN npm config set registry https://npm.arvancloud.ir/
+
 # Install dependencies
 COPY package*.json ./
 RUN npm install
