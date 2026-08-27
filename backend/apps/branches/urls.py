@@ -14,4 +14,9 @@ urlpatterns = [
         views.BranchAdminDetailView.as_view(),
         name="admin-branch-detail",
     ),
+    path(
+        "admin/branches/<int:pk>/restore/",
+        views.BranchRestoreView.as_view(),
+        name="admin-branch-restore",
+    ),
 ]

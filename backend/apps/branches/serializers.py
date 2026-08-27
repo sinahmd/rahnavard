@@ -42,7 +42,7 @@ class BranchAdminSerializer(serializers.ModelSerializer):
             "is_deleted",
             "deleted_at",
         ]
-        read_only_fields = ["deleted_at"]
+        read_only_fields = ["is_deleted", "deleted_at"]
         extra_kwargs = {
             "map_image": {"validators": [ImageValidator()]},
         }

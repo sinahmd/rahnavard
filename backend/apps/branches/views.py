@@ -1,4 +1,5 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
 
 from .models import Branch
 from .serializers import BranchAdminSerializer, BranchSerializer
@@ -38,3 +39,24 @@ class BranchAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         """Soft delete instead of hard delete."""
         instance.soft_delete()
+
+
+class BranchRestoreView(generics.GenericAPIView):
+    """Admin endpoint to restore a soft-deleted branch."""
+
+    serializer_class = BranchAdminSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Branch.objects.with_deleted()
+
+    def post(self, request, pk=None):
+        instance = self.get_object()
+        if not instance.is_deleted:
+            return Response(
+                {'detail': 'This branch is not soft-deleted.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        instance.restore()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)

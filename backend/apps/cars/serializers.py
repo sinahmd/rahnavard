@@ -97,7 +97,7 @@ class CarAdminSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["gallery", "deleted_at", "created_at", "updated_at"]
+        read_only_fields = ["gallery", "is_deleted", "deleted_at", "created_at", "updated_at"]
         extra_kwargs = {
             "main_image": {"validators": [ImageValidator()]},
             "og_image": {"validators": [ImageValidator()]},

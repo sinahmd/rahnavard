@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, generics, permissions
+from rest_framework import filters, generics, permissions, status
+from rest_framework.response import Response
 
 from .models import Car
 from .serializers import CarAdminSerializer, CarDetailSerializer, CarListSerializer
@@ -61,3 +62,24 @@ class CarAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         """Soft delete instead of hard delete."""
         instance.soft_delete()
+
+
+class CarRestoreView(generics.GenericAPIView):
+    """Admin endpoint to restore a soft-deleted car."""
+
+    serializer_class = CarAdminSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Car.objects.with_deleted()
+
+    def post(self, request, pk=None):
+        instance = self.get_object()
+        if not instance.is_deleted:
+            return Response(
+                {'detail': 'This car is not soft-deleted.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        instance.restore()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)

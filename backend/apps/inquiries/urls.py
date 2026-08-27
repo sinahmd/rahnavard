@@ -16,4 +16,9 @@ urlpatterns = [
         views.InquiryAdminDetailView.as_view(),
         name="admin-inquiry-detail",
     ),
+    path(
+        "admin/inquiries/<int:pk>/restore/",
+        views.InquiryRestoreView.as_view(),
+        name="admin-inquiry-restore",
+    ),
 ]

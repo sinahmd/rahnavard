@@ -21,4 +21,9 @@ urlpatterns = [
         views.ArticleAdminDetailView.as_view(),
         name="admin-article-detail",
     ),
+    path(
+        "admin/articles/<int:pk>/restore/",
+        views.ArticleRestoreView.as_view(),
+        name="admin-article-restore",
+    ),
 ]

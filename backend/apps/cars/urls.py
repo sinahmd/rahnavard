@@ -13,4 +13,9 @@ urlpatterns = [
         views.CarAdminDetailView.as_view(),
         name="admin-car-detail",
     ),
+    path(
+        "admin/cars/<int:pk>/restore/",
+        views.CarRestoreView.as_view(),
+        name="admin-car-restore",
+    ),
 ]
