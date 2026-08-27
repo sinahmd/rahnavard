@@ -276,20 +276,18 @@ class TestArticleAdminAPI:
         assert not Article.objects.filter(pk=published_article.pk).exists()
 
     def test_admin_restore_article(self, admin_client, published_article):
-        """Test restoring a soft-deleted article via admin API."""
+        """Test restoring a soft-deleted article via restore endpoint."""
         # First soft delete
         published_article.soft_delete()
 
         # Verify it's soft deleted
         assert published_article.is_deleted is True
 
-        # Restore via PATCH
-        response = admin_client.patch(
-            f'/api/v1/admin/articles/{published_article.pk}/',
-            {'is_deleted': False},
-            format='json'
-        )
+        # Restore via POST to restore endpoint
+        response = admin_client.post(f'/api/v1/admin/articles/{published_article.pk}/restore/')
         assert response.status_code == 200
 
         # Article should be visible again in public API
+        published_article.refresh_from_db()
+        assert published_article.is_deleted is False
         assert Article.objects.filter(pk=published_article.pk).exists()

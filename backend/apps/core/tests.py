@@ -111,6 +111,35 @@ class TestSoftDeleteMixin:
         assert sample_car.is_deleted is False
         assert sample_car.deleted_at is None
 
+    def test_instance_delete_performs_soft_delete(self, sample_car):
+        """Test that instance.delete() performs soft delete, not hard delete."""
+        pk = sample_car.pk
+        sample_car.delete()
+
+        # Should still exist in database
+        assert Car.objects.with_deleted().filter(pk=pk).exists()
+        # Should be soft-deleted
+        assert not Car.objects.filter(pk=pk).exists()
+
+    def test_queryset_delete_performs_soft_delete(self, sample_cars):
+        """Test that QuerySet.delete() performs soft delete, not hard delete."""
+        pks = [c.pk for c in sample_cars]
+
+        # Bulk soft delete via queryset
+        Car.objects.filter(pk__in=pks[:2]).delete()
+
+        # All should still exist in database
+        for pk in pks:
+            assert Car.objects.with_deleted().filter(pk=pk).exists()
+
+        # First 2 should be soft-deleted
+        for pk in pks[:2]:
+            assert not Car.objects.filter(pk=pk).exists()
+
+        # Last 3 should still be active
+        for pk in pks[2:]:
+            assert Car.objects.filter(pk=pk).exists()
+
 
 # ============================================================================
 # SoftDeleteManager Tests

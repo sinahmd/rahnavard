@@ -203,6 +203,41 @@ class TestCarSoftDelete:
         response = api_client.get(f'/api/v1/cars/{sample_car.slug}/')
         assert response.status_code == 404
 
+    def test_slug_reuse_after_soft_delete(self, db, sample_car):
+        """Test that slug can be reused after soft-deleting the original."""
+        original_slug = sample_car.slug
+        sample_car.soft_delete()
+
+        # Should be able to create a new car with the same slug
+        new_car = Car.objects.create(
+            brand='Honda',
+            model='CRV',
+            persian_name='هوندا CRV',
+            slug=original_slug,
+            year=2025,
+            fuel_type='gasoline',
+            transmission='automatic',
+            main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+        )
+        assert new_car.slug == original_slug
+
+    def test_slug_rejected_when_active_exists(self, db, sample_car):
+        """Test that slug is rejected when an active record has it."""
+        import pytest
+        from django.db import IntegrityError
+
+        with pytest.raises(IntegrityError):
+            Car.objects.create(
+                brand='Honda',
+                model='CRV',
+                persian_name='هوندا CRV',
+                slug=sample_car.slug,  # Same slug
+                year=2025,
+                fuel_type='gasoline',
+                transmission='automatic',
+                main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+            )
+
     def test_multiple_cars_soft_delete(self, sample_cars):
         """Test soft deleting multiple cars."""
         # Soft delete first 2 cars
@@ -321,21 +356,56 @@ class TestCarAdminAPI:
         assert Car.objects.with_deleted().filter(pk=sample_car.pk).exists()
         assert not Car.objects.filter(pk=sample_car.pk).exists()
 
-    def test_admin_restore_car(self, admin_client, sample_car):
-        """Test restoring a soft-deleted car via admin API."""
+    def test_admin_restore_car_via_endpoint(self, admin_client, sample_car):
+        """Test restoring a soft-deleted car via restore endpoint."""
         # First soft delete
         sample_car.soft_delete()
-
-        # Verify it's soft deleted
         assert sample_car.is_deleted is True
 
-        # Restore via PATCH
-        response = admin_client.patch(
-            f'/api/v1/admin/cars/{sample_car.pk}/',
-            {'is_deleted': False},
-            format='json'
-        )
+        # Restore via POST to restore endpoint
+        response = admin_client.post(f'/api/v1/admin/cars/{sample_car.pk}/restore/')
         assert response.status_code == 200
 
         # Car should be visible again in public API
+        sample_car.refresh_from_db()
+        assert sample_car.is_deleted is False
         assert Car.objects.filter(pk=sample_car.pk).exists()
+
+    def test_admin_restore_non_deleted_car_fails(self, admin_client, sample_car):
+        """Test that restoring a non-deleted car returns 400."""
+        response = admin_client.post(f'/api/v1/admin/cars/{sample_car.pk}/restore/')
+        assert response.status_code == 400
+        assert 'not soft-deleted' in response.data['detail']
+
+    def test_instance_delete_performs_soft_delete(self, admin_client, sample_car):
+        """Test that instance.delete() performs soft delete."""
+        pk = sample_car.pk
+        sample_car.delete()
+
+        # Should still exist in database
+        assert Car.objects.with_deleted().filter(pk=pk).exists()
+        # Should be soft-deleted
+        assert not Car.objects.filter(pk=pk).exists()
+
+    def test_queryset_delete_performs_soft_delete(self, sample_cars):
+        """Test that QuerySet.delete() performs soft delete."""
+        pks = [c.pk for c in sample_cars]
+
+        # Bulk soft delete via queryset
+        Car.objects.filter(pk__in=pks[:2]).delete()
+
+        # All should still exist in database
+        for pk in pks:
+            assert Car.objects.with_deleted().filter(pk=pk).exists()
+
+        # First 2 should be soft-deleted
+        for pk in pks[:2]:
+            assert not Car.objects.filter(pk=pk).exists()
+
+    def test_hard_delete_removes_permanently(self, sample_car):
+        """Test that hard_delete permanently removes the record."""
+        pk = sample_car.pk
+        sample_car.hard_delete()
+
+        # Should not appear in any queryset
+        assert not Car.objects.with_deleted().filter(pk=pk).exists()

@@ -232,20 +232,18 @@ class TestBranchAdminAPI:
         assert not Branch.objects.filter(pk=sample_branch.pk).exists()
 
     def test_admin_restore_branch(self, admin_client, sample_branch):
-        """Test restoring a soft-deleted branch via admin API."""
+        """Test restoring a soft-deleted branch via restore endpoint."""
         # First soft delete
         sample_branch.soft_delete()
 
         # Verify it's soft deleted
         assert sample_branch.is_deleted is True
 
-        # Restore via PATCH
-        response = admin_client.patch(
-            f'/api/v1/admin/branches/{sample_branch.pk}/',
-            {'is_deleted': False},
-            format='json'
-        )
+        # Restore via POST to restore endpoint
+        response = admin_client.post(f'/api/v1/admin/branches/{sample_branch.pk}/restore/')
         assert response.status_code == 200
 
         # Branch should be visible again in public API
+        sample_branch.refresh_from_db()
+        assert sample_branch.is_deleted is False
         assert Branch.objects.filter(pk=sample_branch.pk).exists()
