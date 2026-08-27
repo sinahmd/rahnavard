@@ -58,13 +58,15 @@ class ArticleAdminSerializer(serializers.ModelSerializer):
             "cover_image",
             "is_published",
             "published_at",
+            "is_deleted",
+            "deleted_at",
             "seo_title",
             "seo_description",
             "og_image",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+        read_only_fields = ["deleted_at", "created_at", "updated_at"]
         extra_kwargs = {
             "cover_image": {"validators": [ImageValidator()]},
             "og_image": {"validators": [ImageValidator()]},

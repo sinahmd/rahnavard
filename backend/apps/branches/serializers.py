@@ -39,7 +39,10 @@ class BranchAdminSerializer(serializers.ModelSerializer):
             "longitude",
             "is_active",
             "display_order",
+            "is_deleted",
+            "deleted_at",
         ]
+        read_only_fields = ["deleted_at"]
         extra_kwargs = {
             "map_image": {"validators": [ImageValidator()]},
         }

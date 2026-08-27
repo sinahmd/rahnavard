@@ -17,4 +17,4 @@ class InquirySerializer(serializers.ModelSerializer):
     class Meta:
         model = Inquiry
         fields = "__all__"
-        read_only_fields = ["id", "ip_address", "user_agent", "created_at"]
+        read_only_fields = ["id", "ip_address", "user_agent", "deleted_at", "created_at"]
