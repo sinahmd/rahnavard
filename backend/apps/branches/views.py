@@ -18,13 +18,23 @@ class BranchAdminListView(generics.ListCreateAPIView):
     """Admin endpoint for listing and creating branches."""
 
     serializer_class = BranchAdminSerializer
-    queryset = Branch.objects.all()
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Branch.objects.with_deleted()
 
 
 class BranchAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Admin endpoint for branch detail, update, and delete."""
 
     serializer_class = BranchAdminSerializer
-    queryset = Branch.objects.all()
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Branch.objects.with_deleted()
+
+    def perform_destroy(self, instance):
+        """Soft delete instead of hard delete."""
+        instance.soft_delete()

@@ -37,16 +37,26 @@ class ArticleAdminListView(generics.ListCreateAPIView):
     """Admin endpoint for listing and creating articles."""
 
     serializer_class = ArticleAdminSerializer
-    queryset = Article.objects.all()
     permission_classes = [permissions.IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ["is_published"]
     search_fields = ["title", "excerpt"]
+
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Article.objects.with_deleted()
 
 
 class ArticleAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Admin endpoint for article detail, update, and delete."""
 
     serializer_class = ArticleAdminSerializer
-    queryset = Article.objects.all()
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Article.objects.with_deleted()
+
+    def perform_destroy(self, instance):
+        """Soft delete instead of hard delete."""
+        instance.soft_delete()

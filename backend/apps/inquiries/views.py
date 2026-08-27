@@ -29,13 +29,23 @@ class InquiryAdminListView(generics.ListAPIView):
     """Admin endpoint for listing inquiries."""
 
     serializer_class = InquirySerializer
-    queryset = Inquiry.objects.all()
     permission_classes = [permissions.IsAdminUser]
 
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Inquiry.objects.with_deleted()
 
-class InquiryAdminDetailView(generics.RetrieveUpdateAPIView):
-    """Admin endpoint for inquiry detail and status update."""
+
+class InquiryAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin endpoint for inquiry detail, update, and delete."""
 
     serializer_class = InquirySerializer
-    queryset = Inquiry.objects.all()
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Inquiry.objects.with_deleted()
+
+    def perform_destroy(self, instance):
+        """Soft delete instead of hard delete."""
+        instance.soft_delete()

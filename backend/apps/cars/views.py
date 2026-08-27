@@ -38,16 +38,26 @@ class CarAdminListView(generics.ListCreateAPIView):
     """Admin endpoint for listing and creating cars."""
 
     serializer_class = CarAdminSerializer
-    queryset = Car.objects.all()
     permission_classes = [permissions.IsAdminUser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ["brand", "is_active", "is_featured"]
     search_fields = ["brand", "model", "persian_name"]
+
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Car.objects.with_deleted()
 
 
 class CarAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Admin endpoint for car detail, update, and delete."""
 
     serializer_class = CarAdminSerializer
-    queryset = Car.objects.all()
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        """Include soft-deleted items in admin."""
+        return Car.objects.with_deleted()
+
+    def perform_destroy(self, instance):
+        """Soft delete instead of hard delete."""
+        instance.soft_delete()
