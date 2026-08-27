@@ -249,6 +249,23 @@ class TestSiteSettings:
         settings = SiteSettings.load()
         assert str(settings) == 'راهنورد خودرو'
 
+    def test_delete_raises_error(self):
+        """Test that deleting SiteSettings raises ValueError."""
+        settings = SiteSettings.load()
+        import pytest
+        with pytest.raises(ValueError, match="Cannot delete SiteSettings singleton"):
+            settings.delete()
+
+    def test_delete_does_not_remove_from_database(self):
+        """Test that failed delete doesn't remove the record."""
+        settings = SiteSettings.load()
+        try:
+            settings.delete()
+        except ValueError:
+            pass
+        # Settings should still exist
+        assert SiteSettings.objects.filter(pk=1).exists()
+
 
 @pytest.mark.django_db
 class TestHeroSlide:

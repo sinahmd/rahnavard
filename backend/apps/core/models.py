@@ -93,12 +93,24 @@ class SiteSettings(models.Model):
         verbose_name_plural = "Site Settings"
 
     def save(self, *args, **kwargs):
-        # Ensure only one instance exists
+        # Ensure only one instance exists (singleton)
         self.pk = 1
         super().save(*args, **kwargs)
 
+    def delete(self, *args, **kwargs):
+        """Prevent deletion of singleton settings.
+
+        Deleting SiteSettings would lose all site configuration.
+        Use save() to update settings instead.
+        """
+        raise ValueError(
+            "Cannot delete SiteSettings singleton. "
+            "Use save() to update settings instead."
+        )
+
     @classmethod
     def load(cls):
+        """Load or create the singleton settings instance."""
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
 
