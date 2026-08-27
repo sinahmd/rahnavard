@@ -66,9 +66,20 @@ cd backend && python manage.py check && pytest
 ### Rule 4: Document Local-Only Changes
 
 If a change should NOT go to production:
-- Document it in `DEVELOPMENT.md`
+- Document it in `DEVELOPMENT.md` (Section 11)
 - Mark it clearly as `[LOCAL ONLY]`
 - Never merge it to `main`
+
+**Current local-only changes:**
+| File | Why it's local-only |
+|------|-------------------|
+| `frontend/Dockerfile` | Removed Arvan npm mirror (403 outside Iran) |
+| `frontend/lib/authFetch.ts` | Uses `NEXT_PUBLIC_API_URL` for full URL (no nginx locally) |
+
+**Why authFetch is local-only:**
+In production, nginx proxies `/api/*` → backend. Relative URLs work.
+In local dev (no nginx), relative URLs hit port 3000 (Next.js) → 404.
+The fix prepends `NEXT_PUBLIC_API_URL` to build the full backend URL.
 
 ### Rule 5: Keep Merges Clean
 
@@ -78,7 +89,15 @@ Before merging `develop` → `main`:
 - [ ] No hardcoded secrets
 - [ ] All migrations committed
 - [ ] `DEVELOPMENT.md` updated if workflow changed
+- [ ] Local-only changes reverted (see Section 11 in DEVELOPMENT.md)
 - [ ] PR reviewed (even if by yourself)
+
+**Local-only changes to revert before merge:**
+```bash
+# 1. Restore Arvan mirror in frontend/Dockerfile
+# 2. Revert authFetch.ts to use relative URLs
+# See DEVELOPMENT.md Section 11 for exact code
+```
 
 ---
 
@@ -151,9 +170,14 @@ Before merging `develop` → `main`:
 - ✅ Mobile responsive
 
 ### In Progress (develop):
-- 🔄 Soft delete for data safety (Phase 1 ✅)
-- 🔄 Database optimization (indexes)
-- 🔄 GDPR compliance
+- ✅ Soft delete for data safety
+- ✅ Database optimization (indexes)
+- ✅ GDPR compliance (IP/User-Agent removed)
+- ✅ Accidental hard delete prevention
+- ✅ Unique slug constraint fix
+- ✅ Restore endpoints
+- ✅ SiteSettings singleton protection
+- ✅ Frontend local dev fix (authFetch)
 
 ### Planned:
 - 🔲 Car comparison tool

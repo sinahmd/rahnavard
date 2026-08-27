@@ -401,6 +401,7 @@ git push origin main
 | File | Change | Reason | Merge to main? |
 |------|--------|--------|----------------|
 | `frontend/Dockerfile` | Removed `npm.arvancloud.ir` mirror | Mirror returns 403 outside Iran | ❌ No |
+| `frontend/lib/authFetch.ts` | Uses `NEXT_PUBLIC_API_URL` for full URL | No nginx in local dev, relative URLs hit port 3000 | ❌ No |
 | `frontend/.dockerignore` | Created | Speeds up local Docker builds | ✅ Yes |
 | `backend/.dockerignore` | Created | Speeds up local Docker builds | ✅ Yes |
 | `backend/apps/core/mixins.py` | Created `SoftDeleteMixin` | Data safety feature | ✅ Yes |
@@ -411,13 +412,27 @@ git push origin main
 
 ### What to restore before merging to main:
 
-```bash
-# In frontend/Dockerfile, uncomment the Arvan mirror line:
-# RUN npm config set registry https://npm.arvancloud.ir/
+**1. `frontend/Dockerfile`** — Uncomment the Arvan mirror line:
+```dockerfile
+RUN npm config set registry https://npm.arvancloud.ir/
 ```
 
+**2. `frontend/lib/authFetch.ts`** — Remove `NEXT_PUBLIC_API_URL` prefix, revert to relative URLs:
+```typescript
+// BEFORE (local dev):
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || ''
+const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`
+return fetch(fullUrl, { ...options, headers })
+
+// AFTER (production — revert to this):
+return fetch(url, { ...options, headers })
+```
+
+> **Why?** In production, nginx proxies `/api/*` → backend. Relative URLs work.
+> In local dev (no nginx), relative URLs hit port 3000 (Next.js) → 404.
+
 > **Note:** The soft delete changes (mixins, models, views, serializers) are **safe to merge**.
-> Only the Dockerfile change needs to be restored.
+> Only the Dockerfile and authFetch changes need to be reverted.
 
 ---
 
