@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+
+# Test coverage
+coverage/
+
+# Build info
+tsconfig.tsbuildinfo
+
+# Environment files (passed via docker-compose)
+.env
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# Docker (avoid recursive context)
+Dockerfile
+Dockerfile.prod
+.dockerignore
+
+# Testing
+jest.config.js
+jest.setup.js
+__tests__/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+.vercel/
+.swc/
