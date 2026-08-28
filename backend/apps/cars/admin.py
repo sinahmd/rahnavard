@@ -36,7 +36,24 @@ class CarAdmin(admin.ModelAdmin):
             },
         ),
         ("مشخصات فنی", {"fields": ("fuel_type", "transmission", "engine", "price")}),
-        ("تصاویر", {"fields": ("main_image", "gallery")}),
+        (
+            "مشخصات عمومی",
+            {
+                "fields": ("manufacturer", "body_type", "color"),
+                "description": "این مقادیر در نمای اول صفحهٔ خودرو نمایش داده می‌شوند.",
+            },
+        ),
+        (
+            "توضیحات فنی (تب)",
+            {
+                "fields": ("technical_description",),
+                "description": "متن یا HTML که در تب «توضیحات فنی» نمایش داده می‌شود.",
+            },
+        ),
+        (
+            "تصاویر و کاتالوگ",
+            {"fields": ("main_image", "gallery", "catalog_file")},
+        ),
         ("وضعیت", {"fields": ("is_active", "is_featured", "display_order")}),
         (
             "SEO",

@@ -409,3 +409,61 @@ class TestCarAdminAPI:
 
         # Should not appear in any queryset
         assert not Car.objects.with_deleted().filter(pk=pk).exists()
+
+
+@pytest.mark.django_db
+class TestCarNewFields:
+    """Tests for the new general specs, technical description, and PDF catalogue fields."""
+
+    def test_create_car_with_new_fields(self, sample_car):
+        """All new fields can be saved on the model."""
+        sample_car.manufacturer = "ژاپن"
+        sample_car.body_type = "سدان"
+        sample_car.color = "خاکستری"
+        sample_car.technical_description = "<p>توضیحات فنی نمونه</p>"
+        sample_car.catalog_file = SimpleUploadedFile(
+            "catalog.pdf", b"%PDF-1.4\n%", content_type="application/pdf"
+        )
+        sample_car.save()
+        sample_car.refresh_from_db()
+
+        assert sample_car.manufacturer == "ژاپن"
+        assert sample_car.body_type == "سدان"
+        assert sample_car.color == "خاکستری"
+        assert sample_car.technical_description == "<p>توضیحات فنی نمونه</p>"
+        assert sample_car.catalog_file.name.endswith(".pdf")
+
+    def test_detail_serializer_returns_new_fields(self, api_client, sample_car):
+        """Public detail endpoint exposes the new fields."""
+        sample_car.manufacturer = "کره"
+        sample_car.body_type = "شاسی‌بلند"
+        sample_car.color = "سفید"
+        sample_car.technical_description = "توضیحات"
+        sample_car.save()
+
+        response = api_client.get(f"/api/v1/cars/{sample_car.slug}/")
+        assert response.status_code == 200
+        data = response.data
+        assert data["manufacturer"] == "کره"
+        assert data["body_type"] == "شاسی‌بلند"
+        assert data["color"] == "سفید"
+        assert data["technical_description"] == "توضیحات"
+        # catalog_file is a URL string (or null when empty)
+        assert data["catalog_file"] is None
+
+    def test_admin_can_update_new_fields(self, admin_client, sample_car):
+        """Admin serializer allows updating the new fields."""
+        data = {
+            "manufacturer": "آلمان",
+            "body_type": "سدان",
+            "color": "مشکی",
+            "technical_description": "متن جدید",
+        }
+        response = admin_client.patch(
+            f"/api/v1/admin/cars/{sample_car.pk}/", data, format="json"
+        )
+        assert response.status_code == 200
+        assert response.data["manufacturer"] == "آلمان"
+        assert response.data["body_type"] == "سدان"
+        assert response.data["color"] == "مشکی"
+        assert response.data["technical_description"] == "متن جدید"
