@@ -25,6 +25,10 @@ media/
 *.swp
 *.swo
 
+# AI agent config (local only)
+.opencode/
+agents/
+
 # OS
 .DS_Store
 Thumbs.db
