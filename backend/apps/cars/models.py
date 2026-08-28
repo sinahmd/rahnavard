@@ -1,5 +1,7 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils.text import slugify
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.mixins import SoftDeleteMixin
 from apps.core.models import Redirect
@@ -38,6 +40,40 @@ class Car(SoftDeleteMixin, models.Model):
     engine = models.CharField(max_length=100, blank=True, verbose_name="موتور")
     price = models.DecimalField(
         max_digits=15, decimal_places=0, null=True, blank=True, verbose_name="قیمت"
+    )
+
+    # General specifications (visible on the detail page)
+    manufacturer = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("کشور سازنده"),
+    )
+    body_type = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name=_("نوع بدنه"),
+    )
+    color = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("رنگ بدنه"),
+    )
+
+    # Technical description (shown in a tab on the detail page)
+    technical_description = models.TextField(
+        blank=True,
+        verbose_name=_("توضیحات فنی"),
+        help_text=_("متن یا HTML برای نمایش در تب توضیحات فنی"),
+    )
+
+    # PDF catalogue for the car
+    catalog_file = models.FileField(
+        upload_to="car_catalogs/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=["pdf"])],
+        verbose_name=_("کاتالوگ PDF"),
+        help_text=_("فایل PDF کاتالوگ خودرو"),
     )
 
     # Images
