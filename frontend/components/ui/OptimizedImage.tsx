@@ -19,9 +19,15 @@ export default function OptimizedImage(props: ImageProps) {
     src = src.replace('http://backend:8000', '')
   }
 
+  // Local dev: API returns http://localhost:8000/media/... which is valid
+  // (browser can reach localhost:8000) but must be marked unoptimized so
+  // Next.js _next/image proxy doesn't try to fetch it from inside Docker
+  // (where localhost doesn't resolve to the backend container).
+
   const isMediaUrl =
     src.startsWith('/media/') ||
-    src.includes('rahnavard.co/media/')
+    src.includes('rahnavard.co/media/') ||
+    src.startsWith('http://localhost:8000/media/')
 
   // Only pass unoptimized when true to avoid React DOM warning for false
   return isMediaUrl ? <Image {...props} src={src} unoptimized /> : <Image {...props} src={src} />
