@@ -13,6 +13,7 @@ interface Car {
   year: number
   is_active: boolean
   is_featured: boolean
+  catalog_file: string | null
 }
 
 export default function AdminCarsPage() {
@@ -109,12 +110,13 @@ export default function AdminCarsPage() {
               <th className="p-4 font-bold">سال</th>
               <th className="p-4 font-bold">وضعیت</th>
               <th className="p-4 font-bold">ویژه</th>
+              <th className="p-4 font-bold">کاتالوگ</th>
               <th className="p-4 font-bold">عملیات</th>
             </tr>
           </thead>
           <tbody>
             {cars.length === 0 ? (
-              <tr><td colSpan={7} className="p-4 text-center text-gray-500">خودرویی وجود ندارد</td></tr>
+              <tr><td colSpan={8} className="p-4 text-center text-gray-500">خودرویی وجود ندارد</td></tr>
             ) : cars.map((car) => (
               <tr key={car.id} className="border-t hover:bg-gray-50">
                 <td className="p-4">{car.brand}</td>
@@ -144,6 +146,23 @@ export default function AdminCarsPage() {
                   >
                     {car.is_featured ? 'ویژه' : 'عادی'}
                   </button>
+                </td>
+                <td className="p-4">
+                  {car.catalog_file ? (
+                    <a
+                      href={car.catalog_file}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      PDF
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 text-sm">—</span>
+                  )}
                 </td>
                 <td className="p-4">
                   <div className="flex gap-2">

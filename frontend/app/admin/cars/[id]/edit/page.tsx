@@ -40,8 +40,18 @@ const carFields: FormField[] = [
   { name: 'engine', label: 'موتور', type: 'text', placeholder: 'مثال: 2.0L 4-Cylinder', section: 'مشخصات فنی' },
   { name: 'price', label: 'قیمت (تومان)', type: 'number', placeholder: 'مثال: 1500000000', section: 'مشخصات فنی' },
 
-  // Section: تصاویر
-  { name: 'main_image', label: 'تصویر اصلی', type: 'file', accept: 'image/*', section: 'تصاویر', helpText: 'خالی بگذارید تا تصویر قبلی حفظ شود.' },
+  // Section: مشخصات عمومی
+  { name: 'manufacturer', label: 'کشور سازنده', type: 'text', placeholder: 'مثال: ژاپن', section: 'مشخصات عمومی' },
+  { name: 'body_type', label: 'نوع بدنه', type: 'text', placeholder: 'مثال: سدان، شاسی‌بلند', section: 'مشخصات عمومی' },
+  { name: 'color', label: 'رنگ بدنه', type: 'text', placeholder: 'مثال: سفید', section: 'مشخصات عمومی' },
+
+  // Section: توضیحات فنی
+  { name: 'technical_description', label: 'توضیحات فنی', type: 'textarea', section: 'توضیحات فنی', placeholder: 'متن یا HTML برای نمایش در تب توضیحات فنی', helpText: 'می‌توانید از HTML استفاده کنید.' },
+
+  // Section: تصاویر و کاتالوگ
+  { name: 'main_image', label: 'تصویر اصلی', type: 'file', accept: 'image/*', section: 'تصاویر و کاتالوگ', helpText: 'خالی بگذارید تا تصویر قبلی حفظ شود.' },
+  { name: 'gallery', label: 'گالری تصاویر (اسلایدر)', type: 'gallery', accept: 'image/*', section: 'تصاویر و کاتالوگ', helpText: 'تصاویر اسلایدر خودرو. می‌توانید چند تصویر همزمان انتخاب کنید.' },
+  { name: 'catalog_file', label: 'کاتالوگ PDF', type: 'file', accept: '.pdf', section: 'تصاویر و کاتالوگ', helpText: 'فایل PDF کاتالوگ خودرو.' },
 
   // Section: وضعیت و نمایش
   { name: 'is_active', label: 'فعال', type: 'checkbox', defaultValue: true, section: 'وضعیت و نمایش' },

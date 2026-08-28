@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authFetch } from '@/lib/authFetch'
 import ImageUpload from './ImageUpload'
+import FileUpload from './FileUpload'
+import GalleryUpload from './GalleryUpload'
 
 export interface FormField {
   name: string
   label: string
-  type: 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'file' | 'datetime-local' | 'url'
+  type: 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'file' | 'datetime-local' | 'url' | 'gallery'
   required?: boolean
   placeholder?: string
   options?: { value: string; label: string }[]
@@ -17,7 +19,7 @@ export interface FormField {
   accept?: string
   helpText?: string
   defaultValue?: string | boolean
-  validate?: (value: string | boolean | File | null) => string | null
+  validate?: (value: string | boolean | File | null | File[]) => string | null
 }
 
 interface AdminFormProps {
@@ -94,21 +96,26 @@ export default function AdminForm({
   const router = useRouter()
   const isEdit = !!id
 
-  const [formData, setFormData] = useState<Record<string, string | boolean | File | null>>(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [formData, setFormData] = useState<Record<string, any>>(() => {
     // Initialize with default values for new items
-    const initial: Record<string, string | boolean | File | null> = {}
+    const initial: Record<string, any> = {}
     if (!id) {
       fields.forEach((field) => {
         if (field.defaultValue !== undefined) {
           initial[field.name] = field.defaultValue
         } else if (field.type === 'checkbox') {
           initial[field.name] = false
+        } else if (field.type === 'gallery') {
+          initial[field.name] = []
         }
       })
     }
     return initial
   })
   const [existingImages, setExistingImages] = useState<Record<string, string>>({})
+  const [existingFileNames, setExistingFileNames] = useState<Record<string, string>>({})
+  const [existingGalleryUrls, setExistingGalleryUrls] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -126,15 +133,25 @@ export default function AdminForm({
       const response = await authFetch(`${apiBase}${id}/`)
       if (response.ok) {
         const data = await response.json()
-        const initial: Record<string, string | boolean | File | null> = {}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const initial: Record<string, any> = {}
         const images: Record<string, string> = {}
+
+        const fileNames: Record<string, string> = {}
+        const galleryUrls: Record<string, string[]> = {}
 
         fields.forEach((field) => {
           if (field.type === 'checkbox') {
             initial[field.name] = !!data[field.name]
+          } else if (field.type === 'gallery') {
+            galleryUrls[field.name] = Array.isArray(data[field.name]) ? (data[field.name] as string[]) : []
+            initial[field.name] = []
           } else if (field.type === 'file') {
             if (data[field.name]) {
               images[field.name] = data[field.name]
+              // Extract filename from URL for non-image files
+              const parts = data[field.name].split('/')
+              fileNames[field.name] = parts[parts.length - 1]
             }
             initial[field.name] = null
           } else if (field.type === 'datetime-local' && data[field.name]) {
@@ -147,6 +164,8 @@ export default function AdminForm({
 
         setFormData(initial)
         setExistingImages(images)
+        setExistingFileNames(fileNames)
+        setExistingGalleryUrls(galleryUrls)
       } else {
         setError('خطا در بارگذاری اطلاعات')
       }
@@ -159,7 +178,7 @@ export default function AdminForm({
 
   // Validate a single field
   const validateField = useCallback(
-    (name: string, value: string | boolean | File | null): string | null => {
+    (name: string, value: string | boolean | File | null | File[]): string | null => {
       const field = fields.find((f) => f.name === name)
       if (!field) return null
 
@@ -172,7 +191,7 @@ export default function AdminForm({
       // Default required/type validation
       const defaultValidator = getDefaultValidator(field)
       if (defaultValidator) {
-        return defaultValidator(value)
+        return defaultValidator(Array.isArray(value) ? null : value)
       }
 
       return null
@@ -186,7 +205,12 @@ export default function AdminForm({
     let isValid = true
 
     fields.forEach((field) => {
-      // For file fields on edit: skip validation if no new file and existing image exists
+      // For gallery fields: skip validation (optional field)
+      if (field.type === 'gallery') {
+        return
+      }
+
+      // For file fields on edit: skip validation if no new file and existing file exists
       if (field.type === 'file' && !formData[field.name] && existingImages[field.name]) {
         return
       }
@@ -196,7 +220,7 @@ export default function AdminForm({
         return
       }
 
-      const error = validateField(field.name, formData[field.name])
+      const error = validateField(field.name, formData[field.name] as string | boolean | File | null)
       if (error) {
         errors[field.name] = error
         isValid = false
@@ -207,7 +231,8 @@ export default function AdminForm({
     return isValid
   }, [fields, formData, existingImages, validateField])
 
-  const handleChange = (name: string, value: string | boolean | File | null) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleChange = (name: string, value: any) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
     setTouched((prev) => ({ ...prev, [name]: true }))
 
@@ -223,6 +248,10 @@ export default function AdminForm({
 
   const handleBlur = (name: string) => {
     setTouched((prev) => ({ ...prev, [name]: true }))
+
+    // Skip gallery fields for blur validation
+    const field = fields.find((f) => f.name === name)
+    if (field?.type === 'gallery') return
 
     // Validate on blur
     const error = validateField(name, formData[name])
@@ -258,6 +287,14 @@ export default function AdminForm({
           submitData.append(field.name, value)
         }
         // Don't append null file fields on edit (keeps existing)
+      } else if (field.type === 'gallery') {
+        // Append each gallery file as gallery_0, gallery_1, etc.
+        const files = Array.isArray(value) ? value : []
+        files.forEach((file, idx) => {
+          if (file instanceof File) {
+            submitData.append(`gallery_${idx}`, file)
+          }
+        })
       } else if (field.type === 'checkbox') {
         submitData.append(field.name, value ? 'true' : 'false')
       } else if (value !== null && value !== undefined) {
@@ -374,24 +411,58 @@ export default function AdminForm({
                   }
 
                   if (field.type === 'file') {
+                    const isImageField = !field.accept || field.accept.includes('image')
                     return (
                       <div
                         key={field.name}
                         className={
-                          field.name === 'content' || field.name === 'description' || field.name === 'excerpt' || field.name === 'seo_description' || field.name === 'address'
+                          field.name === 'content' || field.name === 'description' || field.name === 'excerpt' || field.name === 'seo_description' || field.name === 'address' || field.name === 'technical_description'
                             ? 'md:col-span-2'
                             : ''
                         }
                       >
-                        <ImageUpload
-                          name={field.name}
+                        {isImageField ? (
+                          <ImageUpload
+                            name={field.name}
+                            label={field.label}
+                            value={formData[field.name] instanceof File ? formData[field.name] as File : null}
+                            onChange={(file) => handleChange(field.name, file)}
+                            existingUrl={existingImages[field.name]}
+                            required={field.required}
+                            helpText={field.helpText}
+                            error={fieldError}
+                          />
+                        ) : (
+                          <FileUpload
+                            name={field.name}
+                            label={field.label}
+                            value={formData[field.name] instanceof File ? formData[field.name] as File : null}
+                            onChange={(file) => handleChange(field.name, file)}
+                            existingUrl={existingImages[field.name]}
+                            existingFileName={existingFileNames[field.name]}
+                            required={field.required}
+                            helpText={field.helpText}
+                            error={fieldError}
+                            accept={field.accept}
+                          />
+                        )}
+                      </div>
+                    )
+                  }
+
+                  if (field.type === 'gallery') {
+                    return (
+                      <div key={field.name} className="md:col-span-2">
+                        <GalleryUpload
                           label={field.label}
-                          value={formData[field.name] instanceof File ? formData[field.name] as File : null}
-                          onChange={(file) => handleChange(field.name, file)}
-                          existingUrl={existingImages[field.name]}
+                          name={field.name}
+                          value={Array.isArray(formData[field.name]) ? (formData[field.name] as File[]) : []}
+                          onChange={(files) => handleChange(field.name, files)}
+                          existingUrls={existingGalleryUrls[field.name] || []}
                           required={field.required}
                           helpText={field.helpText}
                           error={fieldError}
+                          accept={field.accept}
                         />
                       </div>
                     )
