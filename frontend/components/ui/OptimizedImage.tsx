@@ -12,17 +12,11 @@ import Image, { ImageProps } from 'next/image'
  * we skip the extra optimization hop for /media/ paths.
  */
 export default function OptimizedImage(props: ImageProps) {
-  let src = typeof props.src === 'string' ? props.src : ''
-
-  // Transform Docker-internal backend URLs to public URLs
-  if (src.startsWith('http://backend:8000/media/')) {
-    src = src.replace('http://backend:8000', '')
-  }
+  const src = typeof props.src === 'string' ? props.src : ''
 
   const isMediaUrl =
     src.startsWith('/media/') ||
-    src.includes('rahnavard.co/media/') ||
-    src.startsWith('http://localhost:8000/media/')
+    src.includes('rahnavard.co/media/')
 
   // Only pass unoptimized when true to avoid React DOM warning for false
   // Explicitly pass alt to satisfy jsx-a11y/alt-text ESLint rule

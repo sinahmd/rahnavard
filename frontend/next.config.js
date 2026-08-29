@@ -8,12 +8,6 @@ const nextConfig = {
         hostname: 'rahnavard.co',
         pathname: '/media/**',
       },
-      {
-        protocol: 'http',
-        hostname: 'backend',
-        port: '8000',
-        pathname: '/media/**',
-      },
     ],
   },
 }
