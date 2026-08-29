@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { apiUrl } from '@/lib/apiUrl'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 
 interface HeroSlide {
@@ -24,7 +23,7 @@ export default function HeroSlider() {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const response = await fetch(apiUrl('/api/v1/hero-slides/'))
+        const response = await fetch('/api/v1/hero-slides/')
         if (response.ok) {
           const data = await response.json()
           setSlides(data.results || data || [])

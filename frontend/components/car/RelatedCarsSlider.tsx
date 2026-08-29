@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { apiUrl } from '@/lib/apiUrl'
 
 
 interface Car {
@@ -35,7 +34,7 @@ export default function RelatedCarsSlider({ currentSlug }: Props) {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(apiUrl('/api/v1/cars/?is_active=true&limit=20'))
+        const res = await fetch('/api/v1/cars/?is_active=true&limit=20')
         if (!res.ok) throw new Error('Failed to fetch related cars')
         const data = await res.json()
         const all: Car[] = data.results || data || []
