@@ -299,21 +299,24 @@ cd backend && python manage.py check && pytest --no-cov
 cd frontend && npm run lint && npx tsc --noEmit
 ```
 
-#### Step 3: Revert local-only changes
-
-See [Section 11](#11-local-only-changes-develop-branch) for exact files.
+#### Step 3: Check for local-only files (CRITICAL)
 
 ```bash
-# Revert Dockerfile (restore Arvan npm mirror)
-# Edit frontend/Dockerfile — uncomment the mirror line
-
-# Revert authFetch.ts (restore relative URLs)
-# Edit frontend/lib/authFetch.ts — remove API_BASE and fullUrl
+bash scripts/check-local-only.sh
 ```
+
+If violations are found, revert each file:
+```bash
+for f in $(grep -v '^#' LOCAL_ONLY_FILES.txt | grep -v '^\s*$' | sed 's/^[[:space:]]*//'); do
+  git checkout main -- "$f"
+done
+```
+
+See [Section 11](#11-local-only-changes-develop-branch) for full details.
 
 #### Step 4: Commit the revert
 ```bash
-git add frontend/Dockerfile frontend/lib/authFetch.ts
+git add -A
 git commit -m "revert: restore local-only changes for production merge"
 ```
 
@@ -366,15 +369,16 @@ git push origin develop
 ```bash
 # === MERGE TO PRODUCTION ===
 git checkout develop && git pull origin develop
-# [revert local-only changes]
-git add frontend/Dockerfile frontend/lib/authFetch.ts
+bash scripts/check-local-only.sh   # Verify no local-only files in diff
+# [revert local-only files listed by script]
+git add -A
 git commit -m "revert: restore local-only changes for production merge"
 git checkout main && git merge develop --no-edit && git push origin main
 
 # === BACK TO LOCAL DEV ===
 git checkout develop && git merge main --no-edit
 # [re-apply local-only changes]
-git add frontend/Dockerfile frontend/lib/authFetch.ts
+git add -A
 git commit -m "chore: re-apply local-only changes for Docker dev"
 git push origin develop
 ```
@@ -499,156 +503,66 @@ git push origin main
 
 ## 11. Local-Only Changes (develop branch)
 
-> ⚠️ **These changes exist ONLY on `develop` and should NOT be merged to `main`.**
-> They are for local development convenience only.
+> ⚠️ **CRITICAL: These files exist ONLY on `develop` and must NEVER be merged to `main`.**
+> They are for local Docker development only. Merging them will break CI and deploy.
+
+### The Single Source of Truth
+
+**`LOCAL_ONLY_FILES.txt`** — Lists every file that must NOT be merged to main.
+
+```
+# How to check before any merge:
+bash scripts/check-local-only.sh
+```
+
+The script reads `LOCAL_ONLY_FILES.txt` and checks if any of those files appear in the diff between develop and main. If violations are found, it shows exactly which files to revert and how.
 
 ### Why local-only changes exist
 
-In production, nginx proxies `/api/*` → backend. All client-side `fetch('/api/v1/...')` calls work because nginx forwards them. In local Docker dev, there's no nginx proxy — the Next.js dev server on port 3000 doesn't know about Django on port 8000. Local-only changes bridge this gap.
+In production, nginx proxies `/api/*` → backend. Relative URLs like `fetch('/api/v1/cars/')` work because nginx forwards them.
 
-### Files table
+In local Docker dev, there's no nginx proxy. The Next.js dev server on port 3000 doesn't know about Django on port 8000. Local-only changes bridge this gap:
 
-| File | Change | Reason | Merge to main? |
-|------|--------|--------|----------------|
-| `frontend/Dockerfile` | Removed `npm.arvancloud.ir` mirror | Mirror returns 403 outside Iran | ❌ No |
-| `frontend/lib/authFetch.ts` | Uses `NEXT_PUBLIC_API_URL` (stripped of `/api/v1`) for admin API calls | No nginx in local dev, admin auth calls need full backend URL | ❌ No |
-| `frontend/lib/apiUrl.ts` | **NEW** — Helper to build full API URLs for client-side fetch calls | Client components use `apiUrl('/api/v1/...')` instead of relative `/api/v1/...` to reach Django directly | ❌ No |
-| `frontend/contexts/SettingsContext.tsx` | Uses `apiUrl()` for settings fetch | Same as above | ❌ No |
-| `frontend/components/home/FeaturedCars.tsx` | Uses `apiUrl()` for cars fetch | Same as above | ❌ No |
-| `frontend/components/home/HeroSlider.tsx` | Uses `apiUrl()` for hero slides fetch | Same as above | ❌ No |
-| `frontend/components/home/LatestArticles.tsx` | Uses `apiUrl()` for articles fetch | Same as above | ❌ No |
-| `frontend/components/home/WhyRahnavard.tsx` | Uses `apiUrl()` for why-features fetch | Same as above | ❌ No |
-| `frontend/components/home/Branches.tsx` | Uses `apiUrl()` for branches fetch | Same as above | ❌ No |
-| `frontend/components/home/ConsultationForm.tsx` | Uses `apiUrl()` for inquiries POST | Same as above | ❌ No |
-| `frontend/components/car/RelatedCarsSlider.tsx` | Uses `apiUrl()` for related cars fetch | Same as above | ❌ No |
-| `frontend/components/car/CarImageGallery.tsx` | **NEW** — Uses `apiUrl()` to resolve `/media/` URLs to full backend URL | SSR needs absolute URLs for media in local dev (no nginx proxy) | ❌ No |
-| `frontend/app/cars/[slug]/page.tsx` | Contains `resolveMediaUrl()` helper function | Server component resolves `/media/` URLs to absolute for SSR in local dev | ❌ No |
-| `frontend/components/ui/OptimizedImage.tsx` | Marks `http://localhost:8000/media/` as unoptimized | Docker image optimizer can't reach localhost:8000 inside container | ❌ No |
-| `frontend/next.config.js` | Added `backend:8000` to `images.remotePatterns` | Allows Next.js image optimizer to fetch from Docker backend container | ❌ No |
-| `backend/config/settings.py` | Increased throttle rates in DEBUG mode (`10000/hour`) | Local dev needs higher rate limit for testing | ❌ No |
-| `frontend/.dockerignore` | Created | Speeds up local Docker builds | ✅ Yes |
-| `backend/.dockerignore` | Created | Speeds up local Docker builds | ✅ Yes |
-| `backend/apps/core/mixins.py` | Created `SoftDeleteMixin` | Data safety feature | ✅ Yes |
-| `backend/apps/*/models.py` | Added soft delete fields | Data safety feature | ✅ Yes |
-| `backend/apps/*/views.py` | Admin views use `with_deleted()` | Admin needs to see deleted items | ✅ Yes |
-| `backend/apps/*/serializers.py` | Added `is_deleted` to admin serializers | Admin restore functionality | ✅ Yes |
-| `backend/apps/*/admin.py` | Added restore/delete actions | Admin UI improvement | ✅ Yes |
-| `frontend/components/car/CarImageGallery.tsx` | **NEW** — Interactive image gallery with lightbox | Car detail page redesign (feature) | ✅ Yes |
-| `frontend/components/car/PdfViewer.tsx` | **NEW** — PDF viewer with download/fullscreen | Car detail page feature | ✅ Yes |
-| `frontend/components/admin/GalleryUpload.tsx` | **NEW** — Multi-file gallery upload with drag & drop | Admin car gallery management | ✅ Yes |
-| `frontend/components/admin/FileUpload.tsx` | **NEW** — File upload component | Admin form reusability | ✅ Yes |
-| `frontend/components/ui/Tabs.tsx` | **NEW** — Reusable tab component | UI component library | ✅ Yes |
-| `frontend/components/admin/AdminForm.tsx` | Added gallery field type support | Admin car gallery management | ✅ Yes |
-| `frontend/app/admin/cars/new/page.tsx` | Added gallery field to car form | Admin car gallery management | ✅ Yes |
-| `frontend/app/admin/cars/[id]/edit/page.tsx` | Added gallery field to car form | Admin car gallery management | ✅ Yes |
-| `frontend/app/admin/cars/page.tsx` | Added catalog file column | Admin car management | ✅ Yes |
-| `frontend/components/car/__tests__/RelatedCarsSlider.test.tsx` | **NEW** — Tests | Test coverage | ✅ Yes |
-| `frontend/components/admin/__tests__/FileUpload.test.tsx` | **NEW** — Tests | Test coverage | ✅ Yes |
-| `frontend/components/ui/__tests__/Tabs.test.tsx` | **NEW** — Tests | Test coverage | ✅ Yes |
+- **`apiUrl()`** — builds `http://localhost:8000/api/v1/...` in dev, returns `/api/v1/...` in prod
+- **`authFetch.ts`** — uses `NEXT_PUBLIC_API_URL` base for admin API calls in dev
+- **`Dockerfile`** — removes Arvan npm mirror (403 outside Iran)
+- **`OptimizedImage.tsx`** — marks localhost media as unoptimized
+- **`next.config.js`** — adds `backend:8000` to image remote patterns
+- **`settings.py`** — higher throttle rates for testing
 
-### What to restore before merging to main:
+### Pre-Merge Checklist (MUST run before merge to main)
 
-**1. `frontend/Dockerfile`** — Uncomment the Arvan mirror line:
-```dockerfile
-RUN npm config set registry https://npm.arvancloud.ir/
+```bash
+# 1. Run the local-only check
+bash scripts/check-local-only.sh
+
+# 2. If violations found, revert each file
+for f in $(grep -v '^#' LOCAL_ONLY_FILES.txt | grep -v '^\s*$' | sed 's/^[[:space:]]*//'); do
+  git checkout main -- "$f"
+done
+
+# 3. Commit the revert
+git add -A
+git commit -m "revert: restore local-only changes for production merge"
+
+# 4. Now merge to main
+git checkout main && git merge develop --no-edit && git push origin main
 ```
 
-**2. `frontend/lib/authFetch.ts`** — Remove `API_BASE` and `fullUrl`, revert to direct fetch:
-```typescript
-// BEFORE (local dev):
-const RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || ''
-const API_BASE = RAW_API_BASE.replace(/\/api\/v1\/?$/, '')
-// ...
-const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`
-return fetch(fullUrl, { ...options, headers })
+### When adding new local-only changes
 
-// AFTER (production — revert to this):
-return fetch(url, { ...options, headers })
-```
+If you create a new file or modify an existing file for local dev purposes:
 
-**3. Delete `frontend/lib/apiUrl.ts`** — This file doesn't exist on main.
+1. Add the file path to `LOCAL_ONLY_FILES.txt`
+2. Run `bash scripts/check-local-only.sh` to verify it's detected
+3. The merge workflow will now automatically include it in reverts
 
-**4. Revert all `apiUrl()` imports** in these files — replace `apiUrl('/api/v1/...')` back to `'/api/v1/...'`:
-- `frontend/contexts/SettingsContext.tsx`
-- `frontend/components/home/FeaturedCars.tsx`
-- `frontend/components/home/HeroSlider.tsx`
-- `frontend/components/home/LatestArticles.tsx`
-- `frontend/components/home/WhyRahnavard.tsx`
-- `frontend/components/home/Branches.tsx`
-- `frontend/components/home/ConsultationForm.tsx`
-- `frontend/components/car/RelatedCarsSlider.tsx`
+### Full documentation
 
-**5. Revert `frontend/components/ui/OptimizedImage.tsx`** — Remove the `localhost:8000/media/` unoptimized check:
-```typescript
-// Remove this block:
-// if (src.startsWith('http://localhost:8000/media/')) {
-//   // ... mark as unoptimized
-// }
-//
-// And revert isMediaUrl to not include localhost:
-// const isMediaUrl = src.startsWith('/media/') || src.includes('rahnavard.co/media/')
-```
-
-**6. Revert `frontend/next.config.js`** — Remove `backend:8000` from `images.remotePatterns`:
-```javascript
-// Remove this pattern:
-// { protocol: 'http', hostname: 'backend', port: '8000', pathname: '/media/**' },
-```
-
-**7. Revert `backend/config/settings.py`** — Remove DEBUG-conditional throttle rates:
-```python
-# Revert to:
-"anon": "100/hour",
-"user": "1000/hour",
-```
-
-**8. Revert `frontend/components/car/CarImageGallery.tsx`** — Remove `apiUrl` import and `resolveMediaUrl` function:
-```typescript
-// Remove this import:
-// import { apiUrl } from '@/lib/apiUrl'
-//
-// Remove this function:
-// function resolveMediaUrl(url: string): string {
-//   if (url.startsWith('http')) return url
-//   if (url.startsWith('/media/')) return apiUrl(url)
-//   return url
-// }
-//
-// And revert allImages to not use resolveMediaUrl:
-// const allImages = [mainImage, ...gallery].filter(Boolean)
-```
-
-**9. Revert `frontend/app/cars/[slug]/page.tsx`** — Remove `resolveMediaUrl` function and its usage:
-```typescript
-// Remove this function:
-// function resolveMediaUrl(url: string): string {
-//   if (url.startsWith('http')) return url
-//   if (url.startsWith('/media/')) {
-//     const host = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || ''
-//     return host ? `${host}${url}` : url
-//   }
-//   return url
-// }
-//
-// And revert CarImageGallery props to use raw URLs:
-// <CarImageGallery
-//   mainImage={car.main_image}
-//   gallery={car.gallery || []}
-//   persianName={car.persian_name}
-// />
-```
-
-> **Why?** In production, nginx proxies `/api/*` → backend. Relative URLs work.
-> In local dev (no nginx), relative URLs hit port 3000 (Next.js) → 404.
-> The `apiUrl` helper builds `http://localhost:8000/api/v1/...` in local dev,
-> but returns `/api/v1/...` (relative) in production.
->
-> The OptimizedImage and throttle changes only affect local Docker dev.
-> Production uses nginx for media serving and has appropriate rate limits.
-
-> **Note:** The soft delete changes (mixins, models, views, serializers), gallery upload (GalleryUpload, AdminForm, serializers), car page redesign (CarImageGallery, PdfViewer, Tabs, car detail page), and all tests are **safe to merge**.
-> Only the Dockerfile, authFetch, apiUrl, client component, OptimizedImage, next.config.js, settings.py, CarImageGallery's `resolveMediaUrl`, and the car page's `resolveMediaUrl` changes need to be reverted.
+See `LOCAL_ONLY_FILES.txt` for the complete list with reasons.
+See `scripts/check-local-only.sh` for the automated check script.
+See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-08-28 (added apiUrl helper for local dev API calls)*
+*Last updated: 2026-08-30 (added LOCAL_ONLY_FILES.txt and check-local-only.sh)*

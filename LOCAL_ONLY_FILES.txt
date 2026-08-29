@@ -1,0 +1,55 @@
+# LOCAL-ONLY FILES — develop branch only
+# =============================================
+# These files exist ONLY on develop for local Docker development.
+# They must NEVER be merged to main. CI and deploy will fail if they are.
+#
+# WHY: In production, nginx proxies /api/* to backend. In local Docker dev,
+# there's no nginx proxy, so these files bridge the gap.
+#
+# HOW TO USE:
+#   1. Before any merge/PR to main, run: bash scripts/check-local-only.sh
+#   2. If the script finds modified local-only files, REVERT them first
+#   3. Then merge to main
+#   4. After merging, re-apply local-only changes on develop
+#
+# FILE FORMAT: one relative path per line. Lines starting with # are comments.
+# Empty lines are ignored.
+
+# --- Docker ---
+frontend/Dockerfile
+
+# --- API URL helper (local dev) ---
+frontend/lib/apiUrl.ts
+
+# --- Auth fetch (uses NEXT_PUBLIC_API_URL for local dev) ---
+frontend/lib/authFetch.ts
+
+# --- Client components using apiUrl() instead of relative paths ---
+frontend/contexts/SettingsContext.tsx
+frontend/components/home/FeaturedCars.tsx
+frontend/components/home/HeroSlider.tsx
+frontend/components/home/LatestArticles.tsx
+frontend/components/home/WhyRahnavard.tsx
+frontend/components/home/Branches.tsx
+frontend/components/home/ConsultationForm.tsx
+frontend/components/car/RelatedCarsSlider.tsx
+frontend/components/car/ConsultationModal.tsx
+
+# --- Server components with resolveMediaUrl() ---
+frontend/components/car/CarImageGallery.tsx
+frontend/app/cars/[slug]/page.tsx
+
+# --- Image optimization (localhost:8000 unoptimized check) ---
+frontend/components/ui/OptimizedImage.tsx
+
+# --- Next.js config (backend:8000 remote pattern) ---
+frontend/next.config.js
+
+# --- Backend throttle (DEBUG-conditional high rates) ---
+backend/config/settings.py
+
+# --- Test mocks (apiUrl mock for local dev) ---
+frontend/components/car/__tests__/RelatedCarsSlider.test.tsx
+frontend/components/home/__tests__/FeaturedCars.test.tsx
+frontend/components/home/__tests__/LatestArticles.test.tsx
+frontend/components/home/__tests__/ConsultationForm.test.tsx
