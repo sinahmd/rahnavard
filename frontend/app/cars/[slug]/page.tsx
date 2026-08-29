@@ -9,6 +9,20 @@ import CarImageGallery from '@/components/car/CarImageGallery'
 import PdfViewer from '@/components/car/PdfViewer'
 import CarCTAButtons from '@/components/car/CarCTAButtons'
 
+/**
+ * Resolve a media URL to a full backend URL for local dev.
+ * In production, nginx serves /media/* directly.
+ * In local dev, relative /media/* URLs need the backend host prefix.
+ */
+function resolveMediaUrl(url: string): string {
+  if (url.startsWith('http')) return url
+  if (url.startsWith('/media/')) {
+    const host = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || ''
+    return host ? `${host}${url}` : url
+  }
+  return url
+}
+
 interface Car {
   id: number
   brand: string
@@ -233,8 +247,8 @@ export default async function CarDetailPage({ params }: Props) {
             {/* LEFT: Image Gallery */}
             <div>
               <CarImageGallery
-                mainImage={car.main_image}
-                gallery={car.gallery || []}
+                mainImage={resolveMediaUrl(car.main_image)}
+                gallery={(car.gallery || []).map(resolveMediaUrl)}
                 persianName={car.persian_name}
               />
             </div>

@@ -78,7 +78,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SiteSettings>(defaults)
 
   useEffect(() => {
-    fetch('/api/v1/settings/')
+    fetch(apiUrl('/api/v1/settings/'))
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setSettings((prev) => ({ ...prev, ...data }))

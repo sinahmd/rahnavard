@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { apiUrl } from '@/lib/apiUrl'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
 
@@ -23,7 +24,7 @@ export default function LatestArticles() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/v1/articles/')
+        const res = await fetch(apiUrl('/api/v1/articles/'))
         if (res.ok) {
           const data = await res.json()
           setArticles((data.results || data || []).slice(0, 3))

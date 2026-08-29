@@ -2,9 +2,6 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Use Arvan Cloud npm mirror for faster installs in Iran
-RUN npm config set registry https://npm.arvancloud.ir/
-
 # Build args for NEXT_PUBLIC_* vars
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000

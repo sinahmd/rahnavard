@@ -21,7 +21,8 @@ export default function OptimizedImage(props: ImageProps) {
 
   const isMediaUrl =
     src.startsWith('/media/') ||
-    src.includes('rahnavard.co/media/')
+    src.includes('rahnavard.co/media/') ||
+    src.startsWith('http://localhost:8000/media/')
 
   // Only pass unoptimized when true to avoid React DOM warning for false
   return isMediaUrl ? <Image {...props} src={src} unoptimized /> : <Image {...props} src={src} />
