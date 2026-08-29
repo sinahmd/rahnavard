@@ -9,6 +9,11 @@ jest.mock('@/contexts/SettingsContext', () => ({
   })),
 }))
 
+jest.mock('@/lib/apiUrl', () => ({
+  apiUrl: (path: string) => `http://localhost:8000${path}`,
+}))
+
+
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
