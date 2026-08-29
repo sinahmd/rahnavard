@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
-import { apiUrl } from '@/lib/apiUrl'
 
 
 interface Branch {
@@ -24,7 +23,7 @@ export default function Branches() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(apiUrl('/api/v1/branches/'))
+        const res = await fetch('/api/v1/branches/')
         if (res.ok) {
           const data = await res.json()
           setBranches(data.results || data || [])

@@ -2,11 +2,6 @@ import '@testing-library/jest-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import RelatedCarsSlider from '../RelatedCarsSlider'
 
-jest.mock('@/lib/apiUrl', () => ({
-  apiUrl: (path: string) => `http://localhost:8000${path}`,
-}))
-
-
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
