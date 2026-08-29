@@ -42,7 +42,7 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
 class HeroSlideSerializer(serializers.ModelSerializer):
     class Meta:
         model = HeroSlide
-        fields = ["id", "title", "image", "alt_text", "is_active", "display_order"]
+        fields = ["id", "title", "image", "alt_text", "link", "is_active", "display_order"]
         extra_kwargs = {
             "image": {"validators": [ImageValidator()]},
         }

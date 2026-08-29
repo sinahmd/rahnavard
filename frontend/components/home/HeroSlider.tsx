@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { apiUrl } from '@/lib/apiUrl'
 
 interface HeroSlide {
   id: number
   title: string
   image: string
   alt_text: string
+  link?: string
 }
 
 const SLIDE_DURATION = 6000
@@ -22,7 +23,7 @@ export default function HeroSlider() {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const response = await fetch(apiUrl('/api/v1/hero-slides/'))
+        const response = await fetch('/api/v1/hero-slides/')
         if (response.ok) {
           const data = await response.json()
           setSlides(data.results || data || [])
@@ -64,18 +65,34 @@ export default function HeroSlider() {
     )
   }
 
+  const currentSlide = slides[current]
+  const hasLink = currentSlide?.link && currentSlide.link.trim() !== ''
+
   return (
     <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] overflow-hidden bg-[#111]">
       {slides.map((slide, index) => (
         <div key={slide.id} className={`absolute inset-0 transition-opacity duration-[900ms] ease-in-out ${index === current ? 'opacity-100' : 'opacity-0'}`}>
-          <OptimizedImage
-            src={slide.image}
-            alt={slide.alt_text}
-            fill
-            className={`object-cover object-center ${index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'}`}
-            priority={index === 0}
-            sizes="100vw"
-          />
+          {slide.link && slide.link.trim() !== '' ? (
+            <Link href={slide.link} className="block absolute inset-0">
+              <OptimizedImage
+                src={slide.image}
+                alt={slide.alt_text}
+                fill
+                className={`object-cover object-center ${index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'}`}
+                priority={index === 0}
+                sizes="100vw"
+              />
+            </Link>
+          ) : (
+            <OptimizedImage
+              src={slide.image}
+              alt={slide.alt_text}
+              fill
+              className={`object-cover object-center ${index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'}`}
+              priority={index === 0}
+              sizes="100vw"
+            />
+          )}
         </div>
       ))}
 
@@ -93,8 +110,8 @@ export default function HeroSlider() {
       <div className="absolute bottom-16 right-0 left-0 z-10 hidden md:block">
         <div className="wrap flex items-end justify-between gap-5">
           <div className="flex gap-3.5 flex-wrap">
-            <a href="#cars" className="btn btn-primary">مشاهده خودروها</a>
-            <a href="#consult" className="btn btn-outline">درخواست مشاوره</a>
+            <Link href="/cars" className="btn btn-primary">مشاهده خودروها</Link>
+            <a href="/#consult" className="btn btn-outline">درخواست مشاوره</a>
           </div>
         </div>
       </div>

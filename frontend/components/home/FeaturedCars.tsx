@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
-import { apiUrl } from '@/lib/apiUrl'
 
 interface Car {
   id: number
@@ -25,12 +24,12 @@ export default function FeaturedCars() {
     const fetchData = async () => {
       try {
         // Try featured cars first, fall back to all active cars
-        let res = await fetch(apiUrl('/api/v1/cars/?is_featured=true'))
+        let res = await fetch('/api/v1/cars/?is_featured=true')
         let data = await res.json()
         let carsList = data.results || data || []
 
         if (carsList.length === 0) {
-          res = await fetch(apiUrl('/api/v1/cars/'))
+          res = await fetch('/api/v1/cars/')
           data = await res.json()
           carsList = data.results || data || []
         }
@@ -80,6 +79,7 @@ export default function FeaturedCars() {
             خودرویی یافت نشد. از پنل مدیریت خودرو اضافه کنید.
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {cars.map((car) => (
               <div
@@ -116,6 +116,12 @@ export default function FeaturedCars() {
               </div>
             ))}
           </div>
+          <div className="text-center mt-10">
+            <Link href="/cars" className="btn btn-outline">
+              مشاهده همه خودروها
+            </Link>
+          </div>
+          </>
         )}
       </div>
     </section>

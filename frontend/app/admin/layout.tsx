@@ -104,7 +104,7 @@ export default function AdminLayout({
                 <Link
                   href={link.href}
                   className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                    pathname === link.href
+                    (pathname === link.href || (link.href !== '/admin' && pathname.startsWith(link.href)))
                       ? 'bg-accent text-dark font-bold'
                       : 'hover:bg-gray-100'
                   }`}

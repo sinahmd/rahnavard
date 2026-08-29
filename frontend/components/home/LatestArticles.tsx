@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
-import { apiUrl } from '@/lib/apiUrl'
 
 interface Article {
   id: number
@@ -24,7 +23,7 @@ export default function LatestArticles() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(apiUrl('/api/v1/articles/'))
+        const res = await fetch('/api/v1/articles/')
         if (res.ok) {
           const data = await res.json()
           setArticles((data.results || data || []).slice(0, 3))
@@ -83,6 +82,7 @@ export default function LatestArticles() {
             مقاله‌ای یافت نشد. از پنل مدیریت مقاله اضافه کنید.
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {articles.map((article) => (
               <Link
@@ -129,6 +129,12 @@ export default function LatestArticles() {
               </Link>
             ))}
           </div>
+          <div className="text-center mt-10">
+            <Link href="/articles" className="btn btn-outline">
+              مشاهده همه مقالات
+            </Link>
+          </div>
+          </>
         )}
       </div>
     </section>

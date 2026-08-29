@@ -25,13 +25,13 @@ class SiteSettings(models.Model):
         max_length=100, default="مشاهده خودروها", verbose_name="متن دکمه اصلی هیرو"
     )
     hero_cta_primary_link = models.CharField(
-        max_length=200, default="#cars", verbose_name="لینک دکمه اصلی"
+        max_length=200, default="/cars", verbose_name="لینک دکمه اصلی"
     )
     hero_cta_secondary_text = models.CharField(
         max_length=100, default="درخواست مشاوره", verbose_name="متن دکمه فرعی هیرو"
     )
     hero_cta_secondary_link = models.CharField(
-        max_length=200, default="#consult", verbose_name="لینک دکمه فرعی"
+        max_length=200, default="/#consult", verbose_name="لینک دکمه فرعی"
     )
 
     # Why Section
@@ -124,6 +124,12 @@ class HeroSlide(models.Model):
     title = models.CharField(max_length=200, blank=True, verbose_name="عنوان")
     image = models.ImageField(upload_to="hero/", verbose_name="تصویر")
     alt_text = models.CharField(max_length=300, verbose_name="متن جایگزین")
+    link = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name="لینک",
+        help_text="لینک صفحه مقصد (مثلاً /cars/toyota-rav4 یا /#consult)",
+    )
     is_active = models.BooleanField(default=True, verbose_name="فعال")
     display_order = models.IntegerField(default=0, verbose_name="ترتیب نمایش")
 

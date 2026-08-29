@@ -18,20 +18,6 @@ const nextConfig = {
         hostname: 'rahnavard.co',
         pathname: '/media/**',
       },
-      // Local dev: Next.js image optimizer runs inside Docker container,
-      // so 'localhost:8000' doesn't resolve — use container name 'backend' instead.
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '8000',
-        pathname: '/media/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'backend',
-        port: '8000',
-        pathname: '/media/**',
-      },
     ],
   },
   // i18n is handled via <html lang="fa" dir="rtl"> in layout.tsx

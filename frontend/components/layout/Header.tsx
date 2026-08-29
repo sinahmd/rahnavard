@@ -2,23 +2,29 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import MobileNav from './MobileNav'
 import { useSettings } from '@/contexts/SettingsContext'
 
-const navLinks = [
-  { href: '#top', label: 'خانه' },
-  { href: '#why', label: 'درباره ما' },
-  { href: '#cars', label: 'خودروها' },
-  { href: '#articles', label: 'مقالات' },
-  { href: '#branches', label: 'شعب' },
-  { href: '#consult', label: 'تماس با ما' },
-]
+function getNavLinks(pathname: string) {
+  const isHome = pathname === '/'
+  return [
+    { href: isHome ? '#top' : '/', label: 'خانه' },
+    { href: isHome ? '#why' : '/#why', label: 'درباره ما' },
+    { href: isHome ? '#cars' : '/cars', label: 'خودروها' },
+    { href: isHome ? '#articles' : '/articles', label: 'مقالات' },
+    { href: isHome ? '#branches' : '/#branches', label: 'شعب' },
+    { href: isHome ? '#consult' : '/#consult', label: 'تماس با ما' },
+  ]
+}
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const settings = useSettings()
+  const pathname = usePathname()
+  const navLinks = getNavLinks(pathname)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,7 +48,7 @@ export default function Header() {
       <div className="wrap flex items-center justify-center min-h-[44px] relative">
         {/* Logo */}
         <Link
-          href="#top"
+          href="/"
           className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center h-[44px] z-10"
         >
           {settings.logo ? (

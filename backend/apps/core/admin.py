@@ -53,9 +53,13 @@ class SiteSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(HeroSlide)
 class HeroSlideAdmin(admin.ModelAdmin):
-    list_display = ["title", "alt_text", "is_active", "display_order"]
+    list_display = ["title", "alt_text", "link", "is_active", "display_order"]
     list_filter = ["is_active"]
     list_editable = ["is_active", "display_order"]
+    fieldsets = (
+        (None, {"fields": ("title", "image", "alt_text", "link")}),
+        ("تنظیمات نمایش", {"fields": ("is_active", "display_order")}),
+    )
 
 
 @admin.register(WhyFeature)

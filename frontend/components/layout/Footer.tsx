@@ -1,18 +1,24 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
 
-const quickLinks = [
-  { href: '#why', label: 'درباره ما' },
-  { href: '#cars', label: 'خودروها' },
-  { href: '#articles', label: 'مقالات' },
-  { href: '#consult', label: 'مشاوره' },
-]
+function getQuickLinks(pathname: string) {
+  const isHome = pathname === '/'
+  return [
+    { href: isHome ? '#why' : '/#why', label: 'درباره ما' },
+    { href: isHome ? '#cars' : '/cars', label: 'خودروها' },
+    { href: isHome ? '#articles' : '/articles', label: 'مقالات' },
+    { href: isHome ? '#consult' : '/#consult', label: 'مشاوره' },
+  ]
+}
 
 export default function Footer() {
   const settings = useSettings()
+  const pathname = usePathname()
+  const quickLinks = getQuickLinks(pathname)
 
   return (
     <footer className="bg-dark text-white pt-16 pb-6">
@@ -20,7 +26,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr] gap-10 pb-10 border-b border-white/12">
           {/* Logo & Description */}
           <div>
-            <Link href="#top" className="inline-block mb-4">
+            <Link href="/" className="inline-block mb-4">
               {settings.logo ? (
                 <OptimizedImage
                   src={settings.logo}

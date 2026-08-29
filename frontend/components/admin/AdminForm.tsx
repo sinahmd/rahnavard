@@ -11,7 +11,7 @@ import GalleryUpload from './GalleryUpload'
 export interface FormField {
   name: string
   label: string
-  type: 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'file' | 'datetime-local' | 'url' | 'gallery'
+  type: 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'file' | 'datetime-local' | 'url' | 'gallery' | 'custom'
   required?: boolean
   placeholder?: string
   options?: { value: string; label: string }[]
@@ -20,6 +20,7 @@ export interface FormField {
   helpText?: string
   defaultValue?: string | boolean
   validate?: (value: string | boolean | File | null | File[]) => string | null
+  renderField?: (value: string, onChange: (val: string) => void) => React.ReactNode
 }
 
 interface AdminFormProps {
@@ -464,6 +465,27 @@ export default function AdminForm({
                           error={fieldError}
                           accept={field.accept}
                         />
+                      </div>
+                    )
+                  }
+
+                  if (field.type === 'custom' && field.renderField) {
+                    return (
+                      <div key={field.name} className="md:col-span-2">
+                        <label className="block text-sm font-bold mb-2">
+                          {field.label}
+                          {field.required && <span className="text-red-500 mr-1">*</span>}
+                        </label>
+                        {field.renderField(
+                          String(formData[field.name] ?? ''),
+                          (val: string) => handleChange(field.name, val)
+                        )}
+                        {field.helpText && (
+                          <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>
+                        )}
+                        {fieldError && (
+                          <p className="text-red-500 text-sm mt-1">{fieldError}</p>
+                        )}
                       </div>
                     )
                   }

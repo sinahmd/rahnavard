@@ -10,6 +10,7 @@ interface HeroSlide {
   title: string
   image: string
   alt_text: string
+  link: string
   is_active: boolean
   display_order: number
 }
@@ -81,6 +82,7 @@ export default function AdminHeroSlidesPage() {
               <th className="p-4 font-bold">عنوان</th>
               <th className="p-4 font-bold">متن جایگزین</th>
               <th className="p-4 font-bold">ترتیب</th>
+              <th className="p-4 font-bold">لینک</th>
               <th className="p-4 font-bold">وضعیت</th>
               <th className="p-4 font-bold">عملیات</th>
             </tr>
@@ -88,7 +90,7 @@ export default function AdminHeroSlidesPage() {
           <tbody>
             {slides.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">
+                <td colSpan={7} className="p-4 text-center text-gray-500">
                   اسلایدی وجود ندارد
                 </td>
               </tr>
@@ -113,6 +115,7 @@ export default function AdminHeroSlidesPage() {
                   <td className="p-4">{slide.title || '-'}</td>
                   <td className="p-4 text-sm">{slide.alt_text}</td>
                   <td className="p-4">{slide.display_order}</td>
+                  <td className="p-4 text-sm text-gray-500">{slide.link || '-'}</td>
                   <td className="p-4">
                     <button
                       onClick={() => toggleActive(slide.id, slide.is_active)}
