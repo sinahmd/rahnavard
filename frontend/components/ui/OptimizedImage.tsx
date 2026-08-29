@@ -25,5 +25,10 @@ export default function OptimizedImage(props: ImageProps) {
     src.startsWith('http://localhost:8000/media/')
 
   // Only pass unoptimized when true to avoid React DOM warning for false
-  return isMediaUrl ? <Image {...props} src={src} unoptimized /> : <Image {...props} src={src} />
+  // Explicitly pass alt to satisfy jsx-a11y/alt-text ESLint rule
+  return isMediaUrl ? (
+    <Image {...props} src={src} alt={props.alt || ''} unoptimized />
+  ) : (
+    <Image {...props} src={src} alt={props.alt || ''} />
+  )
 }

@@ -97,10 +97,9 @@ export default function AdminForm({
   const router = useRouter()
   const isEdit = !!id
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [formData, setFormData] = useState<Record<string, any>>(() => {
+  const [formData, setFormData] = useState<Record<string, string | boolean | File | null | File[]>>(() => {
     // Initialize with default values for new items
-    const initial: Record<string, any> = {}
+    const initial: Record<string, string | boolean | File | null | File[]> = {}
     if (!id) {
       fields.forEach((field) => {
         if (field.defaultValue !== undefined) {
@@ -134,8 +133,7 @@ export default function AdminForm({
       const response = await authFetch(`${apiBase}${id}/`)
       if (response.ok) {
         const data = await response.json()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const initial: Record<string, any> = {}
+        const initial: Record<string, string | boolean | File | null | File[]> = {}
         const images: Record<string, string> = {}
 
         const fileNames: Record<string, string> = {}
@@ -232,8 +230,7 @@ export default function AdminForm({
     return isValid
   }, [fields, formData, existingImages, validateField])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleChange = (name: string, value: any) => {
+  const handleChange = (name: string, value: string | boolean | File | null | File[]) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
     setTouched((prev) => ({ ...prev, [name]: true }))
 
