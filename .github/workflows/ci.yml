@@ -21,25 +21,18 @@ jobs:
   check-local-only:
     name: Check Local-Only Files
     runs-on: ubuntu-latest
-    # Only run on PRs to main or pushes to main
-    if: github.base_ref == 'main' || github.ref == 'refs/heads/main'
+    # Only run on PRs to main — this is the gate that blocks bad merges
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history needed for diff
 
-      - name: Check for local-only files in diff
+      - name: Check for local-only files in PR diff
         run: |
-          echo "🔍 Checking for local-only files..."
-          # Determine the diff range
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            DIFF_RANGE="origin/main...HEAD"
-          else
-            DIFF_RANGE="origin/main~1..HEAD"
-          fi
-          # Run the check
-          bash scripts/check-local-only.sh "$DIFF_RANGE"
+          echo "🔍 Checking for local-only files in PR..."
+          bash scripts/check-local-only.sh "origin/main...HEAD"
 
   lint-frontend:
     name: Lint Frontend
