@@ -25,6 +25,7 @@ export default function Header() {
   const settings = useSettings()
   const pathname = usePathname()
   const navLinks = getNavLinks(pathname)
+  const isHome = pathname === '/'
 
   useEffect(() => {
     const handleScroll = () => {
@@ -40,7 +41,7 @@ export default function Header() {
   return (
     <header
       className={`fixed top-0 right-0 left-0 z-50 transition-all duration-300 ${
-        isScrolled
+        !isHome || isScrolled
           ? 'bg-[rgba(254,252,245,0.92)] shadow-[0_2px_18px_rgba(0,0,0,0.06)] py-3.5'
           : 'bg-transparent py-5'
       }`}
@@ -49,7 +50,7 @@ export default function Header() {
         {/* Logo */}
         <Link
           href="/"
-          className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center h-[44px] z-10"
+          className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center h-[44px] z-10 shrink-0"
         >
           {settings.logo ? (
             <OptimizedImage
@@ -57,14 +58,14 @@ export default function Header() {
               alt="راهنورد خودرو"
               width={150}
               height={38}
-              className={`h-[38px] w-auto max-w-none object-contain transition-all duration-300 ${
-                isScrolled ? 'brightness-0' : 'brightness-0 invert'
+              className={`h-[38px] w-auto max-w-none transition-all duration-300 ${
+                !isHome || isScrolled ? 'brightness-0' : 'brightness-0 invert'
               }`}
               priority
             />
           ) : (
             <span className={`text-xl font-black transition-all duration-300 ${
-              isScrolled ? 'text-dark' : 'text-white'
+              !isHome || isScrolled ? 'text-dark' : 'text-white'
             }`}>
               راهنورد
             </span>
@@ -79,7 +80,7 @@ export default function Header() {
                 <Link
                   href={link.href}
                   className={`inline-flex items-center h-full text-[15px] font-medium leading-none opacity-92 hover:opacity-100 transition-opacity relative ${
-                    isScrolled ? 'text-dark' : 'text-white'
+                    !isHome || isScrolled ? 'text-dark' : 'text-white'
                   }`}
                 >
                   {link.label}
@@ -98,22 +99,22 @@ export default function Header() {
           <span
             className={`w-6 h-0.5 rounded-sm transition-all duration-300 origin-center ${
               isMobileMenuOpen
-                ? `translate-y-[5.5px] rotate-45 ${isScrolled ? 'bg-dark' : 'bg-white'}`
-                : isScrolled ? 'bg-dark' : 'bg-white'
+                ? `translate-y-[5.5px] rotate-45 ${!isHome || isScrolled ? 'bg-dark' : 'bg-white'}`
+                : !isHome || isScrolled ? 'bg-dark' : 'bg-white'
             }`}
           />
           <span
             className={`w-6 h-0.5 rounded-sm transition-all duration-300 ${
               isMobileMenuOpen
                 ? 'opacity-0 scale-0'
-                : isScrolled ? 'bg-dark' : 'bg-white'
+                : !isHome || isScrolled ? 'bg-dark' : 'bg-white'
             }`}
           />
           <span
             className={`w-6 h-0.5 rounded-sm transition-all duration-300 origin-center ${
               isMobileMenuOpen
-                ? `-translate-y-[5.5px] -rotate-45 ${isScrolled ? 'bg-dark' : 'bg-white'}`
-                : isScrolled ? 'bg-dark' : 'bg-white'
+                ? `-translate-y-[5.5px] -rotate-45 ${!isHome || isScrolled ? 'bg-dark' : 'bg-white'}`
+                : !isHome || isScrolled ? 'bg-dark' : 'bg-white'
             }`}
           />
         </button>

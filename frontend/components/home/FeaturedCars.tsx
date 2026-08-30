@@ -117,9 +117,15 @@ export default function FeaturedCars() {
               </div>
             ))}
           </div>
-          <div className="text-center mt-10">
-            <Link href="/cars" className="btn btn-outline">
-              مشاهده همه خودروها
+          <div className="flex justify-center mt-12">
+            <Link
+              href="/cars"
+              className="group inline-flex items-center gap-3 px-8 py-4 bg-dark text-white rounded-xl font-bold text-[15px] transition-all duration-300 hover:bg-accent hover:shadow-lg hover:-translate-y-0.5"
+            >
+              مشاهده همه محصولات
+              <svg className="w-5 h-5 transition-transform duration-300 group-hover:-translate-x-1 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
             </Link>
           </div>
           </>
