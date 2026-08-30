@@ -15,11 +15,11 @@ export async function authFetch(
     ...(options.headers as Record<string, string>),
   }
   if (token) {
-    headers["Authorization"] = 
+    headers["Authorization"] = `Token ${token}`
   }
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = headers["Content-Type"] || "application/json"
   }
-  const fullUrl = url.startsWith("http") ? url : 
+  const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`
   return fetch(fullUrl, { ...options, headers })
 }

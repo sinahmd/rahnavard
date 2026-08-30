@@ -53,7 +53,20 @@ async function getCar(slug: string): Promise<Car | null> {
         signal: AbortSignal.timeout(8000),
       })
       if (!res.ok) return null
-      return res.json()
+      const data = await res.json()
+      // Strip internal backend URL prefix — backend returns http://backend:8000/media/...
+      // but client components need relative /media/... URLs for OptimizedImage to work
+      const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+      if (data.main_image && data.main_image.startsWith(backendUrl)) {
+        data.main_image = data.main_image.slice(backendUrl.length)
+      }
+      if (data.catalog_file && data.catalog_file.startsWith(backendUrl)) {
+        data.catalog_file = data.catalog_file.slice(backendUrl.length)
+      }
+      if (data.og_image && data.og_image.startsWith(backendUrl)) {
+        data.og_image = data.og_image.slice(backendUrl.length)
+      }
+      return data
     } catch {
       if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
     }
@@ -72,6 +85,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const title = car.seo_title || `${car.persian_name} | راهنورد خودرو`
   const description = car.seo_description || car.description || `${car.brand} ${car.model} - راهنورد خودرو`
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'
 
   return {
     title,
@@ -80,9 +94,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description,
       images: car.og_image
-        ? [{ url: car.og_image, width: 800, height: 600, alt: car.persian_name }]
+        ? [{ url: car.og_image.startsWith('http') ? car.og_image : `${siteUrl}${car.og_image}`, width: 800, height: 600, alt: car.persian_name }]
         : car.main_image
-          ? [{ url: car.main_image, width: 800, height: 600, alt: car.persian_name }]
+          ? [{ url: car.main_image.startsWith('http') ? car.main_image : `${siteUrl}${car.main_image}`, width: 800, height: 600, alt: car.persian_name }]
           : [],
     },
   }

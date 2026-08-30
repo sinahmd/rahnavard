@@ -72,7 +72,7 @@ export default function HeroSlider() {
   return (
     <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] overflow-hidden bg-[#111]">
       {slides.map((slide, index) => (
-        <div key={slide.id} className={`absolute inset-0 transition-opacity duration-[900ms] ease-in-out ${index === current ? 'opacity-100' : 'opacity-0'}`}>
+        <div key={slide.id} className={`absolute inset-0 transition-opacity duration-[900ms] ease-in-out ${index === current ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
           {slide.link && slide.link.trim() !== '' ? (
             <Link href={slide.link} className="block absolute inset-0">
               <OptimizedImage
