@@ -53,7 +53,7 @@ export default function ConsultationModal({ isOpen, onClose, carName }: Consulta
     setError(null)
 
     try {
-      const response = await fetch('/api/v1/inquiries/', {
+      const response = await fetch(apiUrl('/api/v1/inquiries/'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
