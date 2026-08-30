@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { apiUrl } from "@/lib/apiUrl"
 import OptimizedImage from '@/components/ui/OptimizedImage'
 
 
