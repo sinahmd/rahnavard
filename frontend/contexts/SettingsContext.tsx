@@ -1,7 +1,6 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { apiUrl } from '@/lib/apiUrl'
 
 
 interface SiteSettings {
@@ -79,7 +78,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SiteSettings>(defaults)
 
   useEffect(() => {
-    fetch(apiUrl('/api/v1/settings/'))
+    fetch('/api/v1/settings/')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setSettings((prev) => ({ ...prev, ...data }))

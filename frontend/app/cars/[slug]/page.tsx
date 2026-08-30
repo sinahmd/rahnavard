@@ -56,15 +56,15 @@ async function getCar(slug: string): Promise<Car | null> {
       const data = await res.json()
       // Strip internal backend URL prefix — backend returns http://backend:8000/media/...
       // but client components need relative /media/... URLs for OptimizedImage to work
-      const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
-      if (data.main_image && data.main_image.startsWith(backendUrl)) {
-        data.main_image = data.main_image.slice(backendUrl.length)
+      const bkUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+      if (data.main_image && data.main_image.startsWith(bkUrl)) {
+        data.main_image = data.main_image.slice(bkUrl.length)
       }
-      if (data.catalog_file && data.catalog_file.startsWith(backendUrl)) {
-        data.catalog_file = data.catalog_file.slice(backendUrl.length)
+      if (data.catalog_file && data.catalog_file.startsWith(bkUrl)) {
+        data.catalog_file = data.catalog_file.slice(bkUrl.length)
       }
-      if (data.og_image && data.og_image.startsWith(backendUrl)) {
-        data.og_image = data.og_image.slice(backendUrl.length)
+      if (data.og_image && data.og_image.startsWith(bkUrl)) {
+        data.og_image = data.og_image.slice(bkUrl.length)
       }
       return data
     } catch {
