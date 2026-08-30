@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { apiUrl } from "@/lib/apiUrl"
 import { useSettings } from '@/contexts/SettingsContext'
 
 interface Car {
