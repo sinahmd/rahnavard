@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { apiUrl } from "@/lib/apiUrl"
 import { useSettings } from '@/contexts/SettingsContext'
 
 
@@ -22,7 +21,7 @@ export default function WhyRahnavard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(apiUrl('/api/v1/why-features/'))
+        const res = await fetch('/api/v1/why-features/')
         if (res.ok) {
           const data = await res.json()
           setFeatures(data.results || data || [])
@@ -84,7 +83,7 @@ export default function WhyRahnavard() {
                 <div className="w-12 h-12 mx-auto mb-5 flex items-center justify-center">
                   {feature.icon ? (
                     <OptimizedImage
-                      src={apiUrl(feature.icon)}
+                      src={feature.icon}
                       alt={feature.title}
                       width={48}
                       height={48}

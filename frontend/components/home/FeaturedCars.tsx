@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { apiUrl } from "@/lib/apiUrl"
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -25,12 +24,12 @@ export default function FeaturedCars() {
     const fetchData = async () => {
       try {
         // Try featured cars first, fall back to all active cars
-        let res = await fetch(apiUrl('/api/v1/cars/?is_featured=true'))
+        let res = await fetch('/api/v1/cars/?is_featured=true')
         let data = await res.json()
         let carsList = data.results || data || []
 
         if (carsList.length === 0) {
-          res = await fetch(apiUrl('/api/v1/cars/'))
+          res = await fetch('/api/v1/cars/')
           data = await res.json()
           carsList = data.results || data || []
         }
@@ -90,7 +89,7 @@ export default function FeaturedCars() {
                 <div className="w-full aspect-[4/3] flex items-center justify-center mb-[18px] overflow-hidden">
                   {car.main_image ? (
                     <OptimizedImage
-                      src={apiUrl(car.main_image)}
+                      src={car.main_image}
                       alt={car.persian_name}
                       width={400}
                       height={300}
@@ -123,7 +122,7 @@ export default function FeaturedCars() {
               className="group inline-flex items-center gap-3 px-8 py-4 bg-dark text-white rounded-xl font-bold text-[15px] transition-all duration-300 hover:bg-accent hover:shadow-lg hover:-translate-y-0.5"
             >
               مشاهده همه محصولات
-              <svg className="w-5 h-5 transition-transform duration-300 group-hover:-translate-x-3 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-5 h-5 transition-transform duration-300 group-hover:-translate-x-1 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 6l-6 6 6 6" />
               </svg>
             </Link>

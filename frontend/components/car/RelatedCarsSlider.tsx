@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { apiUrl } from "@/lib/apiUrl"
 import OptimizedImage from '@/components/ui/OptimizedImage'
 
 
@@ -35,7 +34,7 @@ export default function RelatedCarsSlider({ currentSlug }: Props) {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(apiUrl('/api/v1/cars/?is_active=true&limit=20'))
+        const res = await fetch('/api/v1/cars/?is_active=true&limit=20')
         if (!res.ok) throw new Error('Failed to fetch related cars')
         const data = await res.json()
         const all: Car[] = data.results || data || []
@@ -78,7 +77,7 @@ export default function RelatedCarsSlider({ currentSlug }: Props) {
               <div className="w-full aspect-[4/3] flex items-center justify-center mb-4 overflow-hidden">
                 {car.main_image ? (
                   <OptimizedImage
-                    src={apiUrl(car.main_image)}
+                    src={car.main_image}
                     alt={car.persian_name}
                     width={400}
                     height={300}

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { apiUrl } from "@/lib/apiUrl"
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -24,7 +23,7 @@ export default function LatestArticles() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(apiUrl('/api/v1/articles/'))
+        const res = await fetch('/api/v1/articles/')
         if (res.ok) {
           const data = await res.json()
           setArticles((data.results || data || []).slice(0, 3))
@@ -94,7 +93,7 @@ export default function LatestArticles() {
                 <div className="h-40 bg-gradient-to-br from-[#ffeca1] to-white flex items-center justify-center relative overflow-hidden">
                   {article.cover_image ? (
                     <OptimizedImage
-                      src={apiUrl(article.cover_image)}
+                      src={article.cover_image}
                       alt={article.title}
                       width={400}
                       height={160}
