@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     # Public endpoints
     path("cars/", views.CarListView.as_view(), name="car-list"),
+    path("cars/filters/", views.CarFilterOptionsView.as_view(), name="car-filter-options"),
     path("cars/<str:slug>/", views.CarDetailView.as_view(), name="car-detail"),
     # Admin endpoints
     path("admin/cars/", views.CarAdminListView.as_view(), name="admin-car-list"),

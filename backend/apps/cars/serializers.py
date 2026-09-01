@@ -55,6 +55,12 @@ class CarListSerializer(serializers.ModelSerializer):
     """Serializer for car list view."""
 
     main_image = serializers.ImageField(read_only=True)
+    fuel_type_display = serializers.CharField(
+        source="get_fuel_type_display", read_only=True
+    )
+    transmission_display = serializers.CharField(
+        source="get_transmission_display", read_only=True
+    )
 
     class Meta:
         model = Car
@@ -66,7 +72,12 @@ class CarListSerializer(serializers.ModelSerializer):
             "slug",
             "year",
             "fuel_type",
+            "fuel_type_display",
             "transmission",
+            "transmission_display",
+            "price",
+            "body_type",
+            "engine",
             "main_image",
             "is_featured",
             "display_order",

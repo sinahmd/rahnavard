@@ -1,3 +1,4 @@
+import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, permissions, status
 from rest_framework.response import Response
@@ -6,8 +7,27 @@ from .models import Car
 from .serializers import CarAdminSerializer, CarDetailSerializer, CarListSerializer
 
 
+class CarFilter(django_filters.FilterSet):
+    """FilterSet for public car listing with range filters."""
+
+    min_price = django_filters.NumberFilter(field_name="price", lookup_expr="gte")
+    max_price = django_filters.NumberFilter(field_name="price", lookup_expr="lte")
+    min_year = django_filters.NumberFilter(field_name="year", lookup_expr="gte")
+    max_year = django_filters.NumberFilter(field_name="year", lookup_expr="lte")
+
+    class Meta:
+        model = Car
+        fields = {
+            "brand": ["exact"],
+            "fuel_type": ["exact"],
+            "transmission": ["exact"],
+            "body_type": ["exact"],
+            "is_featured": ["exact"],
+        }
+
+
 class CarListView(generics.ListAPIView):
-    """Public endpoint for listing active cars."""
+    """Public endpoint for listing active cars with search, filtering, and ordering."""
 
     serializer_class = CarListSerializer
     permission_classes = [permissions.AllowAny]
@@ -16,12 +36,32 @@ class CarListView(generics.ListAPIView):
         filters.SearchFilter,
         filters.OrderingFilter,
     ]
-    filterset_fields = ["brand", "fuel_type", "transmission", "is_featured"]
+    filterset_class = CarFilter
     search_fields = ["brand", "model", "persian_name", "description"]
     ordering_fields = ["display_order", "created_at", "year", "price"]
+    ordering = ["display_order", "-created_at"]
 
     def get_queryset(self):
         return Car.objects.filter(is_active=True)
+
+
+class CarFilterOptionsView(generics.GenericAPIView):
+    """Returns distinct filter values for the car listing page."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        qs = Car.objects.filter(is_active=True)
+        return Response({
+            "brands": list(qs.values_list("brand", flat=True).distinct().order_by("brand")),
+            "body_types": list(qs.exclude(body_type="").values_list("body_type", flat=True).distinct().order_by("body_type")),
+            "fuel_types": list(qs.values_list("fuel_type", flat=True).distinct().order_by("fuel_type")),
+            "transmissions": list(qs.values_list("transmission", flat=True).distinct().order_by("transmission")),
+            "min_year": qs.order_by("year").values_list("year", flat=True).first(),
+            "max_year": qs.order_by("-year").values_list("year", flat=True).first(),
+            "min_price": qs.exclude(price__isnull=True).order_by("price").values_list("price", flat=True).first(),
+            "max_price": qs.exclude(price__isnull=True).order_by("-price").values_list("price", flat=True).first(),
+        })
 
 
 class CarDetailView(generics.RetrieveAPIView):

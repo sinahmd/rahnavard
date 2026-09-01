@@ -467,3 +467,318 @@ class TestCarNewFields:
         assert response.data["body_type"] == "سدان"
         assert response.data["color"] == "مشکی"
         assert response.data["technical_description"] == "متن جدید"
+
+
+# ============================================================================
+# Car Search, Filtering & Pagination Tests
+# ============================================================================
+
+
+@pytest.fixture
+def filter_cars(db):
+    """Create cars with varied attributes for filter testing."""
+    cars = []
+    specs = [
+        {"brand": "Toyota", "model": "RAV4", "persian_name": "تویوتا راو۴", "slug": "toyota-rav4",
+         "year": 2025, "fuel_type": "hybrid", "transmission": "automatic", "price": 1500000000, "body_type": "شاسی‌بلند", "is_active": True},
+        {"brand": "Hyundai", "model": "Elantra", "persian_name": "هیوندای النترا", "slug": "hyundai-elantra",
+         "year": 2024, "fuel_type": "gasoline", "transmission": "automatic", "price": 900000000, "body_type": "سدان", "is_active": True},
+        {"brand": "Kia", "model": "Sportage", "persian_name": "کیا اسپورتیج", "slug": "kia-sportage",
+         "year": 2025, "fuel_type": "gasoline", "transmission": "automatic", "price": 1200000000, "body_type": "شاسی‌بلند", "is_active": True},
+        {"brand": "Toyota", "model": "Corolla", "persian_name": "تویوتا کرولا", "slug": "toyota-corolla",
+         "year": 2023, "fuel_type": "gasoline", "transmission": "manual", "price": 800000000, "body_type": "سدان", "is_active": True},
+        {"brand": "Hyundai", "model": "Tucson", "persian_name": "هیوندای توسان", "slug": "hyundai-tucson",
+         "year": 2025, "fuel_type": "hybrid", "transmission": "automatic", "price": 1800000000, "body_type": "شاسی‌بلند", "is_active": True},
+    ]
+    for i, spec in enumerate(specs):
+        car = Car.objects.create(
+            display_order=i,
+            main_image=SimpleUploadedFile(f'car{i}.jpg', b'', 'image/jpeg'),
+            **spec,
+        )
+        cars.append(car)
+    return cars
+
+
+@pytest.mark.django_db
+class TestCarSearch:
+    """Tests for search functionality on the car listing endpoint."""
+
+    def test_search_by_brand(self, api_client, filter_cars):
+        """Search finds cars by brand name."""
+        response = api_client.get('/api/v1/cars/?search=Toyota')
+        assert response.status_code == 200
+        assert response.data['count'] == 2
+
+    def test_search_by_model(self, api_client, filter_cars):
+        """Search finds cars by model name."""
+        response = api_client.get('/api/v1/cars/?search=Elantra')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+        assert response.data['results'][0]['model'] == 'Elantra'
+
+    def test_search_by_persian_name(self, api_client, filter_cars):
+        """Search finds cars by Persian name."""
+        response = api_client.get('/api/v1/cars/?search=کیا')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+
+    def test_search_no_results(self, api_client, filter_cars):
+        """Search returns empty when nothing matches."""
+        response = api_client.get('/api/v1/cars/?search=BMW')
+        assert response.status_code == 200
+        assert response.data['count'] == 0
+
+    def test_search_combined_with_filter(self, api_client, filter_cars):
+        """Search and filter can be combined."""
+        response = api_client.get('/api/v1/cars/?search=Toyota&fuel_type=hybrid')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+        assert response.data['results'][0]['model'] == 'RAV4'
+
+
+@pytest.mark.django_db
+class TestCarFiltering:
+    """Tests for filter functionality on the car listing endpoint."""
+
+    def test_filter_by_brand(self, api_client, filter_cars):
+        """Filter cars by exact brand."""
+        response = api_client.get('/api/v1/cars/?brand=Toyota')
+        assert response.status_code == 200
+        assert response.data['count'] == 2
+
+    def test_filter_by_fuel_type(self, api_client, filter_cars):
+        """Filter cars by fuel type."""
+        response = api_client.get('/api/v1/cars/?fuel_type=hybrid')
+        assert response.status_code == 200
+        assert response.data['count'] == 2
+
+    def test_filter_by_transmission(self, api_client, filter_cars):
+        """Filter cars by transmission type."""
+        response = api_client.get('/api/v1/cars/?transmission=manual')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+
+    def test_filter_by_body_type(self, api_client, filter_cars):
+        """Filter cars by body type."""
+        response = api_client.get('/api/v1/cars/?body_type=سدان')
+        assert response.status_code == 200
+        assert response.data['count'] == 2
+
+    def test_filter_by_price_range(self, api_client, filter_cars):
+        """Filter cars by price range."""
+        response = api_client.get('/api/v1/cars/?min_price=1000000000&max_price=1600000000')
+        assert response.status_code == 200
+        assert response.data['count'] == 2
+        prices = [int(c['price']) for c in response.data['results']]
+        assert all(1000000000 <= p <= 1600000000 for p in prices)
+
+    def test_filter_by_year_range(self, api_client, filter_cars):
+        """Filter cars by year range."""
+        response = api_client.get('/api/v1/cars/?min_year=2024&max_year=2025')
+        assert response.status_code == 200
+        assert response.data['count'] == 4
+
+    def test_filter_combined(self, api_client, filter_cars):
+        """Multiple filters can be combined."""
+        response = api_client.get('/api/v1/cars/?brand=Toyota&fuel_type=hybrid')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+
+    def test_filter_no_results(self, api_client, filter_cars):
+        """Filters return empty when no matches."""
+        response = api_client.get('/api/v1/cars/?body_type=کوپه')
+        assert response.status_code == 200
+        assert response.data['count'] == 0
+
+
+@pytest.mark.django_db
+class TestCarOrdering:
+    """Tests for ordering functionality."""
+
+    def test_order_by_price_ascending(self, api_client, filter_cars):
+        """Order cars by price ascending."""
+        response = api_client.get('/api/v1/cars/?ordering=price')
+        assert response.status_code == 200
+        prices = [int(c['price']) for c in response.data['results']]
+        assert prices == sorted(prices)
+
+    def test_order_by_price_descending(self, api_client, filter_cars):
+        """Order cars by price descending."""
+        response = api_client.get('/api/v1/cars/?ordering=-price')
+        assert response.status_code == 200
+        prices = [int(c['price']) for c in response.data['results']]
+        assert prices == sorted(prices, reverse=True)
+
+    def test_order_by_year(self, api_client, filter_cars):
+        """Order cars by year."""
+        response = api_client.get('/api/v1/cars/?ordering=-year')
+        assert response.status_code == 200
+        years = [c['year'] for c in response.data['results']]
+        assert years == sorted(years, reverse=True)
+
+
+@pytest.mark.django_db
+class TestCarPagination:
+    """Tests for pagination behavior."""
+
+    def test_pagination_structure(self, api_client, filter_cars):
+        """Response has correct pagination structure."""
+        response = api_client.get('/api/v1/cars/')
+        assert response.status_code == 200
+        assert 'count' in response.data
+        assert 'results' in response.data
+        assert isinstance(response.data['results'], list)
+
+    def test_pagination_page_param(self, api_client, filter_cars):
+        """Pagination respects page parameter."""
+        response = api_client.get('/api/v1/cars/?page=1')
+        assert response.status_code == 200
+        assert len(response.data['results']) <= 20  # PAGE_SIZE
+
+
+@pytest.mark.django_db
+class TestCarFilterOptions:
+    """Tests for the filter options endpoint."""
+
+    def test_filter_options_returns_correct_structure(self, api_client, filter_cars):
+        """Filter options endpoint returns all expected keys."""
+        response = api_client.get('/api/v1/cars/filters/')
+        assert response.status_code == 200
+        data = response.data
+        assert 'brands' in data
+        assert 'body_types' in data
+        assert 'fuel_types' in data
+        assert 'transmissions' in data
+        assert 'min_year' in data
+        assert 'max_year' in data
+        assert 'min_price' in data
+        assert 'max_price' in data
+
+    def test_filter_options_brands(self, api_client, filter_cars):
+        """Filter options returns distinct brands."""
+        response = api_client.get('/api/v1/cars/filters/')
+        brands = response.data['brands']
+        assert 'Toyota' in brands
+        assert 'Hyundai' in brands
+        assert 'Kia' in brands
+        assert len(brands) == 3
+
+    def test_filter_options_body_types(self, api_client, filter_cars):
+        """Filter options returns distinct body types."""
+        response = api_client.get('/api/v1/cars/filters/')
+        body_types = response.data['body_types']
+        assert 'سدان' in body_types
+        assert 'شاسی‌بلند' in body_types
+
+    def test_filter_options_year_range(self, api_client, filter_cars):
+        """Filter options returns correct year range."""
+        response = api_client.get('/api/v1/cars/filters/')
+        assert response.data['min_year'] == 2023
+        assert response.data['max_year'] == 2025
+
+    def test_filter_options_price_range(self, api_client, filter_cars):
+        """Filter options returns correct price range."""
+        response = api_client.get('/api/v1/cars/filters/')
+        assert response.data['min_price'] == 800000000
+        assert response.data['max_price'] == 1800000000
+
+    def test_filter_options_empty_db(self, api_client):
+        """Filter options returns empty values when no cars exist."""
+        response = api_client.get('/api/v1/cars/filters/')
+        assert response.status_code == 200
+        assert response.data['brands'] == []
+        assert response.data['min_year'] is None
+        assert response.data['max_price'] is None
+
+
+# ============================================================================
+# Edge Cases & Robustness Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestCarEdgeCases:
+    """Tests for edge cases and robustness."""
+
+    def test_invalid_filter_values_return_400(self, api_client, filter_cars):
+        """Invalid filter values return 400 validation error."""
+        response = api_client.get('/api/v1/cars/?min_price=abc')
+        assert response.status_code == 400
+
+    def test_out_of_range_page_returns_404(self, api_client, filter_cars):
+        """Out-of-range page returns 404 (DRF PageNumberPagination behavior)."""
+        response = api_client.get('/api/v1/cars/?page=999')
+        assert response.status_code == 404
+
+    def test_non_numeric_page_returns_404(self, api_client, filter_cars):
+        """Non-numeric page parameter returns 404."""
+        response = api_client.get('/api/v1/cars/?page=abc')
+        assert response.status_code == 404
+
+    def test_search_combined_with_filter_ordering_and_pagination(self, api_client, filter_cars):
+        """Search + filter + ordering + pagination work together."""
+        response = api_client.get('/api/v1/cars/?search=Toyota&fuel_type=hybrid&ordering=-price')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+        assert response.data['results'][0]['model'] == 'RAV4'
+
+    def test_is_featured_filter(self, api_client, filter_cars):
+        """is_featured filter works correctly."""
+        # Add a featured car
+        Car.objects.create(
+            brand='Honda',
+            model='CRV',
+            persian_name='هوندا CRV',
+            slug='honda-crv-featured',
+            year=2025,
+            fuel_type='gasoline',
+            transmission='automatic',
+            price=1000000000,
+            body_type='شاسی‌بلند',
+            is_active=True,
+            is_featured=True,
+            display_order=10,
+            main_image=SimpleUploadedFile('featured.jpg', b'', 'image/jpeg'),
+        )
+        response = api_client.get('/api/v1/cars/?is_featured=true')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+        assert response.data['results'][0]['brand'] == 'Honda'
+
+    def test_ordering_with_filters(self, api_client, filter_cars):
+        """Ordering works correctly with active filters."""
+        response = api_client.get('/api/v1/cars/?brand=Toyota&ordering=price')
+        assert response.status_code == 200
+        prices = [int(c['price']) for c in response.data['results']]
+        assert prices == sorted(prices)
+
+    def test_invalid_ordering_field_ignored(self, api_client, filter_cars):
+        """Ordering by a non-whitelisted field is safely handled."""
+        response = api_client.get('/api/v1/cars/?ordering=secret_field')
+        assert response.status_code == 200
+        assert response.data['count'] == 5  # All returned, just not sorted by that field
+
+    def test_search_empty_string(self, api_client, filter_cars):
+        """Empty search string returns all cars."""
+        response = api_client.get('/api/v1/cars/?search=')
+        assert response.status_code == 200
+        assert response.data['count'] == 5
+
+    def test_persian_search_case_insensitive(self, api_client, db):
+        """Search for Persian text works."""
+        Car.objects.create(
+            brand='Test',
+            model='Car',
+            persian_name='خودروی آزمایشی',
+            slug='test-car-persian',
+            year=2025,
+            fuel_type='gasoline',
+            transmission='automatic',
+            is_active=True,
+            display_order=0,
+            main_image=SimpleUploadedFile('t.jpg', b'', 'image/jpeg'),
+        )
+        response = api_client.get('/api/v1/cars/?search=آزمایشی')
+        assert response.status_code == 200
+        assert response.data['count'] == 1
