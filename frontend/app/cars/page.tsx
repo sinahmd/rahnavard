@@ -10,6 +10,7 @@ import CarFilters, { FilterOptions, FilterState } from '@/components/car/CarFilt
 import ActiveFilters from '@/components/car/ActiveFilters'
 import CarPagination from '@/components/car/CarPagination'
 import { SORT_OPTIONS } from '@/lib/carConstants'
+import { apiUrl } from '@/lib/apiUrl'
 
 const PAGE_SIZE = 20
 
@@ -142,7 +143,7 @@ export default function CarsPage() {
   // Fetch filter options once on mount
   useEffect(() => {
     const controller = new AbortController()
-    fetch('/api/v1/cars/filters/', { signal: controller.signal })
+    fetch(apiUrl('/api/v1/cars/filters/'), { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setFilterOptions(data)
@@ -161,7 +162,7 @@ export default function CarsPage() {
       signal?: AbortSignal
     ) => {
       const qs = buildApiQueryString(s, f, p, o)
-      const url = `/api/v1/cars/${qs ? `?${qs}` : ''}`
+      const url = apiUrl(`/api/v1/cars/${qs ? `?${qs}` : ''}`)
       return fetch(url, { signal }).then(async (res) => {
         if (!res.ok) throw new Error('خطا در دریافت اطلاعات')
         return res.json()
