@@ -21,11 +21,11 @@
 # Removes Arvan npm mirror (403 outside Iran) for local dev
 frontend/Dockerfile
 
-# --- API URL helper ---
-# NOTE: apiUrl.ts is now a PRODUCTION file (not local-only).
-# It works in production (returns relative paths) and on localhost (redirects to backend).
-# It was removed from local-only because app/cars/page.tsx imports it.
-# Keep it on both main and develop.
+# --- API URL helper (local dev) ---
+# Works on BOTH server and client. Server: http://backend:8000/...
+# Client on localhost: http://localhost:8000/... (no nginx proxy)
+# Client in production: returns relative path (nginx handles proxying)
+frontend/lib/apiUrl.ts
 
 # --- Auth fetch (uses NEXT_PUBLIC_API_URL for local dev) ---
 # Admin API calls use full backend URL instead of relative path
@@ -43,6 +43,11 @@ frontend/components/home/Branches.tsx
 frontend/components/home/ConsultationForm.tsx
 frontend/components/car/RelatedCarsSlider.tsx
 frontend/components/car/ConsultationModal.tsx
+
+# --- Cars listing page (uses apiUrl() on develop, relative URLs on main) ---
+# In production: fetch('/api/v1/cars/...') via nginx proxy
+# On develop: fetch(apiUrl('/api/v1/cars/...')) for local Docker dev
+frontend/app/cars/page.tsx
 
 # --- Server components with resolveMediaUrl() ---
 # Server-side fetch from http://backend:8000, strip host prefix from URLs
