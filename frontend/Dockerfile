@@ -1,25 +1,8 @@
 FROM node:20-alpine
-
 WORKDIR /app
-
-# Build args for NEXT_PUBLIC_* vars
-ARG NEXT_PUBLIC_API_URL=https://rahnavard.co/api/v1
-ARG NEXT_PUBLIC_SITE_URL=https://rahnavard.co
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
-
-# Use Arvan Cloud npm mirror for faster installs from Iran
 RUN npm config set registry https://npm.arvancloud.ir/
-
-# Install dependencies
 COPY package*.json ./
-RUN npm install
-
-# Copy project files
+RUN npm ci
 COPY . .
-
-# Expose port
 EXPOSE 3000
-
-# Start the application (dev mode)
 CMD ["npm", "run", "dev"]
