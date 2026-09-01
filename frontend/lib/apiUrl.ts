@@ -1,6 +1,28 @@
+/**
+ * Local-only API URL helper.
+ *
+ * In production, nginx proxies /api/* to the backend, so relative URLs work.
+ * In local Docker dev, there's no nginx proxy, so the client must hit
+ * http://localhost:8000 directly.
+ *
+ * Server-side: always resolves to backend container URL.
+ * Client-side: resolves to localhost:8000 when running on localhost.
+ */
 export function apiUrl(path: string): string {
-  if (typeof window !== 'undefined') return path
-  const backend = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
-  if (path.startsWith('/api/')) return `${backend}${path}`
+  // Server-side: always use the backend container URL
+  if (typeof window === 'undefined') {
+    const backend = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
+    if (path.startsWith('/api/')) return `${backend}${path}`
+    if (path.startsWith('/media/')) return `${backend}${path}`
+    return path
+  }
+
+  // Client-side: if running on localhost (local Docker dev), proxy to backend
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    if (path.startsWith('/api/')) return `http://localhost:8000${path}`
+    if (path.startsWith('/media/')) return `http://localhost:8000${path}`
+  }
+
+  // Production: return relative path (nginx handles proxying)
   return path
 }

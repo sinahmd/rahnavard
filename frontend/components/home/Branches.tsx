@@ -24,7 +24,7 @@ export default function Branches() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/v1/branches/')
+        const res = await fetch(apiUrl('/api/v1/branches/'))
         if (res.ok) {
           const data = await res.json()
           setBranches(data.results || data || [])
@@ -98,10 +98,10 @@ export default function Branches() {
                 {branch.map_image && (
                   <>
                     <a href={branch.map_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-[180px] h-[180px] rounded-4 overflow-hidden border border-gray-light cursor-pointer transition-all hover:scale-[1.02] hover:shadow-card-hover md:block hidden" title="مشاهده در نقشه">
-                      <OptimizedImage src={branch.map_image} alt={`موقعیت ${branch.name}`} width={180} height={180} className="w-full h-full object-cover" loading="lazy" />
+                      <OptimizedImage src={apiUrl(branch.map_image)} alt={`موقعیت ${branch.name}`} width={180} height={180} className="w-full h-full object-cover" loading="lazy" />
                     </a>
                     <a href={branch.map_url} target="_blank" rel="noopener noreferrer" className="md:hidden w-full h-[200px] rounded-[14px] overflow-hidden border border-gray-light cursor-pointer mt-4" title="مشاهده در نقشه">
-                      <OptimizedImage src={branch.map_image} alt={`موقعیت ${branch.name}`} width={400} height={200} className="w-full h-full object-cover" loading="lazy" />
+                      <OptimizedImage src={apiUrl(branch.map_image)} alt={`موقعیت ${branch.name}`} width={400} height={200} className="w-full h-full object-cover" loading="lazy" />
                     </a>
                   </>
                 )}

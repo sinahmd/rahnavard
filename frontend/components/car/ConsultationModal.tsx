@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
+import { apiUrl } from '@/lib/apiUrl'
 
 interface ConsultationModalProps {
   isOpen: boolean

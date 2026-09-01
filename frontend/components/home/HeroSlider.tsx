@@ -24,7 +24,7 @@ export default function HeroSlider() {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const response = await fetch('/api/v1/hero-slides/')
+        const response = await fetch(apiUrl('/api/v1/hero-slides/'))
         if (response.ok) {
           const data = await response.json()
           setSlides(data.results || data || [])
@@ -76,7 +76,7 @@ export default function HeroSlider() {
           {slide.link && slide.link.trim() !== '' ? (
             <Link href={slide.link} className="block absolute inset-0">
               <OptimizedImage
-                src={slide.image}
+                src={apiUrl(slide.image)}
                 alt={slide.alt_text}
                 fill
                 className={`object-cover object-center ${index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'}`}
@@ -86,7 +86,7 @@ export default function HeroSlider() {
             </Link>
           ) : (
             <OptimizedImage
-              src={slide.image}
+              src={apiUrl(slide.image)}
               alt={slide.alt_text}
               fill
               className={`object-cover object-center ${index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'}`}
