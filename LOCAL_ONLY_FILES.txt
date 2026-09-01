@@ -7,24 +7,33 @@
 # there's no nginx proxy, so these files bridge the gap.
 #
 # HOW TO USE:
-#   1. Before any merge/PR to main, run: bash scripts/check-local-only.sh
-#   2. If the script finds modified local-only files, REVERT them first
-#   3. Then merge to main
-#   4. After merging, re-apply local-only changes on develop
+#   1. Before any merge/PR to main, run: bash scripts/prepare-merge.sh
+#      (This stashes local changes and reverts files to main versions)
+#   2. Merge to main, push, deploy
+#   3. Switch back to develop, merge main
+#   4. Run: bash scripts/apply-local-only.sh
+#      (This restores all local changes from the stash)
 #
 # FILE FORMAT: one relative path per line. Lines starting with # are comments.
 # Empty lines are ignored.
 
 # --- Docker ---
+# Removes Arvan npm mirror (403 outside Iran) for local dev
 frontend/Dockerfile
 
 # --- API URL helper (local dev) ---
+# Works on BOTH server and client. Server: http://backend:8000/...
+# Client on localhost: http://localhost:8000/... (no nginx proxy)
+# Client in production: returns relative path (nginx handles proxying)
 frontend/lib/apiUrl.ts
 
 # --- Auth fetch (uses NEXT_PUBLIC_API_URL for local dev) ---
+# Admin API calls use full backend URL instead of relative path
 frontend/lib/authFetch.ts
 
-# --- Client components using apiUrl() instead of relative paths ---
+# --- Client components using apiUrl() for fetch + image URLs ---
+# These wrap fetch() calls and image src with apiUrl() so they work
+# in local Docker where there's no nginx proxy to the backend
 frontend/contexts/SettingsContext.tsx
 frontend/components/home/FeaturedCars.tsx
 frontend/components/home/HeroSlider.tsx
@@ -36,19 +45,24 @@ frontend/components/car/RelatedCarsSlider.tsx
 frontend/components/car/ConsultationModal.tsx
 
 # --- Server components with resolveMediaUrl() ---
+# Server-side fetch from http://backend:8000, strip host prefix from URLs
 frontend/components/car/CarImageGallery.tsx
 frontend/app/cars/[slug]/page.tsx
 
 # --- Image optimization (localhost:8000 unoptimized check) ---
+# Marks localhost:8000 media URLs as unoptimized for Next.js Image
 frontend/components/ui/OptimizedImage.tsx
 
 # --- Next.js config (backend:8000 remote pattern) ---
+# Adds http://backend:8000 to allowed image remote patterns
 frontend/next.config.js
 
 # --- Backend throttle (DEBUG-conditional high rates) ---
+# Higher throttle rates for local testing (10000/hour vs 100/hour)
 backend/config/settings.py
 
 # --- Test mocks (apiUrl mock for local dev) ---
+# Mock apiUrl for components that import it
 frontend/components/car/__tests__/RelatedCarsSlider.test.tsx
 frontend/components/home/__tests__/FeaturedCars.test.tsx
 frontend/components/home/__tests__/LatestArticles.test.tsx

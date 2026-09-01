@@ -253,36 +253,68 @@ Use descriptive names with a prefix:
 ## 7. Full Merge Workflow (develop → main → develop)
 
 > **This is the exact process for merging features to production and getting back to local dev.**
+> ⚠️ **Always use the scripts — manual re-apply is error-prone and WILL miss files.**
 
 ### Overview
 
 ```
 develop (with local-only changes)
     ↓
-Step 1: Revert local-only changes
+Step 1: Stash local-only changes (saves them safely)
     ↓
-Step 2: Commit revert
+Step 2: Revert local-only files to main versions
     ↓
-Step 3: git checkout main
+Step 3: Commit revert
     ↓
-Step 4: git merge develop (fast-forward)
+Step 4: git checkout main → merge develop → push main
     ↓
-Step 5: git push origin main (triggers deploy)
+Step 5: git checkout develop → merge main
     ↓
-Step 6: git checkout develop
-    ↓
-Step 7: git merge main (sync)
-    ↓
-Step 8: Re-apply local-only changes
-    ↓
-Step 9: git push origin develop
+Step 6: Apply stash (restores all local-only changes)
     ↓
 develop ready for local dev again
 ```
 
 ---
 
-### Step-by-Step Commands
+### Automated Workflow (Recommended)
+
+#### Before merging to main:
+```bash
+git checkout develop && git pull origin develop
+
+# Final checks
+cd backend && python manage.py check && pytest --no-cov
+cd frontend && npm run lint && npx tsc --noEmit && npm test -- --watchAll=false
+cd ..
+
+# Stash local-only changes and revert them (ONE COMMAND)
+bash scripts/prepare-merge.sh
+
+# Commit the revert, merge, push
+git add -A
+git commit -m "revert: prepare local-only files for production merge"
+git checkout main && git merge develop --no-edit && git push origin main
+```
+
+#### After merging back to develop:
+```bash
+git checkout develop && git merge main --no-edit
+
+# Restore all local-only changes from stash (ONE COMMAND)
+bash scripts/apply-local-only.sh
+
+# Commit and push
+git add -A
+git commit -m "chore: re-apply local-only changes for Docker dev"
+git push origin develop
+```
+
+---
+
+### Manual Workflow (Only if scripts fail)
+
+If the scripts don't work (e.g., stash conflicts), follow these steps manually:
 
 #### Step 1: Make sure you're on develop and up to date
 ```bash
@@ -292,72 +324,68 @@ git pull origin develop
 
 #### Step 2: Run final checks
 ```bash
-# Backend
 cd backend && python manage.py check && pytest --no-cov
-
-# Frontend
-cd frontend && npm run lint && npx tsc --noEmit
+cd frontend && npm run lint && npx tsc --noEmit && npm test -- --watchAll=false
+cd ..
 ```
 
-#### Step 3: Check for local-only files (CRITICAL)
-
+#### Step 3: Stash local-only changes
 ```bash
-bash scripts/check-local-only.sh
+# Save local-only changes to a named stash
+git stash push -m "local-only-$(date +%Y%m%d)" -- \
+  frontend/Dockerfile \
+  frontend/lib/apiUrl.ts \
+  frontend/lib/authFetch.ts \
+  frontend/contexts/SettingsContext.tsx \
+  frontend/components/home/FeaturedCars.tsx \
+  frontend/components/home/HeroSlider.tsx \
+  frontend/components/home/LatestArticles.tsx \
+  frontend/components/home/WhyRahnavard.tsx \
+  frontend/components/home/Branches.tsx \
+  frontend/components/home/ConsultationForm.tsx \
+  frontend/components/car/RelatedCarsSlider.tsx \
+  frontend/components/car/ConsultationModal.tsx \
+  frontend/components/car/CarImageGallery.tsx \
+  frontend/app/cars/[slug]/page.tsx \
+  frontend/components/ui/OptimizedImage.tsx \
+  frontend/next.config.js \
+  backend/config/settings.py
 ```
 
-If violations are found, revert each file:
+#### Step 4: Revert local-only files to main versions
 ```bash
 for f in $(grep -v '^#' LOCAL_ONLY_FILES.txt | grep -v '^\s*$' | sed 's/^[[:space:]]*//'); do
-  git checkout main -- "$f"
+  git checkout main -- "$f" 2>/dev/null || true
 done
 ```
 
-See [Section 11](#11-local-only-changes-develop-branch) for full details.
-
-#### Step 4: Commit the revert
+#### Step 5: Commit, merge, push
 ```bash
 git add -A
-git commit -m "revert: restore local-only changes for production merge"
-```
-
-#### Step 5: Switch to main and merge
-```bash
+git commit -m "revert: prepare local-only files for production merge"
 git checkout main
 git merge develop --no-edit
-```
-
-#### Step 6: Push main (triggers deploy)
-```bash
 git push origin main
-# → GitHub Actions runs CI
-# → If CI passes, deploy triggers
-# → rahnavard.co updates in ~2-3 minutes
 ```
 
-#### Step 7: Switch back to develop
+#### Step 6: Switch back to develop, merge main, restore stash
 ```bash
 git checkout develop
-```
-
-#### Step 8: Sync develop with main
-```bash
 git merge main --no-edit
-# Usually "Already up to date" if only local-only changes were reverted
+
+# Find and apply the most recent local-only stash
+STASH_REF=$(git stash list | grep "local-only" | head -1 | cut -d: -f1)
+if [ -n "$STASH_REF" ]; then
+  git stash pop "$STASH_REF"
+  echo "✅ Local-only changes restored!"
+else
+  echo "⚠️  No local-only stash found. Re-apply manually."
+fi
 ```
 
-#### Step 9: Re-apply local-only changes
-
+#### Step 7: Commit and push
 ```bash
-# Re-apply Dockerfile change (remove Arvan mirror for local dev)
-# Edit frontend/Dockerfile — remove the mirror line again
-
-# Re-apply authFetch change (use NEXT_PUBLIC_API_URL)
-# Edit frontend/lib/authFetch.ts — add API_BASE and fullUrl
-```
-
-#### Step 10: Commit and push
-```bash
-git add frontend/Dockerfile frontend/lib/authFetch.ts
+git add -A
 git commit -m "chore: re-apply local-only changes for Docker dev"
 git push origin develop
 ```
@@ -369,17 +397,14 @@ git push origin develop
 ```bash
 # === MERGE TO PRODUCTION ===
 git checkout develop && git pull origin develop
-bash scripts/check-local-only.sh   # Verify no local-only files in diff
-# [revert local-only files listed by script]
-git add -A
-git commit -m "revert: restore local-only changes for production merge"
+bash scripts/prepare-merge.sh                     # Stash + revert local-only files
+git add -A && git commit -m "revert: prepare for production merge"
 git checkout main && git merge develop --no-edit && git push origin main
 
 # === BACK TO LOCAL DEV ===
 git checkout develop && git merge main --no-edit
-# [re-apply local-only changes]
-git add -A
-git commit -m "chore: re-apply local-only changes for Docker dev"
+bash scripts/apply-local-only.sh                  # Restore from stash
+git add -A && git commit -m "chore: re-apply local-only changes"
 git push origin develop
 ```
 
@@ -389,12 +414,13 @@ git push origin develop
 
 | Step | What Happens | Risk |
 |------|-------------|------|
+| Stash local-only | Changes saved in git stash | 🟢 None |
 | Revert local-only | Code matches production | 🟢 None |
 | Push main | GitHub Actions CI runs | 🟢 None |
 | CI passes | Deploy auto-triggers | 🟢 None |
 | Deploy completes | rahnavard.co updated | 🟢 None |
 | Back to develop | Local dev resumes | 🟢 None |
-| Re-apply local-only | Docker works locally again | 🟢 None |
+| Apply stash | All local changes restored | 🟢 None |
 
 ---
 
@@ -523,7 +549,7 @@ In production, nginx proxies `/api/*` → backend. Relative URLs like `fetch('/a
 
 In local Docker dev, there's no nginx proxy. The Next.js dev server on port 3000 doesn't know about Django on port 8000. Local-only changes bridge this gap:
 
-- **`apiUrl()`** — builds `http://localhost:8000/api/v1/...` in dev, returns `/api/v1/...` in prod
+- **`apiUrl()`** — works on both server and client. Server: resolves to `http://backend:8000/...`. Client on localhost: resolves to `http://localhost:8000/...`. Client in production: returns relative path (nginx handles proxying)
 - **`authFetch.ts`** — uses `NEXT_PUBLIC_API_URL` base for admin API calls in dev
 - **`Dockerfile`** — removes Arvan npm mirror (403 outside Iran)
 - **`OptimizedImage.tsx`** — marks localhost media as unoptimized
@@ -533,20 +559,19 @@ In local Docker dev, there's no nginx proxy. The Next.js dev server on port 3000
 ### Pre-Merge Checklist (MUST run before merge to main)
 
 ```bash
-# 1. Run the local-only check
-bash scripts/check-local-only.sh
+# 1. Stash local-only changes (saves them for later restoration)
+bash scripts/prepare-merge.sh
 
-# 2. If violations found, revert each file
-for f in $(grep -v '^#' LOCAL_ONLY_FILES.txt | grep -v '^\s*$' | sed 's/^[[:space:]]*//'); do
-  git checkout main -- "$f"
-done
-
-# 3. Commit the revert
+# 2. Commit the revert, merge to main, push
 git add -A
-git commit -m "revert: restore local-only changes for production merge"
-
-# 4. Now merge to main
+git commit -m "revert: prepare local-only files for production merge"
 git checkout main && git merge develop --no-edit && git push origin main
+
+# 3. Switch back to develop and restore local changes
+git checkout develop && git merge main --no-edit
+bash scripts/apply-local-only.sh
+git add -A && git commit -m "chore: re-apply local-only changes"
+git push origin develop
 ```
 
 ### When adding new local-only changes
@@ -555,7 +580,7 @@ If you create a new file or modify an existing file for local dev purposes:
 
 1. Add the file path to `LOCAL_ONLY_FILES.txt`
 2. Run `bash scripts/check-local-only.sh` to verify it's detected
-3. The merge workflow will now automatically include it in reverts
+3. The merge workflow will now automatically include it in stashing and reverts
 
 ### Full documentation
 
@@ -565,4 +590,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-08-30 (added LOCAL_ONLY_FILES.txt and check-local-only.sh)*
+*Last updated: 2026-09-01 (added stash-based merge workflow, prepare-merge.sh, apply-local-only.sh)*
