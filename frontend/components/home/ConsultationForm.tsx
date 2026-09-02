@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
+import { apiUrl } from "@/lib/apiUrl"
 import { useSettings } from '@/contexts/SettingsContext'
 
 
@@ -22,7 +23,7 @@ export default function ConsultationForm() {
     setError(null)
 
     try {
-      const response = await fetch('/api/v1/inquiries/', {
+      const response = await fetch(apiUrl('/api/v1/inquiries/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

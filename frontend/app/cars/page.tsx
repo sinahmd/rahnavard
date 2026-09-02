@@ -10,8 +10,10 @@ import CarFilters, { FilterOptions, FilterState } from '@/components/car/CarFilt
 import ActiveFilters from '@/components/car/ActiveFilters'
 import CarPagination from '@/components/car/CarPagination'
 import { SORT_OPTIONS } from '@/lib/carConstants'
+import { apiUrl } from '@/lib/apiUrl'
 
-const PAGE_SIZE = 20
+const VALID_SORT_VALUES: Set<string> = new Set(SORT_OPTIONS.map((o) => o.value))
+const DEFAULT_PAGE_SIZE = 20
 
 const EMPTY_FILTERS: FilterState = {
   brand: '',
@@ -60,36 +62,23 @@ function readStateFromURL(params: URLSearchParams) {
   }
 }
 
-function buildQueryString(
+/**
+ * Build a query string from filter state.
+ * @param sortKey - 'sort' for browser URL, 'ordering' for backend API
+ */
+function buildParams(
   search: string,
   filters: FilterState,
   page: number,
-  sort: string
+  sort: string,
+  sortKey: 'sort' | 'ordering'
 ): string {
   const params = new URLSearchParams()
   if (search) params.set('search', search)
   Object.entries(filters).forEach(([key, value]) => {
     if (value) params.set(key, value)
   })
-  if (sort) params.set('sort', sort)
-  if (page > 1) params.set('page', String(page))
-  return params.toString()
-}
-
-/** Build the /api/v1/cars/?... query string from state. */
-function buildApiQueryString(
-  search: string,
-  filters: FilterState,
-  page: number,
-  sort: string
-): string {
-  const params = new URLSearchParams()
-  if (search) params.set('search', search)
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value) params.set(key, value)
-  })
-  // Map UI sort values to API ordering
-  if (sort) params.set('ordering', sort)
+  if (sort) params.set(sortKey, sort)
   if (page > 1) params.set('page', String(page))
   return params.toString()
 }
@@ -113,7 +102,8 @@ export default function CarsPage() {
     setSearch(fresh.search)
     setFilters(fresh.filters)
     setPage(fresh.page)
-    setSort(fresh.sort)
+    // 4.2: Validate sort — reset invalid values to default
+    setSort(VALID_SORT_VALUES.has(fresh.sort) ? fresh.sort : '')
   }, [searchParams])
 
   // ── Cars data ──────────────────────────────────────────────────────
@@ -121,6 +111,9 @@ export default function CarsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [initialized, setInitialized] = useState(false)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [retryCount, setRetryCount] = useState(0)
 
   // ── Filter options ─────────────────────────────────────────────────
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
@@ -137,15 +130,22 @@ export default function CarsPage() {
   // ── Mobile filter drawer ──────────────────────────────────────────
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
 
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
+  const totalPages = Math.ceil(totalCount / pageSize)
 
-  // Fetch filter options once on mount
+  // 4.3: Fetch filter options once on mount.
+  // Guard: skip if already loaded (prevents empty dropdowns on
+  // back navigation if a previous fetch was slow).
+  const filterOptionsLoaded = useRef(false)
   useEffect(() => {
+    if (filterOptionsLoaded.current) return
     const controller = new AbortController()
-    fetch('/api/v1/cars/filters/', { signal: controller.signal })
+    fetch(apiUrl('/api/v1/cars/filters/'), { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data) setFilterOptions(data)
+        if (data) {
+          setFilterOptions(data)
+          filterOptionsLoaded.current = true
+        }
       })
       .catch(() => {})
     return () => controller.abort()
@@ -160,8 +160,8 @@ export default function CarsPage() {
       o: string,
       signal?: AbortSignal
     ) => {
-      const qs = buildApiQueryString(s, f, p, o)
-      const url = `/api/v1/cars/${qs ? `?${qs}` : ''}`
+      const qs = buildParams(s, f, p, o, 'ordering')
+      const url = apiUrl(`/api/v1/cars/${qs ? `?${qs}` : ''}`)
       return fetch(url, { signal }).then(async (res) => {
         if (!res.ok) throw new Error('خطا در دریافت اطلاعات')
         return res.json()
@@ -180,8 +180,15 @@ export default function CarsPage() {
 
     fetchCars(search, filters, page, sort, controller.signal)
       .then((data) => {
+        const count = data.count || 0
+        const size = data.page_size || pageSize
         setCars(data.results || [])
-        setTotalCount(data.count || 0)
+        setTotalCount(count)
+        if (data.page_size) setPageSize(data.page_size)
+        // 4.1: If page > totalPages, redirect to page 1
+        if (count > 0 && page > Math.ceil(count / size)) {
+          setPage(1)
+        }
       })
       .catch((err) => {
         if (err.name !== 'AbortError') {
@@ -192,14 +199,15 @@ export default function CarsPage() {
       })
       .finally(() => {
         setLoading(false)
+        setInitialized(true)
       })
 
     return () => controller.abort()
-  }, [search, filters, page, sort, fetchCars])
+  }, [search, filters, page, sort, fetchCars, retryCount])
 
   // ── Push state to URL ──────────────────────────────────────────────
   useEffect(() => {
-    const qs = buildQueryString(search, filters, page, sort)
+    const qs = buildParams(search, filters, page, sort, 'sort')
     const url = `/cars${qs ? `?${qs}` : ''}`
     router.replace(url, { scroll: false })
   }, [search, filters, page, sort]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -226,19 +234,8 @@ export default function CarsPage() {
 
   const handleRetry = useCallback(() => {
     setError(null)
-    setLoading(true)
-    fetchCars(search, filters, page, sort)
-      .then((data) => {
-        setCars(data.results || [])
-        setTotalCount(data.count || 0)
-      })
-      .catch(() => {
-        setError('خطا در بارگذاری خودروها.')
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [search, filters, page, sort, fetchCars])
+    setRetryCount((c) => c + 1)
+  }, [])
 
   const handleClearAll = useCallback(() => {
     setSearch('')
@@ -343,8 +340,8 @@ export default function CarsPage() {
 
             {/* Results */}
             <div className="flex-1 min-w-0">
-              {/* Loading */}
-              {loading && (
+              {/* Loading skeleton — only on initial load (no cars yet) */}
+              {loading && cars.length === 0 && (
                 <div
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
                   role="status"
@@ -392,7 +389,7 @@ export default function CarsPage() {
               )}
 
               {/* Empty */}
-              {!loading && !error && cars.length === 0 && (
+              {!loading && !error && initialized && cars.length === 0 && (
                 <div className="text-center py-16">
                   <div className="w-20 h-20 mx-auto mb-5 bg-gray-light rounded-full flex items-center justify-center">
                     <svg
@@ -421,10 +418,16 @@ export default function CarsPage() {
                 </div>
               )}
 
-              {/* Results */}
-              {!loading && !error && cars.length > 0 && (
+              {/* Results — show even while loading (stale-while-revalidate) */}
+              {!error && cars.length > 0 && (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Stale-while-revalidate: subtle spinner when loading new page */}
+                  {loading && (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin w-6 h-6 border-2 border-accent border-t-transparent rounded-full" />
+                    </div>
+                  )}
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
                     {cars.map((car) => (
                       <CarCard key={car.id} car={car} />
                     ))}

@@ -1,25 +1,11 @@
 import Image, { ImageProps } from 'next/image'
 
-/**
- * OptimizedImage — wraps next/image but marks /media/ URLs as unoptimized.
- *
- * Why? Our media files are served by nginx directly from a Docker volume.
- * The default next/image optimization tries to re-fetch images from the
- * public origin, which breaks inside Docker because the _next/image proxy
- * can't reliably round-trip through Arvan Cloud to reach nginx.
- *
- * Since nginx already serves files efficiently with caching headers,
- * we skip the extra optimization hop for /media/ paths.
- */
 export default function OptimizedImage(props: ImageProps) {
   const src = typeof props.src === 'string' ? props.src : ''
-
   const isMediaUrl =
     src.startsWith('/media/') ||
-    src.includes('rahnavard.co/media/')
-
-  // Only pass unoptimized when true to avoid React DOM warning for false
-  // Explicitly pass alt to satisfy jsx-a11y/alt-text ESLint rule
+    src.includes('rahnavard.co/media/') ||
+    src.includes('localhost:8000/media/')
   return isMediaUrl ? (
     <Image {...props} src={src} alt={props.alt || ''} unoptimized />
   ) : (

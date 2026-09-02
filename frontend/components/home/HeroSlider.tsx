@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { apiUrl } from "@/lib/apiUrl"
 import OptimizedImage from '@/components/ui/OptimizedImage'
 
 interface HeroSlide {
@@ -13,12 +14,23 @@ interface HeroSlide {
 }
 
 const SLIDE_DURATION = 6000
+const SWIPE_THRESHOLD = 50
+const SWIPE_MAX_DRAG = 120
 
 export default function HeroSlider() {
   const [slides, setSlides] = useState<HeroSlide[]>([])
   const [loading, setLoading] = useState(true)
   const [current, setCurrent] = useState(0)
   const [isZooming, setIsZooming] = useState(true)
+
+  // ── Touch / swipe state ──────────────────────────────────────────────
+  const containerRef = useRef<HTMLDivElement>(null)
+  const touchStartX = useRef(0)
+  const touchStartY = useRef(0)
+  const touchDeltaX = useRef(0)
+  const isSwiping = useRef(false)
+  const isVerticalScroll = useRef(false)
+  const [dragOffset, setDragOffset] = useState(0)
 
   useEffect(() => {
     const fetchSlides = async () => {
@@ -40,44 +52,143 @@ export default function HeroSlider() {
     if (slides.length === 0) return
     setCurrent(((index % slides.length) + slides.length) % slides.length)
     setIsZooming(false)
+    setDragOffset(0)
     setTimeout(() => setIsZooming(true), 50)
   }, [slides.length])
 
   const next = useCallback(() => goTo(current + 1), [current, goTo])
   const prev = useCallback(() => goTo(current - 1), [current, goTo])
 
+  // Auto-play
   useEffect(() => {
     if (slides.length === 0) return
     const timer = setInterval(next, SLIDE_DURATION)
     return () => clearInterval(timer)
   }, [next, slides.length])
 
+  // ── Touch handlers ──────────────────────────────────────────────────
+  // touchmove must be a native listener with { passive: false }
+  // so preventDefault() works on Android Chrome.
+  // React's onTouchMove is passive by default and ignores preventDefault.
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+    touchDeltaX.current = 0
+    isSwiping.current = false
+    isVerticalScroll.current = false
+  }, [])
+
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      const deltaX = e.touches[0].clientX - touchStartX.current
+      const deltaY = e.touches[0].clientY - touchStartY.current
+
+      // Determine scroll direction on first significant movement
+      if (!isSwiping.current && !isVerticalScroll.current) {
+        if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+          if (Math.abs(deltaY) > Math.abs(deltaX)) {
+            isVerticalScroll.current = true
+            return
+          }
+          isSwiping.current = true
+        }
+        return
+      }
+
+      if (isVerticalScroll.current) return
+
+      // Prevent vertical scroll while swiping horizontally
+      e.preventDefault()
+
+      // Clamp the drag with rubber-band resistance at edges
+      let clampedDelta = deltaX
+      if (current === 0 && deltaX > 0) {
+        clampedDelta = deltaX * 0.3
+      } else if (current === slides.length - 1 && deltaX < 0) {
+        clampedDelta = deltaX * 0.3
+      }
+      clampedDelta = Math.max(-SWIPE_MAX_DRAG, Math.min(SWIPE_MAX_DRAG, clampedDelta))
+
+      touchDeltaX.current = clampedDelta
+      setDragOffset(clampedDelta)
+    },
+    [current, slides.length]
+  )
+
+  // Register touchmove as a non-passive native listener so
+  // preventDefault() actually works on Android Chrome.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    return () => el.removeEventListener('touchmove', handleTouchMove)
+  }, [handleTouchMove])
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isSwiping.current) {
+      setDragOffset(0)
+      return
+    }
+
+    const delta = touchDeltaX.current
+
+    if (Math.abs(delta) >= SWIPE_THRESHOLD) {
+      // In RTL: swiping right (positive delta) = go to NEXT slide
+      //         swiping left (negative delta) = go to PREV slide
+      if (delta > 0) {
+        next()
+      } else {
+        prev()
+      }
+    } else {
+      // Snap back
+      setDragOffset(0)
+    }
+
+    isSwiping.current = false
+    touchDeltaX.current = 0
+  }, [next, prev])
+
   if (loading) {
-    return <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] bg-[#111]" />
+    return <div className="relative w-full max-h-[100dvh] aspect-[4/5] md:aspect-[1540/860] bg-[#111]" />
   }
 
   if (slides.length === 0) {
     return (
-      <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] bg-[#111] flex items-center justify-center">
+      <div className="relative w-full max-h-[100dvh] aspect-[4/5] md:aspect-[1540/860] bg-[#111] flex items-center justify-center">
         <p className="text-white/50 text-lg">اسلایدی یافت نشد. از پنل مدیریت اسلاید اضافه کنید.</p>
       </div>
     )
   }
 
-  const currentSlide = slides[current]
-  const hasLink = currentSlide?.link && currentSlide.link.trim() !== ''
-
   return (
-    <div className="relative w-full max-h-screen aspect-[4/5] md:aspect-[1540/860] overflow-hidden bg-[#111]">
+    <div
+      ref={containerRef}
+      className="relative w-full max-h-[100dvh] aspect-[4/5] md:aspect-[1540/860] overflow-hidden bg-[#111] touch-pan-y"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {slides.map((slide, index) => (
-        <div key={slide.id} className={`absolute inset-0 transition-opacity duration-[900ms] ease-in-out ${index === current ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div
+          key={slide.id}
+          className={`absolute inset-0 transition-opacity duration-[900ms] ease-in-out ${
+            index === current ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          style={
+            index === current && dragOffset !== 0
+              ? { transform: `translateX(${dragOffset}px)`, transition: 'opacity 900ms ease-in-out, transform 0ms' }
+              : undefined
+          }
+        >
           {slide.link && slide.link.trim() !== '' ? (
             <Link href={slide.link} className="block absolute inset-0">
               <OptimizedImage
                 src={slide.image}
                 alt={slide.alt_text}
                 fill
-                className={`object-cover object-center ${index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'}`}
+                className={`object-cover object-center ${
+                  index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'
+                }`}
                 priority={index === 0}
                 sizes="100vw"
               />
@@ -87,7 +198,9 @@ export default function HeroSlider() {
               src={slide.image}
               alt={slide.alt_text}
               fill
-              className={`object-cover object-center ${index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'}`}
+              className={`object-cover object-center ${
+                index === current && isZooming ? 'animate-hero-zoom' : 'scale-[1.037]'
+              }`}
               priority={index === 0}
               sizes="100vw"
             />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { apiUrl } from "@/lib/apiUrl"
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
