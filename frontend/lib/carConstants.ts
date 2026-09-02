@@ -11,9 +11,9 @@ export const TRANSMISSION_LABELS: Record<string, string> = {
 }
 
 export const SORT_OPTIONS = [
-  { value: '', label: 'پیشنهادی' },
-  { value: '-created_at', label: 'جدیدترین' },
-  { value: 'price', label: 'ارزان‌ترین' },
-  { value: '-price', label: 'گران‌ترین' },
-  { value: '-year', label: 'جدیدترین سال' },
+  { value: '', apiValue: '', label: 'پیشنهادی' },
+  { value: '-created_at', apiValue: '-created_at', label: 'جدیدترین' },
+  { value: 'price', apiValue: 'price', label: 'ارزان‌ترین' },
+  { value: '-price', apiValue: '-price', label: 'گران‌ترین' },
+  { value: '-year', apiValue: '-year', label: 'جدیدترین سال' },
 ] as const
