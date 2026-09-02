@@ -28,8 +28,7 @@ export default function AdminBranchesPage() {
         const data = await response.json()
         setBranches(data.results || data || [])
       }
-    } catch (error) {
-      console.error('Error fetching branches:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -43,8 +42,7 @@ export default function AdminBranchesPage() {
         body: JSON.stringify({ is_active: !currentStatus }),
       })
       if (response.ok) fetchBranches()
-    } catch (error) {
-      console.error('Error updating branch:', error)
+    } catch {
     }
   }
 
@@ -53,8 +51,7 @@ export default function AdminBranchesPage() {
     try {
       const response = await authFetch(`/api/v1/admin/branches/${id}/`, { method: 'DELETE' })
       if (response.ok) fetchBranches()
-    } catch (error) {
-      console.error('Error deleting branch:', error)
+    } catch {
     }
   }
 

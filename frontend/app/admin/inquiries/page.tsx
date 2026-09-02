@@ -29,8 +29,7 @@ export default function AdminInquiriesPage() {
         const data = await response.json()
         setInquiries(data.results || data || [])
       }
-    } catch (error) {
-      console.error('Error fetching inquiries:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -44,8 +43,7 @@ export default function AdminInquiriesPage() {
         body: JSON.stringify({ [field]: value }),
       })
       if (response.ok) fetchInquiries()
-    } catch (error) {
-      console.error('Error updating inquiry:', error)
+    } catch {
     }
   }
 

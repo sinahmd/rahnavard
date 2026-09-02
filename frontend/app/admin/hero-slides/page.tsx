@@ -30,8 +30,7 @@ export default function AdminHeroSlidesPage() {
         const data = await response.json()
         setSlides(data.results || data || [])
       }
-    } catch (error) {
-      console.error('Error fetching hero slides:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -45,8 +44,7 @@ export default function AdminHeroSlidesPage() {
         body: JSON.stringify({ is_active: !currentStatus }),
       })
       if (response.ok) fetchSlides()
-    } catch (error) {
-      console.error('Error updating slide:', error)
+    } catch {
     }
   }
 
@@ -55,8 +53,7 @@ export default function AdminHeroSlidesPage() {
     try {
       const response = await authFetch(`/api/v1/admin/hero-slides/${id}/`, { method: 'DELETE' })
       if (response.ok) fetchSlides()
-    } catch (error) {
-      console.error('Error deleting slide:', error)
+    } catch {
     }
   }
 

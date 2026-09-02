@@ -64,8 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       }))
     }
-  } catch (error) {
-    console.error('Error fetching cars for sitemap:', error)
+  } catch {
   }
 
   // Dynamic article pages
@@ -85,8 +84,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }))
     }
-  } catch (error) {
-    console.error('Error fetching articles for sitemap:', error)
+  } catch {
   }
 
   return [...staticPages, ...carPages, ...articlePages]

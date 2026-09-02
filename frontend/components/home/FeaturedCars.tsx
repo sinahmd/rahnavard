@@ -38,8 +38,7 @@ export default function FeaturedCars() {
         }
 
         setCars(carsList)
-      } catch (error) {
-        console.error('Error fetching cars:', error)
+      } catch {
       } finally {
         setLoading(false)
       }

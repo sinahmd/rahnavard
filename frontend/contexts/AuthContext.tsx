@@ -69,8 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         return null;
       }
-    } catch (error) {
-      console.error('Failed to fetch user:', error);
+    } catch {
       return null;
     }
   }, []);
@@ -133,8 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
       }
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
     } finally {
       // Clear local state regardless of API response
       localStorage.removeItem('admin_token');

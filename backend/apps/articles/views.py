@@ -2,6 +2,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, permissions, status
 from rest_framework.response import Response
 
+from apps.core.pagination import StandardResultsPagination
 from .models import Article
 from .serializers import (
     ArticleAdminSerializer,
@@ -15,6 +16,7 @@ class ArticleListView(generics.ListAPIView):
 
     serializer_class = ArticleListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["title", "excerpt", "content"]
     ordering_fields = ["published_at", "created_at"]

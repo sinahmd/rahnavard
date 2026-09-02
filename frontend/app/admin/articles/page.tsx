@@ -28,8 +28,7 @@ export default function AdminArticlesPage() {
         const data = await response.json()
         setArticles(data.results || data || [])
       }
-    } catch (error) {
-      console.error('Error fetching articles:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -43,8 +42,7 @@ export default function AdminArticlesPage() {
         body: JSON.stringify({ is_published: !currentStatus }),
       })
       if (response.ok) fetchArticles()
-    } catch (error) {
-      console.error('Error updating article:', error)
+    } catch {
     }
   }
 
@@ -53,8 +51,7 @@ export default function AdminArticlesPage() {
     try {
       const response = await authFetch(`/api/v1/admin/articles/${id}/`, { method: 'DELETE' })
       if (response.ok) fetchArticles()
-    } catch (error) {
-      console.error('Error deleting article:', error)
+    } catch {
     }
   }
 

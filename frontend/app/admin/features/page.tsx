@@ -29,8 +29,7 @@ export default function AdminFeaturesPage() {
         const data = await response.json()
         setFeatures(data.results || data || [])
       }
-    } catch (error) {
-      console.error('Error fetching features:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -44,8 +43,7 @@ export default function AdminFeaturesPage() {
         body: JSON.stringify({ is_active: !currentStatus }),
       })
       if (response.ok) fetchFeatures()
-    } catch (error) {
-      console.error('Error updating feature:', error)
+    } catch {
     }
   }
 
@@ -54,8 +52,7 @@ export default function AdminFeaturesPage() {
     try {
       const response = await authFetch(`/api/v1/admin/features/${id}/`, { method: 'DELETE' })
       if (response.ok) fetchFeatures()
-    } catch (error) {
-      console.error('Error deleting feature:', error)
+    } catch {
     }
   }
 

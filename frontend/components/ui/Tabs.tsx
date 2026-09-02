@@ -29,17 +29,6 @@ export default function Tabs({
 }: TabsProps) {
   const [active, setActive] = useState<number>(defaultIndex);
 
-  // Dev‑time safety: warn if children count does not match labels
-  if (process.env.NODE_ENV !== "production") {
-    if (children.length !== labels.length) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "Tabs: number of children must match number of labels",
-        { labels, childrenCount: children.length }
-      );
-    }
-  }
-
   return (
     <div className={className}>
       <div className="flex border-b border-gray-200 overflow-x-auto" role="tablist">

@@ -28,8 +28,7 @@ export default function LatestArticles() {
           const data = await res.json()
           setArticles((data.results || data || []).slice(0, 3))
         }
-      } catch (error) {
-        console.error('Error fetching articles:', error)
+      } catch {
       } finally {
         setLoading(false)
       }

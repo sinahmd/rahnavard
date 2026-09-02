@@ -28,8 +28,7 @@ export default function Branches() {
           const data = await res.json()
           setBranches(data.results || data || [])
         }
-      } catch (error) {
-        console.error('Error fetching branches:', error)
+      } catch {
       } finally {
         setLoading(false)
       }

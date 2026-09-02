@@ -32,8 +32,7 @@ export default function AdminCarsPage() {
         const data = await response.json()
         setCars(data.results || data)
       }
-    } catch (error) {
-      console.error('Error fetching cars:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -49,8 +48,7 @@ export default function AdminCarsPage() {
       if (response.ok) {
         fetchCars()
       }
-    } catch (error) {
-      console.error('Error updating car:', error)
+    } catch {
     }
   }
 
@@ -64,8 +62,7 @@ export default function AdminCarsPage() {
       if (response.ok) {
         fetchCars()
       }
-    } catch (error) {
-      console.error('Error updating car:', error)
+    } catch {
     }
   }
 
@@ -79,8 +76,7 @@ export default function AdminCarsPage() {
       if (response.ok) {
         fetchCars()
       }
-    } catch (error) {
-      console.error('Error deleting car:', error)
+    } catch {
     }
   }
 

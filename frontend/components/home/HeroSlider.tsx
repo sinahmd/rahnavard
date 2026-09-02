@@ -28,8 +28,7 @@ export default function HeroSlider() {
           const data = await response.json()
           setSlides(data.results || data || [])
         }
-      } catch (error) {
-        console.error('Error fetching hero slides:', error)
+      } catch {
       } finally {
         setLoading(false)
       }

@@ -46,8 +46,7 @@ export default function AdminDashboard() {
         })
 
         setInquiries((inquiriesData.results || inquiriesData || []).slice(0, 5))
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
+      } catch {
       } finally {
         setLoading(false)
       }

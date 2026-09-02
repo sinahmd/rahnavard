@@ -26,8 +26,7 @@ export default function WhyRahnavard() {
           const data = await res.json()
           setFeatures(data.results || data || [])
         }
-      } catch (error) {
-        console.error('Error fetching why section data:', error)
+      } catch {
       } finally {
         setLoading(false)
       }
