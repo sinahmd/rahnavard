@@ -25,13 +25,16 @@ export default function FeaturedCars() {
       try {
         // Try featured cars first, fall back to all active cars
         let res = await fetch('/api/v1/cars/?is_featured=true')
+        if (!res.ok) throw new Error(String(res.status))
         let data = await res.json()
         let carsList = data.results || data || []
 
         if (carsList.length === 0) {
           res = await fetch('/api/v1/cars/')
-          data = await res.json()
-          carsList = data.results || data || []
+          if (res.ok) {
+            data = await res.json()
+            carsList = data.results || data || []
+          }
         }
 
         setCars(carsList)
