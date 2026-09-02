@@ -588,4 +588,51 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
-*Last updated: 2026-08-23*
+## 17. Session History (Cross-Session Memory)
+
+> **Update this section at the end of every session.** Summarize what was done, what's in progress, and what the next steps are. This is the only persistent memory across sessions — the AI has no other recall.
+
+### Format Template
+```
+### Session — [DATE]
+- **Goal**: What the user wanted
+- **Done**: What was completedn- **Files touched**: Key files modified
+- **In progress / Next steps**: What remains
+- **Decisions made**: Any architectural or design choices
+```
+
+---
+
+### Session — 2026-09-02
+- **Goal**: Add cross-session memory mechanism to project
+- **Done**: Added Session History section (Section 17) to CLAUDE.md so future AI sessions can recall past work
+- **Files touched**: CLAUDE.md
+- **In progress / Next steps**: Populate this log with prior session summaries (see below)
+- **Decisions made**: Use reverse-chronological format in CLAUDE.md as the single source of session memory
+
+---
+
+### Prior Session Summaries (Reconstructed from Git Log)
+
+These are inferred from commit history since no prior session logs existed.
+
+#### Phase 1 — Initial Setup (2026-08-17 to 2026-08-20)
+- **Goal**: Scaffold full-stack Next.js + Django application
+- **Done**: Project init, Docker setup, Nginx config, Arvan Cloud deployment, CI/CD pipeline, Django models & migrations, admin panel with auth, home page with all sections
+- **Key features built**: Hero slider, Why Rahnavard, Featured Cars, Consultation Form, Branches, Latest Articles, Footer, Header
+- **Backend apps**: core, cars, articles, branches, inquiries, accounts
+
+#### Phase 2 — Bug Fixes & Deployment Hardening (2026-08-20 to 2026-08-27)
+- **Goal**: Fix production issues and stabilize deployment
+- **Done**: SSL redirect fixes, CSRF fix, health check improvements, deploy script hardening, image 400 fixes, slug migrations, local-only files system, admin CRUD for all entities
+- **Key issue**: Local-only Docker dev files kept leaking into production — solved with stash-based merge workflow
+
+#### Phase 3 — Car Listing & UI Polish (2026-08-28 to 2026-09-01)
+- **Goal**: Build /cars listing page and fix UI issues
+- **Done**: Car listing page with URL state management, filtering/search/ordering/pagination, car listing components + tests, header solid bg fix, hero slider link hover, PDF viewer fix, image loading fixes
+- **Files touched**: app/cars/page.tsx, components/car/*, components/admin/*, frontend/lib/*
+- **In progress**: Pending features — articles page, more admin CRUD, additional tests
+
+---
+
+*Last updated: 2026-09-02*
