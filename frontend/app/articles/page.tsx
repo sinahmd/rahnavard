@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { apiUrl } from '@/lib/apiUrl'
+
 import Pagination from '@/components/ui/Pagination'
 
 const DEFAULT_PAGE_SIZE = 20
@@ -75,7 +75,7 @@ export default function ArticlesPage() {
   const fetchArticles = useCallback(
     (s: string, p: number, signal?: AbortSignal) => {
       const qs = buildUrlParams(s, p)
-      const url = apiUrl(`/api/v1/articles/${qs ? `?${qs}` : ''}`)
+      const url = `/api/v1/articles/${qs ? `?${qs}` : ''}`
       return fetch(url, { signal }).then(async (res) => {
         if (!res.ok) throw new Error('خطا در دریافت اطلاعات')
         return res.json()
