@@ -3,6 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, permissions, status
 from rest_framework.response import Response
 
+from apps.core.pagination import StandardResultsPagination
 from .models import Car
 from .serializers import CarAdminSerializer, CarDetailSerializer, CarListSerializer
 
@@ -22,6 +23,7 @@ class CarFilter(django_filters.FilterSet):
             "fuel_type": ["exact"],
             "transmission": ["exact"],
             "body_type": ["exact"],
+            # Used by FeaturedCars component: /api/v1/cars/?is_featured=true
             "is_featured": ["exact"],
         }
 
@@ -31,6 +33,7 @@ class CarListView(generics.ListAPIView):
 
     serializer_class = CarListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = StandardResultsPagination
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,

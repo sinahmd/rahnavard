@@ -108,6 +108,8 @@ class Car(SoftDeleteMixin, models.Model):
             ),
         ]
         indexes = [
+            # Most-hit query: COUNT(*) WHERE is_active=True AND is_deleted=False
+            models.Index(fields=['is_active', 'is_deleted'], name='car_active_deleted_idx'),
             models.Index(fields=['brand', 'is_active', 'is_deleted']),
             models.Index(fields=['year', 'is_active', 'is_deleted']),
             models.Index(fields=['is_featured', 'is_active', 'is_deleted']),
