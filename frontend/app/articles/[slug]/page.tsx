@@ -35,7 +35,16 @@ async function getArticle(slug: string): Promise<Article | null> {
         signal: AbortSignal.timeout(8000),
       })
       if (!res.ok) return null
-      return res.json()
+      const data = await res.json()
+      // Strip internal backend URL prefix — backend returns http://backend:8000/media/...
+      // but client components need relative /media/... URLs for OptimizedImage to work
+      if (data.cover_image && data.cover_image.startsWith(backendUrl)) {
+        data.cover_image = data.cover_image.slice(backendUrl.length)
+      }
+      if (data.og_image && data.og_image.startsWith(backendUrl)) {
+        data.og_image = data.og_image.slice(backendUrl.length)
+      }
+      return data
     } catch {
       if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
     }
@@ -55,6 +64,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = article.seo_title || `${article.title} | راهنورد خودرو`
   const description = article.seo_description || article.excerpt || article.title
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'
+
   return {
     title,
     description,
@@ -64,11 +75,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: 'article',
       publishedTime: article.published_at || undefined,
       images: article.og_image
-        ? [{ url: article.og_image, width: 800, height: 400, alt: article.title }]
+        ? [{ url: article.og_image.startsWith('http') ? article.og_image : `${siteUrl}${article.og_image}`, width: 800, height: 400, alt: article.title }]
         : article.cover_image
-          ? [{ url: article.cover_image, width: 800, height: 400, alt: article.title }]
+          ? [{ url: article.cover_image.startsWith('http') ? article.cover_image : `${siteUrl}${article.cover_image}`, width: 800, height: 400, alt: article.title }]
           : [],
     },
+  }
+}
+
+function formatDate(dateString: string) {
+  if (!dateString) return ''
+  try {
+    return new Date(dateString).toLocaleDateString('fa-IR')
+  } catch {
+    return ''
   }
 }
 
@@ -91,15 +111,6 @@ export default async function ArticleDetailPage({ params }: Props) {
         <Footer />
       </>
     )
-  }
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return ''
-    try {
-      return new Date(dateString).toLocaleDateString('fa-IR')
-    } catch {
-      return ''
-    }
   }
 
   return (
