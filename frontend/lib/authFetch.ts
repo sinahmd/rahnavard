@@ -1,20 +1,25 @@
-const RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
-const API_BASE = RAW_API_BASE.replace(/\/api\/v1\/?$/, "")
-
+/**
+ * Authenticated fetch wrapper.
+ * Automatically includes the admin token from localStorage in all requests.
+ * For FormData bodies, Content-Type is omitted (browser sets it with boundary).
+ */
 export async function authFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const token = localStorage.getItem("admin_token")
+  const token = localStorage.getItem('admin_token')
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   }
+
   if (token) {
-    headers["Authorization"] = `Token ${token}`
+    headers['Authorization'] = `Token ${token}`
   }
+
+  // Don't set Content-Type for FormData — browser handles boundary
   if (!(options.body instanceof FormData)) {
-    headers["Content-Type"] = headers["Content-Type"] || "application/json"
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json'
   }
-  const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`
-  return fetch(fullUrl, { ...options, headers })
+
+  return fetch(url, { ...options, headers })
 }
