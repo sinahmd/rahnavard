@@ -36,6 +36,9 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
+# Local-only: API URL helper (develop branch only)
+frontend/lib/apiUrl.ts
+
 # Logs
 *.log
 
