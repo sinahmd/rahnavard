@@ -115,7 +115,12 @@ echo ""
 # Step 3: Revert local-only files to main versions
 echo -e "${CYAN}Step 2: Reverting local-only files to main versions...${NC}"
 for f in "${CHANGED_FILES[@]}"; do
-    git checkout main -- "$f" 2>/dev/null && echo "   ✅ $f" || echo "   ⚠️  $f (not on main, skipping)"
+    if git checkout main -- "$f" 2>/dev/null; then
+        echo "   ✅ $f"
+    else
+        # File is tracked on develop but not on main — delete it
+        git rm -f "$f" 2>/dev/null && echo "   ✅ $f (removed, not on main)" || rm -f "$f" && echo "   ✅ $f (deleted, not on main)"
+    fi
 done
 
 # Handle untracked files — delete them so they don't leak into the merge
