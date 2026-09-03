@@ -49,9 +49,21 @@ jobs:
 
             echo "🚀 Deployment started — $(date)"
 
+            # Step 0: Ensure GitHub SSH host key is up to date
+            echo "🔑 Checking GitHub SSH access..."
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+            if ! ssh -T git@github.com -o ConnectTimeout=10 2>&1 | grep -q "successfully authenticated"; then
+              echo "⚠️  GitHub SSH key may be invalid — attempting pull anyway..."
+            fi
+
             # Step 1: Pull latest code (shallow fetch avoids SSH hang on diverged history)
             echo "📥 Pulling code..."
-            git fetch --depth 1 origin main
+            if ! git fetch --depth 1 origin main 2>&1; then
+              echo "❌ git fetch failed — check that the server's SSH key has repo access"
+              echo "   Run: ssh -T git@github.com  (from the server)"
+              echo "   If invalid, update the deploy key in GitHub → Settings → Deploy Keys"
+              exit 1
+            fi
             git reset --hard origin/main
             echo "✅ Code at $(git rev-parse --short HEAD)"
 
