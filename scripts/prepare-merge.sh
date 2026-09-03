@@ -3,7 +3,7 @@
 # prepare-merge.sh — Save local-only changes before merging to main
 #
 # This script:
-#   1. Stashes local-only changes (so they survive the revert)
+#   1. Saves local-only file contents to .local-only-backup/
 #   2. Reverts local-only files to their main branch versions
 #   3. Shows you the next steps
 #
@@ -24,6 +24,7 @@ NC='\033[0m'
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOCAL_ONLY_FILE="$REPO_ROOT/LOCAL_ONLY_FILES.txt"
+BACKUP_DIR="$REPO_ROOT/.local-only-backup"
 
 cd "$REPO_ROOT"
 
@@ -54,15 +55,7 @@ echo " 📦 Prepare for Merge to Main"
 echo "============================================="
 echo ""
 
-# Step 1: Check if there are any uncommitted changes
-if ! git diff --quiet HEAD 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  You have uncommitted changes.${NC}"
-    echo "   Please commit or stash them first."
-    echo ""
-    exit 1
-fi
-
-# Step 2: Check which local-only files actually differ from main
+# Step 1: Check which local-only files actually differ from main
 CHANGED_FILES=()
 UNTRACKED_FILES=()
 while IFS= read -r f; do
@@ -73,13 +66,13 @@ while IFS= read -r f; do
             CHANGED_FILES+=("$f")
         fi
     elif [ -f "$f" ]; then
-        # Untracked file on disk — stash it too
+        # Untracked file on disk — save it too
         UNTRACKED_FILES+=("$f")
     fi
 done <<< "$LOCAL_ONLY_FILES"
 
 if [ ${#CHANGED_FILES[@]} -eq 0 ] && [ ${#UNTRACKED_FILES[@]} -eq 0 ]; then
-    echo -e "${GREEN}✅ No local-only changes detected. Nothing to stash.${NC}"
+    echo -e "${GREEN}✅ No local-only changes detected. Nothing to save.${NC}"
     echo "   Safe to merge directly."
     echo ""
     exit 0
@@ -94,31 +87,45 @@ for f in "${UNTRACKED_FILES[@]}"; do
 done
 echo ""
 
-# Step 3: Stash the local-only changes
-echo -e "${CYAN}Step 1: Stashing local-only changes...${NC}"
-STASH_MSG="local-only-$(date +%Y%m%d-%H%M%S)"
-STASH_ARGS=(-m "$STASH_MSG")
-if [ ${#CHANGED_FILES[@]} -gt 0 ]; then
-    STASH_ARGS+=(-- "${CHANGED_FILES[@]}")
-fi
-if [ ${#UNTRACKED_FILES[@]} -gt 0 ]; then
-    STASH_ARGS+=(--include-untracked)
-    for f in "${UNTRACKED_FILES[@]}"; do
-        STASH_ARGS+=(-- "$f")
-    done
-fi
-git stash push "${STASH_ARGS[@]}" || true
-echo -e "${GREEN}   ✅ Changes stashed (stash message: $STASH_MSG)${NC}"
+# Step 2: Save file contents to backup directory
+echo -e "${CYAN}Step 1: Saving local-only file contents...${NC}"
+rm -rf "$BACKUP_DIR"
+mkdir -p "$BACKUP_DIR"
+SAVED_COUNT=0
+
+for f in "${CHANGED_FILES[@]}"; do
+    BACKUP_PATH="$BACKUP_DIR/$f"
+    mkdir -p "$(dirname "$BACKUP_PATH")"
+    cp "$f" "$BACKUP_PATH"
+    echo "   ✅ $f"
+    SAVED_COUNT=$((SAVED_COUNT + 1))
+done
+
+for f in "${UNTRACKED_FILES[@]}"; do
+    BACKUP_PATH="$BACKUP_DIR/$f"
+    mkdir -p "$(dirname "$BACKUP_PATH")"
+    cp "$f" "$BACKUP_PATH"
+    echo "   ✅ $f (untracked)"
+    SAVED_COUNT=$((SAVED_COUNT + 1))
+done
+
+echo -e "${GREEN}   Saved $SAVED_COUNT files to .local-only-backup/${NC}"
 echo ""
 
-# Step 4: Revert local-only files to main versions
+# Step 3: Revert local-only files to main versions
 echo -e "${CYAN}Step 2: Reverting local-only files to main versions...${NC}"
 for f in "${CHANGED_FILES[@]}"; do
     git checkout main -- "$f" 2>/dev/null && echo "   ✅ $f" || echo "   ⚠️  $f (not on main, skipping)"
 done
+
+# Handle untracked files — just delete them (they don't exist on main)
+for f in "${UNTRACKED_FILES[@]}"; do
+    rm -f "$f"
+    echo "   ✅ $f (deleted, not on main)"
+done
 echo ""
 
-# Step 5: Show next steps
+# Step 4: Show next steps
 echo -e "${CYAN}Step 3: Commit the revert:${NC}"
 echo "   git add -A"
 echo "   git commit -m \"revert: prepare local-only files for production merge\""

@@ -7,7 +7,7 @@
 #   2. You switched back to develop
 #   3. You merged main into develop
 #
-# This script finds the most recent local-only stash and applies it.
+# This script restores local-only files from .local-only-backup/
 #
 # Usage:
 #   bash scripts/apply-local-only.sh
@@ -22,6 +22,8 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BACKUP_DIR="$REPO_ROOT/.local-only-backup"
+
 cd "$REPO_ROOT"
 
 # Verify we're on develop
@@ -37,13 +39,11 @@ echo " 🔄 Apply Local-Only Changes"
 echo "============================================="
 echo ""
 
-# Find the most recent local-only stash
-STASH_LIST=$(git stash list | grep "local-only-" | head -1)
-
-if [ -z "$STASH_LIST" ]; then
-    echo -e "${YELLOW}No local-only stash found.${NC}"
+# Check if backup directory exists
+if [ ! -d "$BACKUP_DIR" ]; then
+    echo -e "${YELLOW}No backup directory found (.local-only-backup/).${NC}"
     echo ""
-    echo "If you haven't run prepare-merge.sh yet, the stash doesn't exist."
+    echo "If you haven't run prepare-merge.sh yet, the backup doesn't exist."
     echo "You may need to manually re-apply local-only changes."
     echo ""
     echo "Files that need local-only versions:"
@@ -55,53 +55,61 @@ if [ -z "$STASH_LIST" ]; then
     exit 0
 fi
 
-# Extract stash reference
-STASH_REF=$(echo "$STASH_LIST" | cut -d: -f1)
-echo -e "${CYAN}Found stash: $STASH_LIST${NC}"
-echo ""
+# Find all backed up files
+BACKUP_FILES=()
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    BACKUP_FILES+=("$f")
+done < <(cd "$BACKUP_DIR" && find . -type f | sed 's|^\./||')
 
-# Apply the stash
-echo -e "${CYAN}Applying local-only changes...${NC}"
-if git stash pop "$STASH_REF" 2>/dev/null; then
-    echo -e "${GREEN}   ✅ Local-only changes restored!${NC}"
-else
-    echo -e "${YELLOW}   ⚠️  Stash pop had conflicts. Attempting force apply...${NC}"
-    # If pop fails (e.g., due to merge conflicts from main changes),
-    # try to apply without removing from stash
-    if git stash apply "$STASH_REF" 2>/dev/null; then
-        echo -e "${GREEN}   ✅ Changes applied (stash preserved for safety).${NC}"
-        echo -e "${YELLOW}   Resolve any conflicts, then delete stash: git stash drop $STASH_REF${NC}"
-    else
-        echo -e "${RED}   ❌ Could not apply stash. Manual intervention needed.${NC}"
-        echo ""
-        echo "Stash contents:"
-        git stash show -p "$STASH_REF" | head -100
-        echo ""
-        echo "Try: git stash apply $STASH_REF"
-        echo "Or manually re-apply changes from LOCAL_ONLY_FILES.txt"
-        exit 1
-    fi
+if [ ${#BACKUP_FILES[@]} -eq 0 ]; then
+    echo -e "${YELLOW}Backup directory is empty.${NC}"
+    exit 0
 fi
 
+echo -e "${CYAN}Found ${#BACKUP_FILES[@]} backed up files:${NC}"
 echo ""
 
-# Verify key files
+# Step 1: Restore files from backup
+echo -e "${CYAN}Restoring local-only files...${NC}"
+RESTORED=0
+
+for f in "${BACKUP_FILES[@]}"; do
+    BACKUP_PATH="$BACKUP_DIR/$f"
+    if [ -f "$BACKUP_PATH" ]; then
+        mkdir -p "$(dirname "$f")"
+        cp "$BACKUP_PATH" "$f"
+        echo "   ✅ $f"
+        RESTORED=$((RESTORED + 1))
+    fi
+done
+
+echo -e "${GREEN}   Restored $RESTORED files${NC}"
+echo ""
+
+# Step 2: Clean up backup directory
+echo -e "${CYAN}Cleaning up backup...${NC}"
+rm -rf "$BACKUP_DIR"
+echo -e "${GREEN}   ✅ .local-only-backup/ removed${NC}"
+echo ""
+
+# Step 3: Verify key files
 echo -e "${CYAN}Verifying key local-only files...${NC}"
 
-# Check apiUrl.ts has client-side logic
-if grep -q "window.location.hostname" frontend/lib/apiUrl.ts 2>/dev/null; then
-    echo "   ✅ apiUrl.ts — client-side URL rewriting present"
-else
-    echo -e "   ${YELLOW}⚠️  apiUrl.ts — missing client-side URL rewriting${NC}"
-fi
-
-# Check Dockerfile has Arvan mirror removed
+# Check Dockerfile has Arvan mirror commented out
 if grep -q "^#.*npm config set registry" frontend/Dockerfile 2>/dev/null; then
     echo "   ✅ Dockerfile — Arvan mirror commented out"
 elif grep -q "npm config set registry" frontend/Dockerfile 2>/dev/null; then
     echo -e "   ${YELLOW}⚠️  Dockerfile — Arvan mirror still active (will cause 403 outside Iran)${NC}"
 else
     echo "   ✅ Dockerfile — no npm mirror configured"
+fi
+
+# Check docker-compose has nginx
+if grep -q "nginx" docker-compose.yml 2>/dev/null; then
+    echo "   ✅ docker-compose.yml — nginx proxy present"
+else
+    echo -e "   ${YELLOW}⚠️  docker-compose.yml — missing nginx proxy${NC}"
 fi
 
 echo ""
