@@ -64,14 +64,21 @@ fi
 
 # Step 2: Check which local-only files actually differ from main
 CHANGED_FILES=()
+UNTRACKED_FILES=()
 while IFS= read -r f; do
     [ -z "$f" ] && continue
-    if ! git diff --quiet "main" -- "$f" 2>/dev/null; then
-        CHANGED_FILES+=("$f")
+    if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+        # Tracked file — check if it differs from main
+        if ! git diff --quiet "main" -- "$f" 2>/dev/null; then
+            CHANGED_FILES+=("$f")
+        fi
+    elif [ -f "$f" ]; then
+        # Untracked file on disk — stash it too
+        UNTRACKED_FILES+=("$f")
     fi
 done <<< "$LOCAL_ONLY_FILES"
 
-if [ ${#CHANGED_FILES[@]} -eq 0 ]; then
+if [ ${#CHANGED_FILES[@]} -eq 0 ] && [ ${#UNTRACKED_FILES[@]} -eq 0 ]; then
     echo -e "${GREEN}✅ No local-only changes detected. Nothing to stash.${NC}"
     echo "   Safe to merge directly."
     echo ""
@@ -80,14 +87,27 @@ fi
 
 echo -e "${CYAN}Local-only files with changes (vs main):${NC}"
 for f in "${CHANGED_FILES[@]}"; do
-    echo "   $f"
+    echo "   $f (tracked, differs from main)"
+done
+for f in "${UNTRACKED_FILES[@]}"; do
+    echo "   $f (untracked)"
 done
 echo ""
 
 # Step 3: Stash the local-only changes
 echo -e "${CYAN}Step 1: Stashing local-only changes...${NC}"
 STASH_MSG="local-only-$(date +%Y%m%d-%H%M%S)"
-git stash push -m "$STASH_MSG" -- "${CHANGED_FILES[@]}"
+STASH_ARGS=(-m "$STASH_MSG")
+if [ ${#CHANGED_FILES[@]} -gt 0 ]; then
+    STASH_ARGS+=(-- "${CHANGED_FILES[@]}")
+fi
+if [ ${#UNTRACKED_FILES[@]} -gt 0 ]; then
+    STASH_ARGS+=(--include-untracked)
+    for f in "${UNTRACKED_FILES[@]}"; do
+        STASH_ARGS+=(-- "$f")
+    done
+fi
+git stash push "${STASH_ARGS[@]}" || true
 echo -e "${GREEN}   ✅ Changes stashed (stash message: $STASH_MSG)${NC}"
 echo ""
 

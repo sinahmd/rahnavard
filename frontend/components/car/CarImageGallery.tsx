@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { apiUrl } from '@/lib/apiUrl'
 
 interface Props {
   mainImage: string
@@ -10,15 +9,8 @@ interface Props {
   persianName: string
 }
 
-function resolveMediaUrl(url: string): string {
-  if (!url) return url
-  if (url.startsWith('http://') || url.startsWith('https://')) return url
-  if (url.startsWith('/media/')) return apiUrl(url)
-  return url
-}
-
 export default function CarImageGallery({ mainImage, gallery, persianName }: Props) {
-  const allImages = [mainImage, ...gallery].filter(Boolean).map(resolveMediaUrl)
+  const allImages = [mainImage, ...gallery].filter(Boolean)
   const [activeIndex, setActiveIndex] = useState(0)
   const [zoomed, setZoomed] = useState(false)
 

@@ -93,7 +93,7 @@ export default function AdminArticlesPage() {
               articles.map((article) => (
                 <tr key={article.id} className="border-t hover:bg-gray-50">
                   <td className="p-4">{article.title}</td>
-                  <td className="p-4 font-mono text-sm" dir="ltr">{article.slug}</td>
+                  <td className="p-4 font-mono text-sm">{article.slug}</td>
                   <td className="p-4">
                     <button
                       onClick={() => togglePublished(article.id, article.is_published)}

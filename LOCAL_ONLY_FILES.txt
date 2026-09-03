@@ -3,72 +3,33 @@
 # These files exist ONLY on develop for local Docker development.
 # They must NEVER be merged to main. CI and deploy will fail if they are.
 #
-# WHY: In production, nginx proxies /api/* to backend. In local Docker dev,
-# there's no nginx proxy, so these files bridge the gap.
+# WHY: Local Docker dev needs an nginx proxy (like production) to avoid
+# per-component apiUrl() changes. These files set up that proxy.
+# With nginx proxy, frontend code uses the SAME relative URLs on both
+# branches — no apiUrl() rewrites needed.
 #
 # HOW TO USE:
 #   1. Before any merge/PR to main, run: bash scripts/prepare-merge.sh
-#      (This stashes local changes and reverts files to main versions)
 #   2. Merge to main, push, deploy
 #   3. Switch back to develop, merge main
 #   4. Run: bash scripts/apply-local-only.sh
-#      (This restores all local changes from the stash)
 #
 # FILE FORMAT: one relative path per line. Lines starting with # are comments.
 # Empty lines are ignored.
 
-# --- Docker ---
+# --- Docker Compose (local dev with nginx proxy) ---
+# Production uses docker-compose.prod.yml. This is local dev only.
+docker-compose.yml
+
+# --- Nginx dev config ---
+# Local nginx proxy that matches production routing:
+# /api/* → backend, /* → frontend (with WebSocket for HMR)
+nginx/nginx.dev.conf
+
+# --- Dockerfile ---
 # Removes Arvan npm mirror (403 outside Iran) for local dev
 frontend/Dockerfile
 
-# --- API URL helper (local dev) ---
-# Works on BOTH server and client. Server: http://backend:8000/...
-# Client on localhost: http://localhost:8000/... (no nginx proxy)
-# Client in production: returns relative path (nginx handles proxying)
-frontend/lib/apiUrl.ts
-
-# --- Auth fetch (uses NEXT_PUBLIC_API_URL for local dev) ---
-# Admin API calls use full backend URL instead of relative path
-frontend/lib/authFetch.ts
-
-# --- Client components using apiUrl() for fetch + image URLs ---
-# These wrap fetch() calls and image src with apiUrl() so they work
-# in local Docker where there's no nginx proxy to the backend
-frontend/contexts/SettingsContext.tsx
-frontend/components/home/FeaturedCars.tsx
-frontend/components/home/HeroSlider.tsx
-frontend/components/home/LatestArticles.tsx
-frontend/components/home/WhyRahnavard.tsx
-frontend/components/home/Branches.tsx
-frontend/components/home/ConsultationForm.tsx
-frontend/components/car/RelatedCarsSlider.tsx
-frontend/components/car/ConsultationModal.tsx
-
-# --- Cars listing page (uses apiUrl() on develop, relative URLs on main) ---
-# In production: fetch('/api/v1/cars/...') via nginx proxy
-# On develop: fetch(apiUrl('/api/v1/cars/...')) for local Docker dev
-frontend/app/cars/page.tsx
-
-# --- Server components with resolveMediaUrl() ---
-# Server-side fetch from http://backend:8000, strip host prefix from URLs
-frontend/components/car/CarImageGallery.tsx
-frontend/app/cars/[slug]/page.tsx
-
-# --- Image optimization (localhost:8000 unoptimized check) ---
-# Marks localhost:8000 media URLs as unoptimized for Next.js Image
-frontend/components/ui/OptimizedImage.tsx
-
-# --- Next.js config (backend:8000 remote pattern) ---
-# Adds http://backend:8000 to allowed image remote patterns
-frontend/next.config.js
-
-# --- Backend throttle (DEBUG-conditional high rates) ---
+# --- Backend throttle ---
 # Higher throttle rates for local testing (10000/hour vs 100/hour)
 backend/config/settings.py
-
-# --- Test mocks (apiUrl mock for local dev) ---
-# Mock apiUrl for components that import it
-frontend/components/car/__tests__/RelatedCarsSlider.test.tsx
-frontend/components/home/__tests__/FeaturedCars.test.tsx
-frontend/components/home/__tests__/LatestArticles.test.tsx
-frontend/components/home/__tests__/ConsultationForm.test.tsx

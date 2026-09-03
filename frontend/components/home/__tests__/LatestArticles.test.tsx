@@ -1,4 +1,3 @@
-jest.mock('@/lib/apiUrl', () => ({ apiUrl: (path: string) => path }))
 import '@testing-library/jest-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import LatestArticles from '../LatestArticles'

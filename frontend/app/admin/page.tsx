@@ -113,7 +113,7 @@ export default function AdminDashboard() {
                 {inquiries.map((inquiry) => (
                   <tr key={inquiry.id} className="border-t">
                     <td className="py-3">{inquiry.name}</td>
-                    <td className="py-3 font-mono" dir="ltr">{inquiry.phone}</td>
+                    <td className="py-3 font-mono">{inquiry.phone}</td>
                     <td className="py-3">{inquiry.subject || '-'}</td>
                     <td className="py-3 text-gray-500">{formatDate(inquiry.created_at)}</td>
                   </tr>

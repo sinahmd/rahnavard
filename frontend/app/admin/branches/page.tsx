@@ -85,7 +85,7 @@ export default function AdminBranchesPage() {
                 <tr key={branch.id} className="border-t hover:bg-gray-50">
                   <td className="p-4 font-bold">{branch.name}</td>
                   <td className="p-4">{branch.address}</td>
-                  <td className="p-4 font-mono" dir="ltr">{branch.phone}</td>
+                  <td className="p-4 font-mono">{branch.phone}</td>
                   <td className="p-4">
                     <button
                       onClick={() => toggleActive(branch.id, branch.is_active)}

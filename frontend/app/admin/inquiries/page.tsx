@@ -82,7 +82,7 @@ export default function AdminInquiriesPage() {
               inquiries.map((inquiry) => (
                 <tr key={inquiry.id} className="border-t hover:bg-gray-50">
                   <td className="p-4 font-bold">{inquiry.name}</td>
-                  <td className="p-4 font-mono" dir="ltr">{inquiry.phone}</td>
+                  <td className="p-4 font-mono">{inquiry.phone}</td>
                   <td className="p-4">{inquiry.subject || '-'}</td>
                   <td className="p-4 max-w-xs truncate">{inquiry.message || '-'}</td>
                   <td className="p-4">

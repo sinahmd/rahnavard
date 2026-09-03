@@ -121,10 +121,14 @@ docker compose up --build
 
 | Service | URL | Notes |
 |---------|-----|-------|
-| Frontend | http://localhost:3000 | Next.js dev server |
-| Backend API | http://localhost:8000/api/v1/ | Django REST API |
+| **App (nginx)** | **http://localhost** | **Entry point — all requests go here** |
+| Frontend (HMR) | internal:3000 | Next.js dev server (proxied by nginx) |
+| Backend API | http://localhost:8000/api/v1/ | Django REST API (direct access) |
 | Django Admin | http://localhost:8000/django-admin/ | Superuser access |
 | PostgreSQL | localhost:5432 | User: `user`, Pass: `pass` |
+
+> ⚠️ **Always access the app through http://localhost (port 80), not port 3000.**
+> nginx proxies `/api/*` to the backend and `/*` to the frontend, matching production behavior.
 
 ### 3.3 Hot Reloading — Changes Appear Instantly
 
@@ -332,24 +336,13 @@ cd ..
 #### Step 3: Stash local-only changes
 ```bash
 # Save local-only changes to a named stash
+# (Only 4 files — the nginx proxy eliminated component-level changes)
 git stash push -m "local-only-$(date +%Y%m%d)" -- \
+  docker-compose.yml \
   frontend/Dockerfile \
-  frontend/lib/apiUrl.ts \
-  frontend/lib/authFetch.ts \
-  frontend/contexts/SettingsContext.tsx \
-  frontend/components/home/FeaturedCars.tsx \
-  frontend/components/home/HeroSlider.tsx \
-  frontend/components/home/LatestArticles.tsx \
-  frontend/components/home/WhyRahnavard.tsx \
-  frontend/components/home/Branches.tsx \
-  frontend/components/home/ConsultationForm.tsx \
-  frontend/components/car/RelatedCarsSlider.tsx \
-  frontend/components/car/ConsultationModal.tsx \
-  frontend/components/car/CarImageGallery.tsx \
-  frontend/app/cars/[slug]/page.tsx \
-  frontend/components/ui/OptimizedImage.tsx \
-  frontend/next.config.js \
   backend/config/settings.py
+# Note: nginx/nginx.dev.conf is untracked, use --include-untracked if present
+git stash push -m "local-only-$(date +%Y%m%d)" --include-untracked -- nginx/nginx.dev.conf 2>/dev/null || true
 ```
 
 #### Step 4: Revert local-only files to main versions
@@ -447,27 +440,21 @@ docker compose build
 docker compose build --no-cache
 ```
 
+### "API calls fail with 404 in browser"
+
+Make sure you're accessing the app through **http://localhost** (port 80, nginx), not http://localhost:3000.
+
+The nginx proxy routes `/api/*` → backend. Without it, browser fetch calls to `/api/v1/...` hit the frontend server → 404.
+
 ### "npm install fails with 403 Forbidden (npm mirror)"
 
-The frontend Dockerfiles use npm mirrors for faster installs. Each Dockerfile has a **different** mirror:
-
-| File | Mirror | Used by |
-|------|--------|----------|
-| `frontend/Dockerfile` | `npm.arvancloud.ir` (Iran) | Local dev | 
-| `frontend/Dockerfile.prod` | `registry.npmmirror.com` (China) | Production (Arvan Cloud) |
-
-**If you're outside Iran**, the Arvan mirror may return 403 Forbidden:
-```
-npm error 403 403 Forbidden - GET https://npm.arvancloud.ir/yocto-queue/-/yocto-queue-0.1.0.tgz
-```
-
-**Fix for local development:** Remove or comment out the line in `frontend/Dockerfile`:
+The Arvan npm mirror (`npm.arvancloud.ir`) blocks some packages outside Iran. The local `frontend/Dockerfile` should have the mirror **commented out**:
 
 ```dockerfile
 # RUN npm config set registry https://npm.arvancloud.ir/
 ```
 
-> ⚠️ **Do NOT change `frontend/Dockerfile.prod`** — the production server uses `registry.npmmirror.com` and it works fine from Arvan Cloud. This fix is only for your local `Dockerfile`.
+> ⚠️ **Do NOT change `frontend/Dockerfile.prod`** — production uses `registry.npmmirror.com` and works fine from Arvan Cloud.
 
 ### "I accidentally committed to main"
 ```bash
@@ -532,6 +519,20 @@ git push origin main
 > ⚠️ **CRITICAL: These files exist ONLY on `develop` and must NEVER be merged to `main`.**
 > They are for local Docker development only. Merging them will break CI and deploy.
 
+### Architecture: Nginx Proxy in Local Dev
+
+Local Docker dev uses an **nginx proxy** (port 80) that matches production routing:
+
+```
+Production:  Browser → nginx:80 → /api/*  → backend:8000
+                          nginx:80 → /*     → frontend:3000
+
+Local Dev:   Browser → nginx:80 → /api/*  → backend:8000  (same!)
+                          nginx:80 → /*     → frontend:3000 (with HMR)
+```
+
+This means **frontend components use the same relative URLs on both branches** — no `apiUrl()` rewrites needed. The nginx proxy (`nginx/nginx.dev.conf`) handles the routing.
+
 ### The Single Source of Truth
 
 **`LOCAL_ONLY_FILES.txt`** — Lists every file that must NOT be merged to main.
@@ -543,18 +544,16 @@ bash scripts/check-local-only.sh
 
 The script reads `LOCAL_ONLY_FILES.txt` and checks if any of those files appear in the diff between develop and main. If violations are found, it shows exactly which files to revert and how.
 
-### Why local-only changes exist
+### What's local-only (4 files)
 
-In production, nginx proxies `/api/*` → backend. Relative URLs like `fetch('/api/v1/cars/')` work because nginx forwards them.
+| File | Why it's local-only |
+|------|--------------------|
+| `docker-compose.yml` | Adds nginx proxy service, dev volumes, port config |
+| `nginx/nginx.dev.conf` | Dev nginx config (no SSL, simplified, WebSocket HMR) |
+| `frontend/Dockerfile` | Arvan npm mirror commented out (403 outside Iran) |
+| `backend/config/settings.py` | Higher throttle rates for local testing |
 
-In local Docker dev, there's no nginx proxy. The Next.js dev server on port 3000 doesn't know about Django on port 8000. Local-only changes bridge this gap:
-
-- **`apiUrl()`** — works on both server and client. Server: resolves to `http://backend:8000/...`. Client on localhost: resolves to `http://localhost:8000/...`. Client in production: returns relative path (nginx handles proxying)
-- **`authFetch.ts`** — uses `NEXT_PUBLIC_API_URL` base for admin API calls in dev
-- **`Dockerfile`** — removes Arvan npm mirror (403 outside Iran)
-- **`OptimizedImage.tsx`** — marks localhost media as unoptimized
-- **`next.config.js`** — adds `backend:8000` to image remote patterns
-- **`settings.py`** — higher throttle rates for testing
+> The production stack uses `docker-compose.prod.yml` and `Dockerfile.prod` — completely separate files.
 
 ### Pre-Merge Checklist (MUST run before merge to main)
 
@@ -590,4 +589,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-01 (added stash-based merge workflow, prepare-merge.sh, apply-local-only.sh)*
+*Last updated: 2026-09-03 (nginx proxy approach — reduced local-only from 22 files to 4)*
