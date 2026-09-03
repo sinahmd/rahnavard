@@ -1,3 +1,0 @@
-Deploy test — $(date)
-This file verifies the CI/CD pipeline is working.
-If you see this on rahnavard.co, deployment succeeded.

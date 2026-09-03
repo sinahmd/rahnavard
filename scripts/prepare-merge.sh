@@ -118,9 +118,11 @@ for f in "${CHANGED_FILES[@]}"; do
     git checkout main -- "$f" 2>/dev/null && echo "   ✅ $f" || echo "   ⚠️  $f (not on main, skipping)"
 done
 
-# Handle untracked files — just delete them (they don't exist on main)
+# Handle untracked files — delete them so they don't leak into the merge
 for f in "${UNTRACKED_FILES[@]}"; do
     rm -f "$f"
+    # Also remove empty parent directories
+    rmdir "$(dirname "$f")" 2>/dev/null || true
     echo "   ✅ $f (deleted, not on main)"
 done
 echo ""
