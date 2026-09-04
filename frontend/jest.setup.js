@@ -28,15 +28,22 @@ jest.mock('next/navigation', () => ({
 }))
 
 // Mock next/image
+// Strip Next.js-specific props that are not valid DOM attributes so the
+// mock never emits React warnings like "Received `true` for a non-boolean
+// attribute `unoptimized`".
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: (props) => {
+  default: ({ unoptimized, fill, priority, ...props }) => {
     return <img {...props} />
   },
 }))
 
 // Mock fetch
 global.fetch = jest.fn()
+
+// jsdom does not implement window.scrollTo; components call it on page
+// changes (Pagination) and menu interactions (Header/MobileNav).
+window.scrollTo = jest.fn()
 
 // Mock IntersectionObserver (used by FeaturedCars, LatestArticles, WhyRahnavard for scroll animations)
 global.IntersectionObserver = class IntersectionObserver {

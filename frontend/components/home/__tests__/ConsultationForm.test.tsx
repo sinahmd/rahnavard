@@ -65,10 +65,9 @@ describe('ConsultationForm', () => {
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    // Submit
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    // Submit; the submit handler is async (fetch resolves on a microtask), so
+    // assert via waitFor — it polls inside act() and absorbs those updates.
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('درخواست شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.')).toBeInTheDocument()
@@ -92,16 +91,23 @@ describe('ConsultationForm', () => {
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    // The fetch stays pending, so the loading state is set synchronously by
+    // the click and visible immediately.
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
-    expect(screen.getByText('در حال ارسال...')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('در حال ارسال...')).toBeInTheDocument()
+    })
     expect(screen.getByRole('button')).toBeDisabled()
 
-    // Resolve to clean up
-    act(() => {
+    // Resolve; awaiting the act() lets the post-resolution microtasks
+    // (setIsSubmitting(false), success message) settle inside act().
+    await act(async () => {
       resolveFetch!({ ok: true, json: async () => ({}) })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('درخواست شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.')).toBeInTheDocument()
     })
   })
 
@@ -113,9 +119,7 @@ describe('ConsultationForm', () => {
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('خطا در ارسال درخواست. لطفاً دوباره تلاش کنید.')).toBeInTheDocument()
@@ -130,9 +134,7 @@ describe('ConsultationForm', () => {
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('خطا در ارسال درخواست. لطفاً دوباره تلاش کنید.')).toBeInTheDocument()
@@ -147,9 +149,7 @@ describe('ConsultationForm', () => {
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('درخواست شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.')).toBeInTheDocument()
