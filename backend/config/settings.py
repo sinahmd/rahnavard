@@ -59,7 +59,10 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    # CSRF middleware is kept but API views are exempted via decorator
+    # CsrfViewMiddleware protects Django admin / non-DRF views. DRF API views
+    # are csrf_exempt at the middleware layer; DRF itself enforces CSRF for
+    # session-authenticated unsafe requests inside SessionAuthentication (see
+    # REST_FRAMEWORK below) — token-authenticated requests stay exempt.
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -151,14 +154,24 @@ CSRF_TRUSTED_ORIGINS = env.list(
     ],
 )
 
-# Exempt API endpoints from CSRF (they use CORS + origin checking instead)
-CSRF_TRUSTED_ORIGINS_API = ["/api/"]
+# Session policy for the admin API (Phase 2 dual-mode — see
+# docs/SENIOR_REFACTOR_PLAN.md §6.A). SESSION_COOKIE_SECURE / CSRF_COOKIE_SECURE
+# are applied only when not DEBUG (below); HttpOnly is Django's default and
+# SameSite stays at the default (Lax) — same-origin fetch is unaffected.
+SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 hours
 
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
+    # DUAL-MODE (Phase 2, pre-cutover): TokenAuthentication FIRST so legacy
+    # clients sending `Authorization: Token` are authenticated by the first
+    # authenticator and never hit DRF's CSRF enforcement inside
+    # SessionAuthentication. Cookie-only clients fall through to
+    # SessionAuthentication, where CSRF is enforced for unsafe methods.
+    # Order is load-bearing for the migration and rollback — do not reorder.
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

@@ -1,8 +1,9 @@
+from django.contrib.auth import login, logout, update_session_auth_hash
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from django.contrib.auth import update_session_auth_hash
 
 from .serializers import (
     LoginSerializer,
@@ -13,21 +14,36 @@ from .serializers import (
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@authentication_classes([])
+@ensure_csrf_cookie
 def login_view(request):
     """
-    Authenticate user and return token.
+    Authenticate user, establish a Django session and return the token.
+
+    Dual-mode (Phase 2, pre-cutover): `django.contrib.auth.login()` creates the
+    httpOnly session cookie the new admin client uses, while the DRF token is
+    still returned for legacy clients until TokenAuthentication is removed.
+    `@ensure_csrf_cookie` bootstraps the non-HttpOnly `csrftoken` cookie the
+    browser echoes as `X-CSRFToken` on state-changing requests.
+    `authentication_classes = []` keeps this endpoint anonymous even when the
+    caller already holds an admin session — a session-authenticated unsafe POST
+    would otherwise be rejected by DRF's CSRF enforcement.
     """
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
     user = serializer.validated_data['user']
 
-    # Get or create token
-    token, created = Token.objects.get_or_create(user=user)
+    # Establish the server-side session (rotates any existing session key).
+    login(request, user)
+
+    # Legacy compatibility: keep returning/minting the DRF token until the
+    # frontend has fully cut over (see plan §6.A step 4). Do NOT remove yet.
+    token, _created = Token.objects.get_or_create(user=user)
 
     return Response({
         'token': token.key,
-        'user': UserSerializer(user).data
+        'user': UserSerializer(user).data,
     }, status=status.HTTP_200_OK)
 
 
@@ -35,12 +51,22 @@ def login_view(request):
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
     """
-    Delete user's auth token to logout.
+    Log out through every active mechanism.
+
+    - Session-authenticated (new client): `logout()` flushes the Django session
+      (CSRF applies here — the client sends `X-CSRFToken`).
+    - Token-authenticated (legacy client): the user's DRF token is deleted
+      server-side (existing behavior; token auth bypasses CSRF because
+      TokenAuthentication is listed first in dual mode).
     """
+    # Delete the user's DRF token when one exists (legacy token logout).
     try:
         request.user.auth_token.delete()
     except Exception:
         pass
+
+    # Destroy the session (safe no-op for pure token-authenticated requests).
+    logout(request)
 
     return Response({
         'message': 'Successfully logged out.'
@@ -49,9 +75,27 @@ def logout_view(request):
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+@ensure_csrf_cookie
+def session_view(request):
+    """
+    Admin bootstrap endpoint.
+
+    Returns the current user when the request is authenticated through the
+    default dual-mode classes — the session cookie (new client) or an
+    `Authorization: Token` header (legacy client); 401 otherwise. It is a safe
+    GET, so CSRF never applies here; `@ensure_csrf_cookie` guarantees the
+    client has a `csrftoken` cookie before its first state-changing request.
+    """
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
 def current_user_view(request):
     """
-    Get current authenticated user's information.
+    Get current authenticated user's information (legacy endpoint; the new
+    client bootstraps through `/auth/session/` instead).
     """
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
