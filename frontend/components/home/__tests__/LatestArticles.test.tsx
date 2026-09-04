@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import LatestArticles from '../LatestArticles'
 import type { SiteSettings } from '@/types/settings'
+import type { ArticleListItem } from '@/types/article'
 
 const settings = {
   articles_section_title: 'مقاله و اطلاعیه',
@@ -9,7 +10,6 @@ const settings = {
 } as SiteSettings
 
 const mockFetch = jest.fn()
-global.fetch = mockFetch
 
 const mockArticles = [
   {
@@ -26,112 +26,40 @@ const mockArticles = [
     excerpt: 'مقایسه دو برند محبوب',
     published_at: '2025-01-10T10:00:00Z',
   },
-]
+] as unknown as ArticleListItem[]
 
-describe('LatestArticles', () => {
+describe('LatestArticles (client island)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    global.fetch = mockFetch
   })
 
-  it('should show loading state initially', () => {
-    mockFetch.mockReturnValue(new Promise(() => {}))
-    render(<LatestArticles settings={settings} />)
-    expect(screen.getByText('در حال بارگذاری...')).toBeInTheDocument()
-  })
+  it('renders articles passed as props without fetching on mount', () => {
+    render(<LatestArticles articles={mockArticles} settings={settings} />)
 
-  it('should render articles after loading', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: mockArticles }),
-    })
-
-    render(<LatestArticles settings={settings} />)
-
-    await waitFor(() => {
-      expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument()
-    })
-
+    expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument()
     expect(screen.getByText('مقایسه هیوندای و کیا')).toBeInTheDocument()
+    expect(screen.getByText('نکات مهم هنگام خرید خودرو')).toBeInTheDocument()
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 
-  it('should render article excerpts', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: mockArticles }),
-    })
-
-    render(<LatestArticles settings={settings} />)
-
-    await waitFor(() => {
-      expect(screen.getByText('نکات مهم هنگام خرید خودرو')).toBeInTheDocument()
-    })
-
-    expect(screen.getByText('مقایسه دو برند محبوب')).toBeInTheDocument()
-  })
-
-  it('should render article links with correct href', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: mockArticles }),
-    })
-
-    render(<LatestArticles settings={settings} />)
-
-    await waitFor(() => {
-      expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument()
-    })
+  it('renders article links with correct href', () => {
+    render(<LatestArticles articles={mockArticles} settings={settings} />)
 
     const links = screen.getAllByText('مطالعه بیشتر')
     expect(links[0].closest('a')).toHaveAttribute('href', '/articles/car-buying-guide')
     expect(links[1].closest('a')).toHaveAttribute('href', '/articles/hyundai-vs-kia')
   })
 
-  it('should show empty state when no articles', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: [] }),
-    })
-
-    render(<LatestArticles settings={settings} />)
-
-    await waitFor(() => {
-      expect(screen.getByText(/مقاله‌ای یافت نشد/)).toBeInTheDocument()
-    })
+  it('shows the empty state when no articles', () => {
+    render(<LatestArticles articles={[]} settings={settings} />)
+    expect(screen.getByText(/مقاله‌ای یافت نشد/)).toBeInTheDocument()
   })
 
-  it('should limit articles to 3', async () => {
-    const manyArticles = Array.from({ length: 6 }, (_, i) => ({
-      id: i + 1,
-      title: `مقاله ${i + 1}`,
-      slug: `article-${i + 1}`,
-      excerpt: `توضیح ${i + 1}`,
-      published_at: '2025-01-15T10:00:00Z',
-    }))
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: manyArticles }),
-    })
-
-    render(<LatestArticles settings={settings} />)
-
-    await waitFor(() => {
-      expect(screen.getByText('مقاله 1')).toBeInTheDocument()
-    })
-
-    // Should only render 3 articles
-    const links = screen.getAllByText('مطالعه بیشتر')
-    expect(links).toHaveLength(3)
-  })
-
-  it('should use custom section title from settings prop', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: [] }),
-    })
-
+  it('uses the section title from the settings prop', () => {
     render(
       <LatestArticles
+        articles={[]}
         settings={
           {
             articles_section_title: 'اخبار جدید',
@@ -140,32 +68,11 @@ describe('LatestArticles', () => {
         }
       />
     )
-
-    await waitFor(() => {
-      expect(screen.getByText('اخبار جدید')).toBeInTheDocument()
-    })
+    expect(screen.getByText('اخبار جدید')).toBeInTheDocument()
   })
 
-  it('should handle fetch error gracefully', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    render(<LatestArticles settings={settings} />)
-
-    await waitFor(() => {
-      expect(screen.queryByText('در حال بارگذاری...')).not.toBeInTheDocument()
-    })
+  it('renders the article date in Persian locale', () => {
+    render(<LatestArticles articles={mockArticles} settings={settings} />)
+    expect(screen.getAllByText(/۱۴۰۳/)).toHaveLength(2)
   })
-
-  it('should handle articles without results wrapper', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockArticles, // Direct array
-    })
-
-    render(<LatestArticles settings={settings} />)
-
-    await waitFor(() => {
-      expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument()
-    })
-  })
-})
+})

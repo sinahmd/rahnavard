@@ -6,10 +6,27 @@ import Branches from '@/components/home/Branches'
 import ConsultationForm from '@/components/home/ConsultationForm'
 import JsonLd from '@/components/seo/JsonLd'
 import { getSiteSettings } from '@/lib/data/settings'
+import {
+  getHeroSlides,
+  getWhyFeatures,
+  getFeaturedCars,
+  getLatestArticles,
+  getBranches,
+} from '@/lib/data/home'
 
 export default async function HomePage() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'
-  const settings = await getSiteSettings()
+
+  // Server state: fetched once per request (fetch dedupe collapses the
+  // shared /settings/ call with the layout) and passed into the islands.
+  const [settings, slides, features, cars, articles, branches] = await Promise.all([
+    getSiteSettings(),
+    getHeroSlides(),
+    getWhyFeatures(),
+    getFeaturedCars(),
+    getLatestArticles(),
+    getBranches(),
+  ])
 
   return (
     <>
@@ -36,11 +53,11 @@ export default async function HomePage() {
         }}
       />
       <main>
-        <HeroSlider />
-        <WhyRahnavard settings={settings} />
-        <FeaturedCars settings={settings} />
-        <LatestArticles settings={settings} />
-        <Branches settings={settings} />
+        <HeroSlider slides={slides} />
+        <WhyRahnavard features={features} settings={settings} />
+        <FeaturedCars cars={cars} settings={settings} />
+        <LatestArticles articles={articles} settings={settings} />
+        <Branches branches={branches} settings={settings} />
         <ConsultationForm settings={settings} />
       </main>
     </>

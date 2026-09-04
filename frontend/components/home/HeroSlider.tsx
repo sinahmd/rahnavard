@@ -5,16 +5,14 @@ import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import type { HeroSlide } from '@/types/heroSlide'
 
-/** Slides always carry an image once loaded (rows without one are dropped). */
+/** Slides always carry an image once filtered on the server (rows without one are dropped). */
 type LoadedSlide = HeroSlide & { image: string }
 
 const SLIDE_DURATION = 6000
 const SWIPE_THRESHOLD = 50
 const SWIPE_MAX_DRAG = 120
 
-export default function HeroSlider() {
-  const [slides, setSlides] = useState<LoadedSlide[]>([])
-  const [loading, setLoading] = useState(true)
+export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
   const [current, setCurrent] = useState(0)
   const [isZooming, setIsZooming] = useState(true)
 
@@ -26,25 +24,6 @@ export default function HeroSlider() {
   const isSwiping = useRef(false)
   const isVerticalScroll = useRef(false)
   const [dragOffset, setDragOffset] = useState(0)
-
-  useEffect(() => {
-    const fetchSlides = async () => {
-      try {
-        const response = await fetch('/api/v1/hero-slides/')
-        if (response.ok) {
-          const data = await response.json()
-          const loaded = (data.results || data || []).filter(
-            (slide: HeroSlide): slide is LoadedSlide => Boolean(slide.image)
-          )
-          setSlides(loaded)
-        }
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSlides()
-  }, [])
 
   const goTo = useCallback((index: number) => {
     if (slides.length === 0) return
@@ -146,10 +125,6 @@ export default function HeroSlider() {
     isSwiping.current = false
     touchDeltaX.current = 0
   }, [next, prev])
-
-  if (loading) {
-    return <div className="relative w-full max-h-[100dvh] aspect-[4/5] md:aspect-[1540/860] bg-[#111]" />
-  }
 
   if (slides.length === 0) {
     return (

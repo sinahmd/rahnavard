@@ -1,42 +1,22 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import type { CarListItem } from '@/types/car'
 import type { SiteSettings } from '@/types/settings'
 
-export default function FeaturedCars({ settings }: { settings: SiteSettings }) {
+export default function FeaturedCars({
+  cars,
+  settings,
+}: {
+  cars: CarListItem[]
+  settings: SiteSettings
+}) {
   const sectionRef = useRef<HTMLElement>(null)
-  const [cars, setCars] = useState<CarListItem[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Try featured cars first, fall back to all active cars
-        let res = await fetch('/api/v1/cars/?is_featured=true')
-        if (!res.ok) throw new Error(String(res.status))
-        let data = await res.json()
-        let carsList = data.results || data || []
-
-        if (carsList.length === 0) {
-          res = await fetch('/api/v1/cars/')
-          if (res.ok) {
-            data = await res.json()
-            carsList = data.results || data || []
-          }
-        }
-
-        setCars(carsList)
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
-
+  // Scroll-reveal is progressive enhancement only — the car cards are
+  // already in the server-rendered HTML.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -65,9 +45,7 @@ export default function FeaturedCars({ settings }: { settings: SiteSettings }) {
           <p>{settings.cars_section_description}</p>
         </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray">در حال بارگذاری...</div>
-        ) : cars.length === 0 ? (
+        {cars.length === 0 ? (
           <div className="text-center py-12 text-gray">
             خودرویی یافت نشد. از پنل مدیریت خودرو اضافه کنید.
           </div>

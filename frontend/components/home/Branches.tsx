@@ -1,30 +1,18 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import type { Branch } from '@/types/branch'
 import type { SiteSettings } from '@/types/settings'
 
-export default function Branches({ settings }: { settings: SiteSettings }) {
+export default function Branches({
+  branches,
+  settings,
+}: {
+  branches: Branch[]
+  settings: SiteSettings
+}) {
   const sectionRef = useRef<HTMLElement>(null)
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch('/api/v1/branches/')
-        if (res.ok) {
-          const data = await res.json()
-          setBranches(data.results || data || [])
-        }
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -53,9 +41,7 @@ export default function Branches({ settings }: { settings: SiteSettings }) {
           <h2 className="section-title">{settings.branches_section_title}</h2>
         </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray">در حال بارگذاری...</div>
-        ) : branches.length === 0 ? (
+        {branches.length === 0 ? (
           <div className="text-center py-12 text-gray">
             شعبه‌ای یافت نشد. از پنل مدیریت شعبه اضافه کنید.
           </div>

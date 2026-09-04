@@ -1,31 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import type { ArticleListItem } from '@/types/article'
 import type { SiteSettings } from '@/types/settings'
 
-export default function LatestArticles({ settings }: { settings: SiteSettings }) {
+export default function LatestArticles({
+  articles,
+  settings,
+}: {
+  articles: ArticleListItem[]
+  settings: SiteSettings
+}) {
   const sectionRef = useRef<HTMLElement>(null)
-  const [articles, setArticles] = useState<ArticleListItem[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch('/api/v1/articles/')
-        if (res.ok) {
-          const data = await res.json()
-          setArticles((data.results || data || []).slice(0, 3))
-        }
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -65,9 +53,7 @@ export default function LatestArticles({ settings }: { settings: SiteSettings })
           <p>{settings.articles_section_description}</p>
         </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray">در حال بارگذاری...</div>
-        ) : articles.length === 0 ? (
+        {articles.length === 0 ? (
           <div className="text-center py-12 text-gray">
             مقاله‌ای یافت نشد. از پنل مدیریت مقاله اضافه کنید.
           </div>
