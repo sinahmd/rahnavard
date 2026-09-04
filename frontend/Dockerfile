@@ -8,8 +8,11 @@ ARG NEXT_PUBLIC_SITE_URL=https://rahnavard.co
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 
-# Use Arvan Cloud npm mirror for faster installs from Iran
-RUN npm config set registry https://npm.arvancloud.ir/
+# npm registry: the Arvan Cloud mirror (npm.arvancloud.ir) returns 403 for
+# some packages outside Iran, so the local dev image uses the same accessible
+# China mirror (registry.npmmirror.com) as Dockerfile.prod. This file is
+# local-only (see LOCAL_ONLY_FILES.txt) and never ships to production.
+RUN npm config set registry https://registry.npmmirror.com/
 
 # Install dependencies
 COPY package*.json ./
