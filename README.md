@@ -40,6 +40,18 @@ git checkout main && git merge develop && git push origin main
 
 ---
 
+## Refactor Status
+
+This repository is mid-refactor under **[docs/SENIOR_REFACTOR_PLAN.md](./docs/SENIOR_REFACTOR_PLAN.md)** — the source of truth for the current architecture direction.
+
+**Done (Phases 0–1):** backend HTML sanitizer + backfill migrations; shared wire types in `frontend/types/`; a single typed browser API boundary (`frontend/lib/api/*`) that all admin pages use; an RSC-only data layer (`frontend/lib/data/*`); the dead legacy clients (`lib/api.ts`, `lib/authFetch.ts`, `withAuth`) deleted.
+
+**Not done yet:** admin authentication is still DRF token + `localStorage` as a deliberate compatibility layer. Phase 2 replaces it with Django session cookies + CSRF; until then it must not be treated as a security boundary (any XSS can read the token). Route groups, server-rendered home/listings, and the admin form/list refactors are Phases 3–4.
+
+> ⚠️ The older root-level `PHASE1_IMPLEMENTATION_COMPLETE.md` is **superseded and historical** — it describes the pre-refactor scaffolding, not the current state.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
