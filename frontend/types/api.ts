@@ -10,6 +10,8 @@ export interface Paginated<T> {
   next: string | null
   previous: string | null
   results: T[]
+  /** Actual page size used by the backend (StandardResultsPagination). */
+  page_size?: number
 }
 
 /**
