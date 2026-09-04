@@ -28,28 +28,14 @@ interface AuthContextType {
   isSuperUser: boolean;
 }
 
-// Legacy key from the token era (Phases 0–1). The backend no longer uses it —
-// this is a one-time migration cleanup so old browsers stop carrying it.
-const LEGACY_TOKEN_KEY = 'admin_token';
-
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * One-time purge of the legacy localStorage DRF token. Sessions now live in
- * the httpOnly `sessionid` cookie; any leftover key is dead weight that this
- * one call removes (removeItem on a missing key is a no-op, so it is safe to
- * run on every provider mount).
- */
-function purgeLegacyToken(): void {
-  try {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(LEGACY_TOKEN_KEY);
-    }
-  } catch {
-    // Storage may be unavailable (e.g. hardened privacy modes) — ignore.
-  }
-}
+// TODO(auth-cutover): the pre-Phase-2 `admin_token` localStorage key must be
+// purged exactly once, but ONLY in the post-staging, owner-approved commit
+// that removes TokenAuthentication (plan §7 Phase 2.3→2.4). During dual mode
+// the key is deliberately left untouched so legacy clients can still roll
+// back — new runtime code must never read, write, use, or send it.
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -76,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state from the session cookie
   useEffect(() => {
-    purgeLegacyToken();
     const initAuth = async () => {
       await fetchSession();
       setLoading(false);
@@ -104,7 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // out elsewhere). The finally block clears state and navigates
       // regardless.
     } finally {
-      purgeLegacyToken();
       setUser(null);
       router.push('/admin/login');
     }

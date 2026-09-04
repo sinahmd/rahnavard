@@ -7,8 +7,10 @@
  * - Prefix endpoints with the API base URL.
  * - Authenticate via the ambient Django session cookie (httpOnly `sessionid`).
  *   No credentials are attached by JavaScript — Phase 2 of the senior refactor
- *   removed the DRF-token-in-localStorage model. Any leftover `admin_token`
- *   key is purged once by AuthContext.
+ *   removed the DRF-token-in-localStorage model. A legacy `admin_token` key
+ *   from before the cutover is deliberately left untouched during dual mode
+ *   (it is only purged in the owner-approved TokenAuthentication-removal
+ *   commit, see AuthContext TODO).
  * - Send `X-CSRFToken` (read from the non-HttpOnly `csrftoken` cookie the
  *   backend bootstraps via @ensure_csrf_cookie on login and /auth/session/)
  *   on state-changing methods. DRF only enforces CSRF for session-authenticated

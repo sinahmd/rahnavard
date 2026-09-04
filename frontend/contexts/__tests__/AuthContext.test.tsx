@@ -83,7 +83,7 @@ describe('AuthContext', () => {
     localStorageMock.removeItem.mockClear()
   })
 
-  it('purges the legacy admin_token once on mount and never writes it', async () => {
+  it('never touches localStorage during session bootstrap (legacy key preserved until cutover)', async () => {
     mockFetch.mockResolvedValueOnce(okJson({ detail: 'Not authenticated.' }, 401))
 
     render(
@@ -96,10 +96,12 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('false')
     })
 
-    // One-time migration cleanup for the Phase-1 token key.
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
-    // Nothing is ever stored back — session lives in the httpOnly cookie.
+    // Dual mode keeps the legacy admin_token key untouched for rollback: no
+    // reads, writes, or removals of credentials. Session lives in the
+    // httpOnly cookie; nothing is ever stored by the client.
+    expect(localStorageMock.getItem).not.toHaveBeenCalled()
     expect(localStorageMock.setItem).not.toHaveBeenCalled()
+    expect(localStorageMock.removeItem).not.toHaveBeenCalled()
   })
 
   it('should provide unauthenticated state when the session is missing', async () => {
@@ -235,8 +237,10 @@ describe('AuthContext', () => {
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
     })
-    // Local state is cleared regardless of the API failure.
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
+    // Local state is cleared regardless of the API failure — but the legacy
+    // token key is never touched during dual mode.
+    expect(localStorageMock.removeItem).not.toHaveBeenCalled()
+    expect(localStorageMock.setItem).not.toHaveBeenCalled()
   })
 
   it('should handle refreshUser re-fetching the session', async () => {
