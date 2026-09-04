@@ -637,6 +637,18 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-04 — Local browser smoke test + dev env fixes
+- **Goal**: Full browser-based Phase 2 smoke test on local Docker; fix whatever surfaces.
+- **Done**: Diagnosed two dev-environment problems that had nothing to do with the auth code:
+  1. **Stale client chunks**: the dev `frontend` container's `.next` anonymous volume survived rebuilds, and Docker Desktop on Windows does not reliably deliver fs events into containers, so `next dev` served an OLD compiled `app/admin/layout.tsx` (direct `useAuth`) against the NEW root layout (no provider) → `useAuth must be used within an AuthProvider` only in the regular browser profile; incognito was fine. Fix: purge the `.next` volume (stop container → `docker compose rm -f frontend` → `docker volume rm <anon .next volume>` → `docker compose up -d frontend`).
+  2. **CORS on admin login**: the dev image baked `NEXT_PUBLIC_API_URL=https://rahnavard.co/api/v1` (Dockerfile ARG default from the original scaffold), so admin client calls (http.ts `API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'`) went cross-origin to PRODUCTION → CORS errors on `/auth/login/` and `/auth/session/`. The compose `environment` only overrode SITE_URL. Fix (both local-only files): `frontend/Dockerfile` dev ARG/ENV defaults → `NEXT_PUBLIC_API_URL=/api/v1`, `NEXT_PUBLIC_SITE_URL=http://localhost` (same relative-URL approach as Dockerfile.prod — the local nginx proxy routes `/api/*` → backend); `docker-compose.yml` frontend.environment now also sets `NEXT_PUBLIC_API_URL=/api/v1` so an old image cannot bake a wrong value. Verified by curl through nginx: bootstrap 401 → login 200 (sessionid httpOnly + csrftoken cookies) → session restore 200 → admin branches 200 → POST without CSRF 403 → with CSRF 400 (validation) → logout 200 → session 401. Zero `rahnavard.co/api` references remain in compiled admin chunks.
+  - Also observed: local next/image optimizer 500s (ECONNREFUSED fetching `http://localhost/media` from inside the frontend container) — dev-only, separate from auth; and a transient Next dev `loadManifest` JSON race on a fresh `.next` (retry clears it).
+- **Files touched**: frontend/Dockerfile, docker-compose.yml, CLAUDE.md
+- **In progress / Next steps**: user re-runs the browser smoke (login/persistence/CRUD/public form/logout) in incognito or after closing old localhost tabs; TokenAuthentication removal still gated on staging smoke + owner approval.
+- **Decisions made**: Local dev API base is RELATIVE `/api/v1` (never absolute); image ARG defaults and compose environment must agree so a stale image can't reintroduce the cross-origin bug. When env/Dockerfile changes affect inlined NEXT_PUBLIC_* values, recreate the container (fresh `.next`) — env changes alone do not invalidate compiled chunks.
+
+---
+
 ### Session — 2026-09-04 — Phase 2 review fixes
 - **Goal**: Apply the three final Phase 2 review fixes (public-site auth regression, dual-mode logout token handling, deferred token purge) and make the full local Docker build work.
 - **Done**:

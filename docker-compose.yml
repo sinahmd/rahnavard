@@ -20,6 +20,10 @@ services:
       - backend
     environment:
       - NEXT_PUBLIC_SITE_URL=http://localhost
+      # RELATIVE API base: the browser reaches /api/* through the local nginx
+      # proxy (same-origin), never an absolute host. Overrides the image ARG
+      # so an old image cannot bake a wrong (cross-origin) value.
+      - NEXT_PUBLIC_API_URL=/api/v1
       - BACKEND_INTERNAL_URL=http://backend:8000
     volumes:
       - ./frontend:/app
