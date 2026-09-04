@@ -44,7 +44,7 @@ git checkout main && git merge develop && git push origin main
 
 This repository is mid-refactor under **[docs/SENIOR_REFACTOR_PLAN.md](./docs/SENIOR_REFACTOR_PLAN.md)** — the source of truth for the current architecture direction.
 
-**Done (Phases 0–2):** backend HTML sanitizer + backfill migrations; shared wire types in `frontend/types/`; a single typed browser API boundary (`frontend/lib/api/*`) that all admin pages use; an RSC-only data layer (`frontend/lib/data/*`); the dead legacy clients (`lib/api.ts`, `lib/authFetch.ts`, `withAuth`) deleted; admin authentication moved to **Django session cookies + CSRF** (`sessionid` is httpOnly; the client never attaches an `Authorization` header and never stores a token).
+**Done (Phases 0–3):** backend HTML sanitizer + backfill migrations; shared wire types in `frontend/types/`; a single typed browser API boundary (`frontend/lib/api/*`) that all admin pages use; an RSC-only data layer (`frontend/lib/data/*`); the dead legacy clients (`lib/api.ts`, `lib/authFetch.ts`, `withAuth`) deleted; admin authentication moved to **Django session cookies + CSRF** (`sessionid` is httpOnly; the client never attaches an `Authorization` header and never stores a token). Public pages are now **server-rendered**: route groups split public (`(site)`) from admin (`admin/(protected)`), site settings are fetched on the server in `(site)/layout.tsx` (SettingsContext deleted), the home page and car/article listings render their initial content in the server HTML, and listing interactions are client islands whose state derives from the URL `searchParams` (no mirrored React state; back/forward, deep links and shareable URLs preserved). Detail pages fetch through `lib/data/*` and use `notFound()`; `(site)/loading.tsx` and `(site)/error.tsx` provide public boundaries.
 
 **Dual-mode is still active (Phase 2, pre-cutover):** the backend keeps `TokenAuthentication` enabled (ordered before `SessionAuthentication` for rollback) and the login response still carries a legacy `token` field that the new client deliberately ignores. Removing `TokenAuthentication` / `rest_framework.authtoken` requires the staging smoke checklist in [DEVELOPMENT.md §3.6](./DEVELOPMENT.md#36-phase-2--auth-staging-smoke-checklist-session-cookies--csrf) to pass and explicit owner approval — do not treat dual-mode as complete auth migration.
 
@@ -53,7 +53,7 @@ Post-review dual-mode details (final Phase 2 fixes):
 - **Logout is branch-scoped by the actual authenticator**: a session logout destroys only the Django session and **preserves any legacy DRF token**; only a token-authenticated logout deletes the presented token.
 - The legacy `localStorage['admin_token']` key is **deliberately left untouched during dual mode** (rollback compatibility); it is purged exactly once in the post-staging, owner-approved `TokenAuthentication`-removal commit.
 
-Route groups, server-rendered home/listings, and the admin form/list refactors are Phases 3–4.
+Remaining phases: **Phase 4** (admin list pagination + stats endpoint, AdminForm split) and Phases 5–6 (UI/a11y polish, CSP/hardening, docs).
 
 > ⚠️ The older root-level `PHASE1_IMPLEMENTATION_COMPLETE.md` is **superseded and historical** — it describes the pre-refactor scaffolding, not the current state.
 

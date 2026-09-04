@@ -201,12 +201,49 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green on 2026-09-04 (after Phase 2): backend **273 passed**
-(97.71% coverage, SQLite :memory: via `config.test_settings`), frontend
-**185 passed**, `tsc` clean, lint clean except the known Google-font `<link>`
+Verified green on 2026-09-04 (after Phase 3): backend **275 passed**
+(97.73% coverage, SQLite :memory: via `config.test_settings`), frontend
+**209 passed**, `tsc` clean, lint clean except the known Google-font `<link>`
 warning (`app/layout.tsx`) — do not "fix" it with `next/font/google` (prod image
 builds run where Google Fonts is blocked). Backend tests need no Postgres;
 frontend needs no API server.
+
+### 3.7 Phase 3 — server/client boundary + route architecture (status)
+
+Phase 3 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §7).
+
+- **Route structure**: public pages live under `app/(site)/`; the root
+  `app/layout.tsx` is a minimal shell (html/body/fonts/metadata). Settings are
+  server-fetched in `(site)/layout.tsx`; `SettingsContext` was deleted.
+  `app/admin/layout.tsx` is providers-only (AuthProvider) and the guard/shell
+  lives in `app/admin/(protected)/layout.tsx`, so `/admin/login` sits outside
+  the protected boundary while still receiving AuthProvider.
+- **Home page**: server component; `lib/data/home.ts` provides the section
+  data; the hero slider / featured cars / articles / branches / consultation
+  form are client islands that receive typed data as props and no longer
+  fetch on mount.
+- **Listings (`/cars`, `/articles`)**: URL `searchParams` are the single
+  source of truth inside `CarsExplorer`/`ArticlesExplorer` (no React state
+  mirrors, no URL↔state sync effects; transient state only for input
+  typing/debounce, drawer, loading/error). The pages are async server shells
+  that parse the URL with shared listQuery helpers, fetch the matching first
+  page + filter options, and pass a snapshot to the island, which skips its
+  initial fetch when the URL matches `initialQuery` — the first HTML contains
+  the actual cards.
+- **Detail pages**: use shared `getCarDetail`/`getArticleDetail`
+  (retry/backoff + timeout + media normalization in `lib/data/*`); missing
+  entities call `notFound()`; `(site)/loading.tsx` and `(site)/error.tsx`
+  provide public boundaries.
+
+Architecture rules (grep-verified): `lib/data/*` is server-only and never
+imports `lib/api/*` or reads cookies/localStorage; `lib/api/*` is
+browser/admin-only; no application code references `SettingsContext` or calls
+`/auth/session/` from public routes.
+
+> Phase 2 dual-mode remains active: `TokenAuthentication` is still first and
+> the login response still carries a legacy `token` field. Removal is gated on
+> the §3.6 staging smoke checklist + owner approval — do not treat Phase 3 as
+> auth cutover.
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
@@ -558,7 +595,7 @@ git push origin main
 - ✅ Articles listing and detail pages
 - ✅ Full admin panel (CRUD for all entities)
 - ✅ Car admin: gallery/slider image upload, catalog file upload, soft delete/restore
-- ✅ Token-based authentication
+- ✅ Session-cookie admin auth (dual-mode with legacy token until cutover)
 - ✅ SEO: metadata, sitemap, robots.txt, Schema.org
 - ✅ Docker development + production setup
 - ✅ CI/CD pipeline (GitHub Actions)
@@ -567,11 +604,11 @@ git push origin main
 - ✅ Tabs component (reusable)
 - ✅ Image gallery with lightbox, keyboard navigation, thumbnails
 - ✅ Related cars slider
+- ✅ Server-rendered public pages (home + listings) with client islands
+- ✅ Search/filter/sort/pagination on listing pages with URL-derived state
 
 ### What needs development:
 - 🔲 Car comparison tool
-- 🔲 Search/filter functionality
-- 🔲 Pagination on listing pages
 - 🔲 Contact page
 - 🔲 About page
 - 🔲 Email notifications for inquiries
@@ -657,4 +694,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-03 (nginx proxy approach — reduced local-only from 22 files to 4)*
+*Last updated: 2026-09-04 (Phase 3 server/client boundary + route architecture committed)*

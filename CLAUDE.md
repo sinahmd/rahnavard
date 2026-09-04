@@ -31,7 +31,7 @@ docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # The LOCAL dev frontend/Dockerfile uses the China npm mirror
 # (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
 # Iran — so `docker compose up --build` works locally.
-docker compose exec -T frontend npm test -- --runInBand      # 189 passed (2026-09-04)
+docker compose exec -T frontend npm test -- --runInBand      # 209 passed (2026-09-04)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -40,7 +40,7 @@ docker compose run --rm --no-deps frontend npm run build
 ```
 
 Verified green inside Docker on 2026-09-04 (backend 275 passed / 97.73% cov,
-frontend 189 passed, tsc clean, lint clean except the known Google-font `<link>`
+frontend 209 passed, tsc clean, lint clean except the known Google-font `<link>`
 warning in `app/layout.tsx` — do NOT switch to `next/font/google`: prod images are
 built on a server where Google Fonts is blocked, see plan §J).
 
@@ -637,6 +637,23 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-04 — Phase 3 (server/client boundary + routes)
+- **Goal**: Implement Phase 3 of the Senior Refactor Plan — public content pages server-rendered, settings via RSC, URL-derived listing state, admin login outside the protected guard — with Docker validation.
+- **Done**: Five commits on `develop`:
+  - `194c031` refactor(routing): `(site)` route group for public pages; root layout minimal (html/body/fonts/metadata only); `admin/layout.tsx` is providers-only (AuthProvider); new `admin/(protected)/layout.tsx` guard+shell; `/admin/login` sits outside `(protected)` and still gets AuthProvider; pathname-based login exceptions removed from the guard.
+  - `f2edb6a` refactor(settings): `lib/data/settings.ts` (server-only, `BACKEND_INTERNAL_URL`, revalidate 60, never throws → Persian defaults); `(site)/layout.tsx` server-fetches settings once and renders Header/Footer with typed props; SettingsContext deleted; home sections + Header/Footer + root not-found converted to prop/settings consumers.
+  - `1e4c629` refactor(home): home page is a server component; `lib/data/home.ts` fetches hero slides/features/featured cars/latest articles/branches; sections became client islands receiving typed data as props (no mount fetch); server-rendered HTML contains real content.
+  - `3ff66ad` refactor(cars) + Step A: `CarsExplorer`/`ArticlesExplorer` client islands derive ALL filter/search/sort/page state from `searchParams` (no useState mirrors, no URL↔state sync effects); interactions `router.replace`; transient state only for input typing/debounce, drawer, loading/error.
+  - `32540cf` Step B: `/cars` and `/articles` are async server shells parsing `searchParams` with shared `parseCarListQuery`/`parseArticleListQuery`, fetching the matching first page + filter options server-side (`lib/data/car.ts`/`article.ts`), passing the snapshot to the island; island skips duplicate initial fetch when URL equals `initialQuery`.
+  - `83a1379` fix(seo): detail pages use shared `getCarDetail`/`getArticleDetail` (retry/backoff + timeout + media normalization, previously inline-duplicated); missing entities call `notFound()` → root not-found renders public chrome; added `(site)/loading.tsx` + `(site)/error.tsx`; new `lib/data/__tests__/detail.test.ts`.
+  - Architecture rules verified by grep: SettingsContext/useSettings = NONE; lib/data never imports lib/api and vice versa; no `/auth/session/` in any public app/component; no useState mirror of searchParams in explorers.
+- **Validation (Docker, 2026-09-04)**: backend 275 passed / 97.73%; frontend 209 passed; tsc clean; lint clean (known Google-font warning only); `next build` green (public routes now `ƒ` dynamic, /home first-load 107 kB); public HTML curl evidence: `/cars` first HTML contains real card link (`href="/cars/tot-rav"`), `/cars?brand=Toyota` shows the empty state (local DB brand is `tot`), detail 200 with content, unknown slug → root not-found.
+- **Files touched**: frontend/app (route groups, shells, detail pages, loading/error/not-found), frontend/app/admin/(protected), frontend/components/{layout,home,site}, frontend/lib/data/{settings,home,car,article,request,media}.ts + tests, README.md, DEVELOPMENT.md, CLAUDE.md
+- **In progress / Next steps**: Phase 4 (AdminListPage + pagination + stats endpoint; AdminForm split). Phase 2 cutover (TokenAuthentication removal) still gated on staging smoke + owner approval.
+- **Decisions made**: `(site)` + `admin/(protected)` with providers-only admin layout (login shares AuthProvider with protected shell, guard one level deeper). URL is the single source of truth for listing state; server snapshot + `initialQuery` comparison avoids duplicate island fetch. lib/data is strictly server-only; lib/api strictly browser-only.
+
+---
+
 ### Session — 2026-09-04 — Local browser smoke test + dev env fixes
 - **Goal**: Full browser-based Phase 2 smoke test on local Docker; fix whatever surfaces.
 - **Done**: Diagnosed two dev-environment problems that had nothing to do with the auth code:
@@ -722,4 +739,4 @@ These are inferred from commit history since no prior session logs existed.
 
 ---
 
-*Last updated: 2026-09-04 (Phase 0/1 hardened + committed; Docker verification workflow documented)*
+*Last updated: 2026-09-04 (Phase 3 committed; public RSC + URL-state listings + route groups; Docker verification workflow documented)*
