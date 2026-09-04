@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import LinkPicker from '@/components/admin/LinkPicker'
 import { getHeroSlide, saveHeroSlide } from '@/lib/api/heroSlides'
 
@@ -33,7 +33,7 @@ export default function EditHeroSlidePage() {
       fields={slideFields}
       backUrl="/admin/hero-slides"
       load={(slideId) => getHeroSlide(Number(slideId))}
-      save={(formData) => saveHeroSlide(formData, Number(id))}
+      save={(values) => saveHeroSlide(values, Number(id))}
     />
   )
 }

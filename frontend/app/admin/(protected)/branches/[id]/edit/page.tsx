@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import { getBranch, saveBranch } from '@/lib/api/branches'
 
 const branchFields: FormField[] = [
@@ -31,7 +31,7 @@ export default function EditBranchPage() {
       fields={branchFields}
       backUrl="/admin/branches"
       load={(branchId) => getBranch(Number(branchId))}
-      save={(formData) => saveBranch(formData, Number(id))}
+      save={(values) => saveBranch(values, Number(id))}
     />
   )
 }

@@ -1,10 +1,12 @@
 /**
- * Article endpoints. Same split as cars: multipart FormData for CRUD
- * (cover/og images), JSON PATCH for the published toggle.
+ * Article endpoints. Same split as cars: typed values are serialized to
+ * multipart FormData here (cover/og images), JSON PATCH for publish toggle.
  */
 
 import { request } from './http'
+import { formValuesToFormData } from './formData'
 import type { Paginated } from '@/types/api'
+import type { FormValues } from '@/types/admin-form'
 import type { ArticleAdmin, ArticleListItem } from '@/types/article'
 
 /** Public list (`/api/v1/articles/`). */
@@ -12,9 +14,10 @@ export function listArticlesPublic(): Promise<Paginated<ArticleListItem>> {
   return request<Paginated<ArticleListItem>>('/articles/')
 }
 
-/** Admin list (`/api/v1/admin/articles/`). */
-export function listArticles(): Promise<Paginated<ArticleAdmin>> {
-  return request<Paginated<ArticleAdmin>>('/admin/articles/')
+/** Admin list (`/api/v1/admin/articles/`); `page` 1-based, appended when > 1. */
+export function listArticles(page?: number): Promise<Paginated<ArticleAdmin>> {
+  const qs = page && page > 1 ? `?page=${page}` : ''
+  return request<Paginated<ArticleAdmin>>(`/admin/articles/${qs}`)
 }
 
 /** Admin detail. */
@@ -31,7 +34,8 @@ export function updateArticle(id: number, formData: FormData): Promise<ArticleAd
 }
 
 /** Create-or-update: one signature for the shared admin form. */
-export function saveArticle(formData: FormData, id?: number): Promise<ArticleAdmin> {
+export function saveArticle(values: FormValues, id?: number): Promise<ArticleAdmin> {
+  const formData = formValuesToFormData(values)
   return id === undefined ? createArticle(formData) : updateArticle(id, formData)
 }
 

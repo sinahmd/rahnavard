@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import LinkPicker from '@/components/admin/LinkPicker'
 import { saveHeroSlide } from '@/lib/api/heroSlides'
 
@@ -27,7 +27,7 @@ export default function NewHeroSlidePage() {
       entityNamePersian="اسلاید هیرو"
       fields={slideFields}
       backUrl="/admin/hero-slides"
-      save={(formData) => saveHeroSlide(formData)}
+      save={(values) => saveHeroSlide(values)}
     />
   )
 }

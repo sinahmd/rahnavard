@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import { saveFeature } from '@/lib/api/features'
 
 const featureFields: FormField[] = [
@@ -18,7 +18,7 @@ export default function NewFeaturePage() {
       entityNamePersian="ویژگی"
       fields={featureFields}
       backUrl="/admin/features"
-      save={(formData) => saveFeature(formData)}
+      save={(values) => saveFeature(values)}
     />
   )
 }

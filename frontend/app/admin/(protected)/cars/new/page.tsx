@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import { saveCar } from '@/lib/api/cars'
 
 const carFields: FormField[] = [
@@ -71,7 +71,7 @@ export default function NewCarPage() {
       entityNamePersian="خودرو"
       fields={carFields}
       backUrl="/admin/cars"
-      save={(formData) => saveCar(formData)}
+      save={(values) => saveCar(values)}
     />
   )
 }

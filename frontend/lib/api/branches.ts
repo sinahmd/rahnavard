@@ -1,10 +1,12 @@
 /**
- * Branch endpoints. Multipart FormData for CRUD (map_image upload),
- * JSON PATCH for the active toggle.
+ * Branch endpoints. Typed values are serialized to multipart FormData here
+ * (map_image upload), JSON PATCH for the active toggle.
  */
 
 import { request } from './http'
+import { formValuesToFormData } from './formData'
 import type { Paginated } from '@/types/api'
+import type { FormValues } from '@/types/admin-form'
 import type { Branch, BranchAdmin } from '@/types/branch'
 
 /** Public list (`/api/v1/branches/`). */
@@ -12,9 +14,10 @@ export function listBranchesPublic(): Promise<Paginated<Branch>> {
   return request<Paginated<Branch>>('/branches/')
 }
 
-/** Admin list (`/api/v1/admin/branches/`). */
-export function listBranches(): Promise<Paginated<BranchAdmin>> {
-  return request<Paginated<BranchAdmin>>('/admin/branches/')
+/** Admin list (`/api/v1/admin/branches/`); `page` 1-based, appended when > 1. */
+export function listBranches(page?: number): Promise<Paginated<BranchAdmin>> {
+  const qs = page && page > 1 ? `?page=${page}` : ''
+  return request<Paginated<BranchAdmin>>(`/admin/branches/${qs}`)
 }
 
 /** Admin detail (edit form load). */
@@ -31,7 +34,8 @@ export function updateBranch(id: number, formData: FormData): Promise<BranchAdmi
 }
 
 /** Create-or-update: one signature for the shared admin form. */
-export function saveBranch(formData: FormData, id?: number): Promise<BranchAdmin> {
+export function saveBranch(values: FormValues, id?: number): Promise<BranchAdmin> {
+  const formData = formValuesToFormData(values)
   return id === undefined ? createBranch(formData) : updateBranch(id, formData)
 }
 

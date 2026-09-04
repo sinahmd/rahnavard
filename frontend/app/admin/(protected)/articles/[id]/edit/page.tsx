@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import { getArticle, saveArticle } from '@/lib/api/articles'
 
 const articleFields: FormField[] = [
@@ -34,7 +34,7 @@ export default function EditArticlePage() {
       fields={articleFields}
       backUrl="/admin/articles"
       load={(articleId) => getArticle(Number(articleId))}
-      save={(formData) => saveArticle(formData, Number(id))}
+      save={(values) => saveArticle(values, Number(id))}
     />
   )
 }

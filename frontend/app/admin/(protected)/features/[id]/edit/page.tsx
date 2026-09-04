@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import { getFeature, saveFeature } from '@/lib/api/features'
 
 const featureFields: FormField[] = [
@@ -24,7 +24,7 @@ export default function EditFeaturePage() {
       fields={featureFields}
       backUrl="/admin/features"
       load={(featureId) => getFeature(Number(featureId))}
-      save={(formData) => saveFeature(formData, Number(id))}
+      save={(values) => saveFeature(values, Number(id))}
     />
   )
 }

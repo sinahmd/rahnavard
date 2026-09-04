@@ -1,15 +1,18 @@
 /**
- * HeroSlide endpoints. Multipart FormData for CRUD (image upload),
- * JSON PATCH for the active toggle.
+ * HeroSlide endpoints. Typed values are serialized to multipart FormData
+ * here (image upload), JSON PATCH for the active toggle.
  */
 
 import { request } from './http'
+import { formValuesToFormData } from './formData'
 import type { Paginated } from '@/types/api'
+import type { FormValues } from '@/types/admin-form'
 import type { HeroSlide } from '@/types/heroSlide'
 
-/** Admin list (`/api/v1/admin/hero-slides/`). */
-export function listHeroSlides(): Promise<Paginated<HeroSlide>> {
-  return request<Paginated<HeroSlide>>('/admin/hero-slides/')
+/** Admin list (`/api/v1/admin/hero-slides/`); `page` 1-based, appended when > 1. */
+export function listHeroSlides(page?: number): Promise<Paginated<HeroSlide>> {
+  const qs = page && page > 1 ? `?page=${page}` : ''
+  return request<Paginated<HeroSlide>>(`/admin/hero-slides/${qs}`)
 }
 
 /** Admin detail (edit form load). */
@@ -26,7 +29,8 @@ export function updateHeroSlide(id: number, formData: FormData): Promise<HeroSli
 }
 
 /** Create-or-update: one signature for the shared admin form. */
-export function saveHeroSlide(formData: FormData, id?: number): Promise<HeroSlide> {
+export function saveHeroSlide(values: FormValues, id?: number): Promise<HeroSlide> {
+  const formData = formValuesToFormData(values)
   return id === undefined ? createHeroSlide(formData) : updateHeroSlide(id, formData)
 }
 

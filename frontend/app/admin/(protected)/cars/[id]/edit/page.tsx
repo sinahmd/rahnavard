@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import { getCar, saveCar } from '@/lib/api/cars'
 
 const carFields: FormField[] = [
@@ -77,7 +77,7 @@ export default function EditCarPage() {
       fields={carFields}
       backUrl="/admin/cars"
       load={(carId) => getCar(Number(carId))}
-      save={(formData) => saveCar(formData, Number(id))}
+      save={(values) => saveCar(values, Number(id))}
     />
   )
 }

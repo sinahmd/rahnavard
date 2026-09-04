@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormField } from '@/types/admin-form'
-import AdminForm from '@/components/admin/AdminForm'
+import AdminForm from '@/components/admin/form/AdminForm'
 import { saveArticle } from '@/lib/api/articles'
 
 const articleFields: FormField[] = [
@@ -28,7 +28,7 @@ export default function NewArticlePage() {
       entityNamePersian="مقاله"
       fields={articleFields}
       backUrl="/admin/articles"
-      save={(formData) => saveArticle(formData)}
+      save={(values) => saveArticle(values)}
     />
   )
 }

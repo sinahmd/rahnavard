@@ -9,6 +9,9 @@ import type { ReactNode } from 'react'
 
 export type FormFieldValue = string | boolean | File | null | File[]
 
+/** All values of a form, keyed by field name. */
+export type FormValues = Record<string, FormFieldValue>
+
 export type FormFieldType =
   | 'text'
   | 'textarea'
