@@ -173,8 +173,7 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 docker compose exec backend python manage.py shell
 
-# Backend checks (run once per image rebuild: dev deps are not in the image)
-docker compose exec backend pip install -r requirements-dev.txt
+# Backend checks (dev deps incl. pytest are baked into the dev image)
 docker compose exec backend python -m pytest -q
 docker compose exec backend python manage.py check
 
@@ -202,11 +201,43 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green on 2026-09-04: backend **258 passed** (97.72% coverage, SQLite
-:memory: via `config.test_settings`), frontend **187 passed**, `tsc` clean, lint
-clean except the known Google-font `<link>` warning (`app/layout.tsx`) — do not
-"fix" it with `next/font/google` (prod image builds run where Google Fonts is
-blocked). Backend tests need no Postgres; frontend needs no API server.
+Verified green on 2026-09-04 (after Phase 2): backend **273 passed**
+(97.71% coverage, SQLite :memory: via `config.test_settings`), frontend
+**185 passed**, `tsc` clean, lint clean except the known Google-font `<link>`
+warning (`app/layout.tsx`) — do not "fix" it with `next/font/google` (prod image
+builds run where Google Fonts is blocked). Backend tests need no Postgres;
+frontend needs no API server.
+
+### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
+
+Phase 2 put the admin on **Django session cookies** (`sessionid`, httpOnly) with
+CSRF, but **dual-mode is still active**: the backend keeps `TokenAuthentication`
+first (legacy clients still work) and login still returns a `token` field that
+new clients deliberately ignore. TokenAuthentication removal is gated on this
+checklist passing **on staging** plus the project owner's explicit approval.
+
+Manual smoke (browser → http://localhost):
+- [ ] Fresh browser → `/admin/login` — no `admin_token` in DevTools →
+      Application → Local Storage after first load (one-time purge removed it)
+- [ ] Log in with an admin account — redirect to `/admin` works
+- [ ] Confirm cookies: `sessionid` (HttpOnly ✓) and `csrftoken` (readable) exist
+- [ ] Reload / hard-reload `/admin/...` — session restores without re-login
+- [ ] DevTools → Application → Cookies → delete `sessionid`, then click any
+      admin nav item — expect redirect to `/admin/login` (401 policy)
+- [ ] CRUD write smoke — every admin entity, both create and edit+save, and at
+      least one delete: branches, hero-slides, features, cars (incl. gallery/
+      file upload — FormData path), articles, settings; each must save without
+      CSRF errors (check the Network tab for the `X-CSRFToken` header)
+- [ ] Log out → confirm `sessionid` cookie is gone server-side and you land on
+      `/admin/login`; back-button does not restore the admin session
+- [ ] While logged in as admin, open the public consultation form and submit —
+      must succeed (201) without a CSRF token (public inquiry is exempt)
+- [ ] Non-admin user (or no login) hitting `/api/v1/admin/*` gets 401/403
+
+Regression rollback (if any step fails): the previous commit re-enables the old
+behavior — no data migration is involved, only code. Reordering/removing
+`SessionAuthentication` in `REST_FRAMEWORK` (settings.py) and reverting the
+frontend http.ts/AuthContext commit restores token auth.
 
 ---
 

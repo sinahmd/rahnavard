@@ -44,9 +44,11 @@ git checkout main && git merge develop && git push origin main
 
 This repository is mid-refactor under **[docs/SENIOR_REFACTOR_PLAN.md](./docs/SENIOR_REFACTOR_PLAN.md)** — the source of truth for the current architecture direction.
 
-**Done (Phases 0–1):** backend HTML sanitizer + backfill migrations; shared wire types in `frontend/types/`; a single typed browser API boundary (`frontend/lib/api/*`) that all admin pages use; an RSC-only data layer (`frontend/lib/data/*`); the dead legacy clients (`lib/api.ts`, `lib/authFetch.ts`, `withAuth`) deleted.
+**Done (Phases 0–2):** backend HTML sanitizer + backfill migrations; shared wire types in `frontend/types/`; a single typed browser API boundary (`frontend/lib/api/*`) that all admin pages use; an RSC-only data layer (`frontend/lib/data/*`); the dead legacy clients (`lib/api.ts`, `lib/authFetch.ts`, `withAuth`) deleted; admin authentication moved to **Django session cookies + CSRF** (`sessionid` is httpOnly; the client never attaches an `Authorization` header and never stores a token).
 
-**Not done yet:** admin authentication is still DRF token + `localStorage` as a deliberate compatibility layer. Phase 2 replaces it with Django session cookies + CSRF; until then it must not be treated as a security boundary (any XSS can read the token). Route groups, server-rendered home/listings, and the admin form/list refactors are Phases 3–4.
+**Dual-mode is still active (Phase 2, pre-cutover):** the backend keeps `TokenAuthentication` enabled (ordered before `SessionAuthentication` for rollback) and the login response still carries a legacy `token` field that the new client deliberately ignores. Removing `TokenAuthentication` / `rest_framework.authtoken` requires the staging smoke checklist in [DEVELOPMENT.md §3.6](./DEVELOPMENT.md#36-phase-2--auth-staging-smoke-checklist-session-cookies--csrf) to pass and explicit owner approval — do not treat dual-mode as complete auth migration.
+
+Route groups, server-rendered home/listings, and the admin form/list refactors are Phases 3–4.
 
 > ⚠️ The older root-level `PHASE1_IMPLEMENTATION_COMPLETE.md` is **superseded and historical** — it describes the pre-refactor scaffolding, not the current state.
 

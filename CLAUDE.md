@@ -20,17 +20,15 @@ The owner develops and verifies the whole stack on **local Docker** — `docker 
 venv/node_modules, unless the owner says otherwise.
 
 ```bash
-# Backend — the image installs requirements.txt only, so dev deps are needed
-# once per image rebuild (container-local; lost on `docker compose up --build`):
-docker compose exec -T backend pip install -r requirements-dev.txt
-
-docker compose exec -T backend python -m pytest -q          # 258 passed, ~97% cov (2026-09-04)
+# Backend — the dev image now installs requirements-dev.txt (pytest included)
+# at build time, so a rebuilt backend image runs tests directly:
+docker compose exec -T backend python -m pytest -q          # 273 passed, ~98% cov (2026-09-04)
 docker compose exec -T backend python manage.py check
 docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
 
 # Frontend — all tooling (jest/tsc/eslint/next) is installed in the image
-docker compose exec -T frontend npm test -- --runInBand      # 187 passed (2026-09-04)
+docker compose exec -T frontend npm test -- --runInBand      # 185 passed (2026-09-04)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -38,8 +36,8 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-04 (backend 258 passed / 97.72% cov,
-frontend 187 passed, tsc clean, lint clean except the known Google-font `<link>`
+Verified green inside Docker on 2026-09-04 (backend 273 passed / 97.71% cov,
+frontend 185 passed, tsc clean, lint clean except the known Google-font `<link>`
 warning in `app/layout.tsx` — do NOT switch to `next/font/google`: prod images are
 built on a server where Google Fonts is blocked, see plan §J).
 
@@ -633,6 +631,18 @@ docker compose -f docker-compose.prod.yml restart backend
 - **In progress / Next steps**: What remains
 - **Decisions made**: Any architectural or design choices
 ```
+
+---
+
+### Session — 2026-09-04 — Phase 2 (auth)
+- **Goal**: Implement Phase 2 of the Senior Refactor Plan — dual-mode Django session authentication + CSRF, frontend session-cookie switch, Docker verification, docs. NO TokenAuthentication removal (gated on owner approval after staging smoke).
+- **Done**:
+  - Backend: `TokenAuthentication` kept FIRST + `SessionAuthentication` SECOND in REST_FRAMEWORK (order is load-bearing); 8h `SESSION_COOKIE_AGE`; login calls `django.contrib.auth.login()` + `@ensure_csrf_cookie` while still returning `{token, user}` (dual-mode); new `GET /api/v1/auth/session/` (ensure_csrf_cookie, returns user or 401); logout destroys session + token; inquiry POST view now `authentication_classes = []` so a logged-in admin submitting the public form never needs CSRF. Dev `backend/Dockerfile` now installs `requirements-dev.txt` at build time (Docker is the supported test env; `Dockerfile.prod` untouched).
+  - Tests: `backend/apps/accounts/test_session_auth.py` — login sets session+CSRF cookie, session restore + 401, session-authenticated unsafe write WITHOUT CSRF → 403 and WITH `X-CSRFToken` → success (clients built with `enforce_csrf_checks=True` + `secure=True`; DRF `APIClient` drops `secure` so Django's `Client` is used), legacy `Authorization: Token` still works under CSRF enforcement (token authenticator short-circuits before DRF CSRF), logout destroys session, public inquiry POST while logged-in returns 201 without CSRF, non-admin forbidden.
+  - Frontend: `lib/api/http.ts` never sends `Authorization`, never reads localStorage; forwards `X-CSRFToken` from the `csrftoken` cookie on unsafe methods; 401 → `/admin/login` redirect kept. `AuthContext` bootstraps via `GET /auth/session/`, login/logout through session endpoints, one-time `removeItem('admin_token')` purge only (never reads/writes credentials); legacy dual-mode `token` in login response is deliberately ignored. Tests rewritten for session model (incl. absence of localStorage writes). `jest.setup.js` localStorage mock fixed with `Object.defineProperty` (plain `global.localStorage =` is silently ignored by jsdom → spyOn failed on real Storage).
+- **Files touched**: backend/config/settings.py, backend/apps/accounts/{views,urls,tests,test_session_auth}.py, backend/apps/inquiries/views.py, backend/Dockerfile, frontend/lib/api/{http,auth}.ts, frontend/contexts/AuthContext.tsx + tests, frontend/lib/api/__tests__/{http,endpoints}.test.ts, frontend/jest.setup.js, README.md, DEVELOPMENT.md, CLAUDE.md
+- **In progress / Next steps**: STAGING SMOKE TEST + owner approval before removing TokenAuthentication/localStorage remnants (see DEVELOPMENT.md §3.6 checklist). Production cutover is a deliberate, owner-authorized merge — note `LOCAL_ONLY_FILES.txt` still lists `backend/config/settings.py` (stale: throttle rates are committed on both branches now), so prepare-merge.sh will revert settings.py before a main merge; the cutover must handle that explicitly. Frontend npm-install image rebuilds currently fail outside Iran (Arvan mirror 403) — only rebuild the `backend` image locally.
+- **Decisions made**: Keep dual-mode until explicit cutover approval (rollback = reorder/remove SessionAuthentication + frontend revert). CSRF-enforcement tests must use Django `Client(enforce_csrf_checks=True)` over HTTPS — DRF `APIClient` doesn't forward `secure`. No change to TokenAuthentication/authtoken yet.
 
 ---
 
