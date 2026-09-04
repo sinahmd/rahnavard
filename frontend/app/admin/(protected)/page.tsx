@@ -1,21 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { listCarsPublic } from '@/lib/api/cars'
-import { listArticlesPublic } from '@/lib/api/articles'
-import { listBranchesPublic } from '@/lib/api/branches'
+import { getAdminStats } from '@/lib/api/stats'
 import { listInquiries } from '@/lib/api/inquiries'
+import type { AdminStats } from '@/types/api'
 import type { Inquiry } from '@/types/inquiry'
 
-interface Stats {
-  cars: number
-  articles: number
-  inquiries: number
-  branches: number
-}
+const EMPTY_STATS: AdminStats = { cars: 0, articles: 0, inquiries: 0, branches: 0 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<Stats>({ cars: 0, articles: 0, inquiries: 0, branches: 0 })
+  const [stats, setStats] = useState<AdminStats>(EMPTY_STATS)
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -23,20 +17,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cars, articles, inquiriesData, branches] = await Promise.all([
-          listCarsPublic(),
-          listArticlesPublic(),
+        const [statsData, inquiriesData] = await Promise.all([
+          getAdminStats(),
           listInquiries(),
-          listBranchesPublic(),
         ])
 
-        setStats({
-          cars: cars.results.length,
-          articles: articles.results.length,
-          inquiries: inquiriesData.results.length,
-          branches: branches.results.length,
-        })
-
+        setStats(statsData)
         setInquiries(inquiriesData.results.slice(0, 5))
       } catch {
         setError('خطا در بارگذاری داشبورد')

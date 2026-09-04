@@ -14,6 +14,14 @@ export interface Paginated<T> {
   page_size?: number
 }
 
+/** Admin dashboard aggregate counts (GET /api/v1/admin/stats/). */
+export interface AdminStats {
+  cars: number
+  articles: number
+  branches: number
+  inquiries: number
+}
+
 /**
  * Normalized error envelope produced by `lib/api/http.ts` from DRF error
  * bodies (`detail` / `non_field_errors` / `{field: [errors]}`).

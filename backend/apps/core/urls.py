@@ -9,6 +9,7 @@ urlpatterns = [
     path("why-features/", views.WhyFeatureListView.as_view(), name="why-feature-list"),
     path("homepage/", views.HomepageDataView.as_view(), name="homepage-data"),
     # Admin endpoints
+    path("admin/stats/", views.AdminStatsView.as_view(), name="admin-stats"),
     path("admin/settings/", views.SiteSettingsAdminView.as_view(), name="admin-site-settings"),
     path("admin/hero-slides/", views.HeroSlideAdminListView.as_view(), name="admin-hero-slide-list"),
     path("admin/hero-slides/<int:pk>/", views.HeroSlideAdminDetailView.as_view(), name="admin-hero-slide-detail"),
