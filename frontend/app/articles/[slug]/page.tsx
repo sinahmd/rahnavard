@@ -4,28 +4,14 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import JsonLd from '@/components/seo/JsonLd'
-
-interface Article {
-  id: number
-  title: string
-  slug: string
-  excerpt: string
-  content: string
-  cover_image: string
-  is_published: boolean
-  published_at: string
-  seo_title: string
-  seo_description: string
-  og_image: string
-  created_at: string
-  updated_at: string
-}
+import type { ArticleDetail } from '@/types/article'
+import { normalizeMediaUrls } from '@/lib/data/media'
 
 type Props = {
   params: { slug: string }
 }
 
-async function getArticle(slug: string): Promise<Article | null> {
+async function getArticle(slug: string): Promise<ArticleDetail | null> {
   const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -36,14 +22,9 @@ async function getArticle(slug: string): Promise<Article | null> {
       })
       if (!res.ok) return null
       const data = await res.json()
-      // Strip internal backend URL prefix — backend returns http://backend:8000/media/...
-      // but client components need relative /media/... URLs for OptimizedImage to work
-      if (data.cover_image && data.cover_image.startsWith(backendUrl)) {
-        data.cover_image = data.cover_image.slice(backendUrl.length)
-      }
-      if (data.og_image && data.og_image.startsWith(backendUrl)) {
-        data.og_image = data.og_image.slice(backendUrl.length)
-      }
+      // Strip the internal backend origin from media URLs so client
+      // components get same-origin relative paths (see lib/data/media.ts).
+      normalizeMediaUrls(data, ['cover_image', 'og_image'])
       return data
     } catch {
       if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))

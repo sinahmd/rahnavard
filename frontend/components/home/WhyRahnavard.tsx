@@ -3,14 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
-
-
-interface WhyFeature {
-  id: number
-  title: string
-  description: string
-  icon?: string
-}
+import type { WhyFeature } from '@/types/feature'
 
 export default function WhyRahnavard() {
   const sectionRef = useRef<HTMLElement>(null)

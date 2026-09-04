@@ -1,50 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-
-
-interface SiteSettings {
-  // Branding
-  site_name: string
-  site_description: string
-  logo: string | null
-  phone: string
-  address: string
-
-  // Social
-  instagram: string
-  telegram: string
-  whatsapp: string
-
-  // Hero
-  hero_cta_primary_text: string
-  hero_cta_primary_link: string
-  hero_cta_secondary_text: string
-  hero_cta_secondary_link: string
-
-  // Why Section
-  why_title: string
-  why_description: string
-
-  // Cars Section
-  cars_section_title: string
-  cars_section_description: string
-
-  // Articles Section
-  articles_section_title: string
-  articles_section_description: string
-
-  // Branches Section
-  branches_section_title: string
-
-  // Consultation Form
-  form_title: string
-  form_description: string
-
-  // Footer
-  footer_description: string
-  footer_copyright: string
-}
+import type { SiteSettings } from '@/types/settings'
 
 const defaults: SiteSettings = {
   site_name: 'راهنورد خودرو',
@@ -70,6 +27,7 @@ const defaults: SiteSettings = {
   form_description: 'همکاران ما در کوتاه‌ترین زمان ممکن با شما تماس خواهند گرفت.',
   footer_description: 'راهنورد خودرو ، واردکننده رسمی خودروهای هیوندای، کیا و تویوتا با بیش از یک دهه تجربه در خدمت مشتریان.',
   footer_copyright: 'راهنورد خودرو. تمامی حقوق محفوظ است.',
+  default_og_image: null,
 }
 
 const SettingsContext = createContext<SiteSettings>(defaults)

@@ -3,16 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import type { CarListItem } from '@/types/car'
 
-
-interface Car {
-  id: number
-  brand: string
-  model: string
-  persian_name: string
-  slug: string
-  main_image: string
-}
 
 interface Props {
   currentSlug: string
@@ -28,7 +20,7 @@ interface Props {
  * the frontend.
  */
 export default function RelatedCarsSlider({ currentSlug }: Props) {
-  const [cars, setCars] = useState<Car[]>([])
+  const [cars, setCars] = useState<CarListItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,7 +29,7 @@ export default function RelatedCarsSlider({ currentSlug }: Props) {
         const res = await fetch('/api/v1/cars/?is_active=true&limit=20')
         if (!res.ok) throw new Error('Failed to fetch related cars')
         const data = await res.json()
-        const all: Car[] = data.results || data || []
+        const all: CarListItem[] = data.results || data || []
         const filtered = all.filter((c) => c.slug !== currentSlug).slice(0, 6)
         setCars(filtered)
       } catch {

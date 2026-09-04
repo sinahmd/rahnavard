@@ -8,17 +8,9 @@ import Footer from '@/components/layout/Footer'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 
 import Pagination from '@/components/ui/Pagination'
+import type { ArticleListItem } from '@/types/article'
 
 const DEFAULT_PAGE_SIZE = 20
-
-interface Article {
-  id: number
-  title: string
-  slug: string
-  excerpt: string
-  cover_image: string
-  published_at: string
-}
 
 function readStateFromURL(params: URLSearchParams) {
   return {
@@ -61,7 +53,7 @@ export default function ArticlesPage() {
   }, [searchParams])
 
   // ── Articles data ──────────────────────────────────────────────────
-  const [articles, setArticles] = useState<Article[]>([])
+  const [articles, setArticles] = useState<ArticleListItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -95,7 +87,10 @@ export default function ArticlesPage() {
     fetchArticles(search, page, controller.signal)
       .then((data) => {
         const count = data.count || 0
-        const size = data.page_size || pageSize
+        // The backend always reports page_size; the constant fallback keeps
+        // this effect free of a pageSize dependency (which would otherwise
+        // re-run the fetch whenever the state is set below).
+        const size = data.page_size || DEFAULT_PAGE_SIZE
         setArticles(data.results || [])
         setTotalCount(count)
         if (data.page_size) setPageSize(data.page_size)

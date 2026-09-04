@@ -8,42 +8,14 @@ import RelatedCarsSlider from '@/components/car/RelatedCarsSlider'
 import CarImageGallery from '@/components/car/CarImageGallery'
 import PdfViewer from '@/components/car/PdfViewer'
 import CarCTAButtons from '@/components/car/CarCTAButtons'
-
-interface Car {
-  id: number
-  brand: string
-  model: string
-  persian_name: string
-  slug: string
-  description: string
-  year: number
-  fuel_type: string
-  fuel_type_display: string
-  transmission: string
-  transmission_display: string
-  engine: string
-  price: string | null
-  main_image: string
-  gallery: string[]
-  is_active: boolean
-  is_featured: boolean
-  seo_title: string
-  seo_description: string
-  og_image: string
-  created_at: string
-  updated_at: string
-  manufacturer: string
-  body_type: string
-  color: string
-  technical_description: string
-  catalog_file: string | null
-}
+import type { CarDetail } from '@/types/car'
+import { normalizeMediaUrls } from '@/lib/data/media'
 
 type Props = {
   params: { slug: string }
 }
 
-async function getCar(slug: string): Promise<Car | null> {
+async function getCar(slug: string): Promise<CarDetail | null> {
   const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -54,18 +26,9 @@ async function getCar(slug: string): Promise<Car | null> {
       })
       if (!res.ok) return null
       const data = await res.json()
-      // Strip internal backend URL prefix — backend returns http://backend:8000/media/...
-      // but client components need relative /media/... URLs for OptimizedImage to work
-      const bkUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
-      if (data.main_image && data.main_image.startsWith(bkUrl)) {
-        data.main_image = data.main_image.slice(bkUrl.length)
-      }
-      if (data.catalog_file && data.catalog_file.startsWith(bkUrl)) {
-        data.catalog_file = data.catalog_file.slice(bkUrl.length)
-      }
-      if (data.og_image && data.og_image.startsWith(bkUrl)) {
-        data.og_image = data.og_image.slice(bkUrl.length)
-      }
+      // Strip the internal backend origin from media URLs so client
+      // components get same-origin relative paths (see lib/data/media.ts).
+      normalizeMediaUrls(data, ['main_image', 'catalog_file', 'og_image'])
       return data
     } catch {
       if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))

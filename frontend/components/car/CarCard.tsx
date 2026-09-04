@@ -2,24 +2,7 @@
 
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-
-interface Car {
-  id: number
-  brand: string
-  model: string
-  persian_name: string
-  slug: string
-  year: number
-  fuel_type: string
-  fuel_type_display: string
-  transmission: string
-  transmission_display: string
-  price: string | null
-  body_type: string
-  engine: string
-  main_image: string
-  is_featured: boolean
-}
+import type { CarListItem } from '@/types/car'
 
 function formatPrice(price: string | null): string | null {
   if (!price) return null
@@ -28,7 +11,7 @@ function formatPrice(price: string | null): string | null {
   return new Intl.NumberFormat('fa-IR').format(num)
 }
 
-export default function CarCard({ car }: { car: Car }) {
+export default function CarCard({ car }: { car: CarListItem }) {
   const price = formatPrice(car.price)
 
   return (

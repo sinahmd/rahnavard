@@ -4,20 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
-
-interface Article {
-  id: number
-  title: string
-  slug: string
-  excerpt: string
-  cover_image: string
-  published_at: string
-}
+import type { ArticleListItem } from '@/types/article'
 
 export default function LatestArticles() {
   const sectionRef = useRef<HTMLElement>(null)
   const settings = useSettings()
-  const [articles, setArticles] = useState<Article[]>([])
+  const [articles, setArticles] = useState<ArticleListItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

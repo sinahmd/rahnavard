@@ -3,16 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import { useSettings } from '@/contexts/SettingsContext'
-
-
-interface Branch {
-  id: number
-  name: string
-  address: string
-  phone: string
-  map_url: string
-  map_image: string
-}
+import type { Branch } from '@/types/branch'
 
 export default function Branches() {
   const sectionRef = useRef<HTMLElement>(null)

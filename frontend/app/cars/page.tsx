@@ -10,6 +10,7 @@ import CarFilters, { FilterOptions, FilterState } from '@/components/car/CarFilt
 import ActiveFilters from '@/components/car/ActiveFilters'
 import CarPagination from '@/components/car/CarPagination'
 import { SORT_OPTIONS } from '@/lib/carConstants'
+import type { CarListItem } from '@/types/car'
 
 const VALID_SORT_VALUES: Set<string> = new Set(SORT_OPTIONS.map((o) => o.value))
 const DEFAULT_PAGE_SIZE = 20
@@ -23,24 +24,6 @@ const EMPTY_FILTERS: FilterState = {
   max_year: '',
   min_price: '',
   max_price: '',
-}
-
-interface Car {
-  id: number
-  brand: string
-  model: string
-  persian_name: string
-  slug: string
-  year: number
-  fuel_type: string
-  fuel_type_display: string
-  transmission: string
-  transmission_display: string
-  price: string | null
-  body_type: string
-  engine: string
-  main_image: string
-  is_featured: boolean
 }
 
 function readStateFromURL(params: URLSearchParams) {
@@ -106,7 +89,7 @@ export default function CarsPage() {
   }, [searchParams])
 
   // ── Cars data ──────────────────────────────────────────────────────
-  const [cars, setCars] = useState<Car[]>([])
+  const [cars, setCars] = useState<CarListItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -181,7 +164,10 @@ export default function CarsPage() {
     fetchCars(search, filters, page, sort, controller.signal)
       .then((data) => {
         const count = data.count || 0
-        const size = data.page_size || pageSize
+        // The backend always reports page_size; the constant fallback keeps
+        // this effect free of a pageSize dependency (which would otherwise
+        // re-run the fetch whenever the state is set below).
+        const size = data.page_size || DEFAULT_PAGE_SIZE
         setCars(data.results || [])
         setTotalCount(count)
         if (data.page_size) setPageSize(data.page_size)

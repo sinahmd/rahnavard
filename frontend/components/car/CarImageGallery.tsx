@@ -4,13 +4,13 @@ import { useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 
 interface Props {
-  mainImage: string
+  mainImage: string | null
   gallery: string[]
   persianName: string
 }
 
 export default function CarImageGallery({ mainImage, gallery, persianName }: Props) {
-  const allImages = [mainImage, ...gallery].filter(Boolean)
+  const allImages = [mainImage, ...gallery].filter((url): url is string => Boolean(url))
   const [activeIndex, setActiveIndex] = useState(0)
   const [zoomed, setZoomed] = useState(false)
 
