@@ -216,9 +216,17 @@ first (legacy clients still work) and login still returns a `token` field that
 new clients deliberately ignore. TokenAuthentication removal is gated on this
 checklist passing **on staging** plus the project owner's explicit approval.
 
+Auth is scoped to the admin routes (public pages never call `/auth/session/`
+and are never redirected to `/admin/login`). Session logout **preserves** the
+legacy DRF token; only a token-authenticated logout deletes the presented
+token. The old `localStorage['admin_token']` key is left untouched during
+dual mode — its one-time purge happens only in the cutover commit.
+
 Manual smoke (browser → http://localhost):
-- [ ] Fresh browser → `/admin/login` — no `admin_token` in DevTools →
-      Application → Local Storage after first load (one-time purge removed it)
+- [ ] Visit the public homepage while logged OUT — page loads normally, NO
+      redirect to `/admin/login`, and Network shows no `/auth/session/` call
+- [ ] Fresh browser → `/admin/login` — the legacy `admin_token` key is NOT
+      purged yet (dual mode); it must simply never be read or written
 - [ ] Log in with an admin account — redirect to `/admin` works
 - [ ] Confirm cookies: `sessionid` (HttpOnly ✓) and `csrftoken` (readable) exist
 - [ ] Reload / hard-reload `/admin/...` — session restores without re-login
@@ -228,8 +236,9 @@ Manual smoke (browser → http://localhost):
       least one delete: branches, hero-slides, features, cars (incl. gallery/
       file upload — FormData path), articles, settings; each must save without
       CSRF errors (check the Network tab for the `X-CSRFToken` header)
-- [ ] Log out → confirm `sessionid` cookie is gone server-side and you land on
-      `/admin/login`; back-button does not restore the admin session
+- [ ] Log out (session) → confirm `sessionid` cookie is gone server-side, you
+      land on `/admin/login`, and any legacy DRF token for that user still
+      exists server-side (it is preserved during dual mode)
 - [ ] While logged in as admin, open the public consultation form and submit —
       must succeed (201) without a CSRF token (public inquiry is exempt)
 - [ ] Non-admin user (or no login) hitting `/api/v1/admin/*` gets 401/403

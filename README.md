@@ -48,6 +48,11 @@ This repository is mid-refactor under **[docs/SENIOR_REFACTOR_PLAN.md](./docs/SE
 
 **Dual-mode is still active (Phase 2, pre-cutover):** the backend keeps `TokenAuthentication` enabled (ordered before `SessionAuthentication` for rollback) and the login response still carries a legacy `token` field that the new client deliberately ignores. Removing `TokenAuthentication` / `rest_framework.authtoken` requires the staging smoke checklist in [DEVELOPMENT.md §3.6](./DEVELOPMENT.md#36-phase-2--auth-staging-smoke-checklist-session-cookies--csrf) to pass and explicit owner approval — do not treat dual-mode as complete auth migration.
 
+Post-review dual-mode details (final Phase 2 fixes):
+- `AuthProvider` is **scoped to the `/admin` routes** — public pages never call `/auth/session/` and anonymous visitors are never redirected to `/admin/login` (the full `admin/(protected)` route-group restructure is Phase 3).
+- **Logout is branch-scoped by the actual authenticator**: a session logout destroys only the Django session and **preserves any legacy DRF token**; only a token-authenticated logout deletes the presented token.
+- The legacy `localStorage['admin_token']` key is **deliberately left untouched during dual mode** (rollback compatibility); it is purged exactly once in the post-staging, owner-approved `TokenAuthentication`-removal commit.
+
 Route groups, server-rendered home/listings, and the admin form/list refactors are Phases 3–4.
 
 > ⚠️ The older root-level `PHASE1_IMPLEMENTATION_COMPLETE.md` is **superseded and historical** — it describes the pre-refactor scaffolding, not the current state.

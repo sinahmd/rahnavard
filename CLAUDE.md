@@ -22,13 +22,16 @@ venv/node_modules, unless the owner says otherwise.
 ```bash
 # Backend — the dev image now installs requirements-dev.txt (pytest included)
 # at build time, so a rebuilt backend image runs tests directly:
-docker compose exec -T backend python -m pytest -q          # 273 passed, ~98% cov (2026-09-04)
+docker compose exec -T backend python -m pytest -q          # 275 passed, ~98% cov (2026-09-04)
 docker compose exec -T backend python manage.py check
 docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
 
-# Frontend — all tooling (jest/tsc/eslint/next) is installed in the image
-docker compose exec -T frontend npm test -- --runInBand      # 185 passed (2026-09-04)
+# Frontend — all tooling (jest/tsc/eslint/next) is installed in the image.
+# The LOCAL dev frontend/Dockerfile uses the China npm mirror
+# (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
+# Iran — so `docker compose up --build` works locally.
+docker compose exec -T frontend npm test -- --runInBand      # 189 passed (2026-09-04)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -36,8 +39,8 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-04 (backend 273 passed / 97.71% cov,
-frontend 185 passed, tsc clean, lint clean except the known Google-font `<link>`
+Verified green inside Docker on 2026-09-04 (backend 275 passed / 97.73% cov,
+frontend 189 passed, tsc clean, lint clean except the known Google-font `<link>`
 warning in `app/layout.tsx` — do NOT switch to `next/font/google`: prod images are
 built on a server where Google Fonts is blocked, see plan §J).
 
@@ -631,6 +634,20 @@ docker compose -f docker-compose.prod.yml restart backend
 - **In progress / Next steps**: What remains
 - **Decisions made**: Any architectural or design choices
 ```
+
+---
+
+### Session — 2026-09-04 — Phase 2 review fixes
+- **Goal**: Apply the three final Phase 2 review fixes (public-site auth regression, dual-mode logout token handling, deferred token purge) and make the full local Docker build work.
+- **Done**:
+  - Fix 1 — **AuthProvider moved from the root layout into `app/admin/layout.tsx`** (wrapped via a new `AdminShell` inner component). Public pages no longer call `/auth/session/` and anonymous visitors are never redirected to `/admin/login`. `SettingsProvider` stays in the root layout. No route groups yet (Phase 3). New tests: root-layout tests render into a full jsdom `Document` via `createRoot` (an `<html>` root can't go in RTL's `<div>`); admin-layout tests cover the 401 redirect and authenticated render.
+  - Fix 2 — **backend logout branches on the actual authenticator**: `SessionAuthentication` → destroy session only, PRESERVE the legacy DRF token; token-authenticated (`request.auth` is a `Token`) → delete the presented token. Learned DRF internals: `force_authenticate()` swaps in an internal `ForcedAuthentication` (so `successful_authenticator` is neither Token nor Session), and the reliable signal is `isinstance(request.auth, Token)`. The old `except Exception` catch is gone.
+  - Fix 3 — **removed the automatic `localStorage.removeItem('admin_token')` purge** from AuthContext (left only as a TODO for the cutover commit); http.ts comment updated; AuthContext tests now assert NO localStorage get/set/remove during bootstrap/login/logout.
+  - Docker — **local `frontend/Dockerfile` registry switched from Arvan (`npm.arvancloud.ir`, 403s outside Iran) to the China mirror `registry.npmmirror.com`** (same as Dockerfile.prod). This file is local-only (LOCAL_ONLY_FILES.txt) — `docker compose up --build -d` now works end-to-end locally.
+  - Docs: README (dual-mode rollback details), DEVELOPMENT.md §3.6 smoke checklist updated (public-page no-redirect check, token-preserving logout, key-left-untouched), CLAUDE.md numbers.
+- **Files touched**: frontend/app/layout.tsx, frontend/app/admin/layout.tsx, frontend/contexts/AuthContext.tsx, frontend/lib/api/http.ts (comment), backend/apps/accounts/views.py, backend/apps/accounts/test_session_auth.py, frontend/app/__tests__/layout.test.tsx (new), frontend/app/admin/__tests__/layout.test.tsx (new), frontend/contexts/__tests__/AuthContext.test.tsx, frontend/Dockerfile, README.md, DEVELOPMENT.md, CLAUDE.md
+- **In progress / Next steps**: TokenAuthentication removal STILL requires staging smoke (DEVELOPMENT.md §3.6) + explicit owner approval. Phase 3 route groups will formalize the admin/(protected) boundary (AuthProvider already admin-scoped early).
+- **Decisions made**: Early admin-scoping of auth is a targeted Phase 2 fix, not Phase 3 completion. Purge deferred by design. Logout semantics: branch on the presented credential, never on token existence in the DB.
 
 ---
 
