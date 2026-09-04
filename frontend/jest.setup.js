@@ -63,11 +63,19 @@ global.IntersectionObserver = class IntersectionObserver {
   }
 }
 
-// Mock localStorage
+// Mock localStorage. jsdom exposes it as a prototype accessor, so a plain
+// assignment (global.localStorage = ...) is silently ignored and tests would
+// hit the real Storage object (whose methods cannot be spied on). Define an
+// own data property instead so tests can spy on / assert the absence of
+// credential writes.
 const localStorageMock = {
   getItem: jest.fn(),
   setItem: jest.fn(),
   removeItem: jest.fn(),
   clear: jest.fn(),
 }
-global.localStorage = localStorageMock
+Object.defineProperty(global, 'localStorage', {
+  value: localStorageMock,
+  configurable: true,
+  writable: true,
+})

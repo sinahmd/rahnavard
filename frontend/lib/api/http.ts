@@ -5,15 +5,18 @@
  * server-only layer and must never import this module). Responsibilities:
  *
  * - Prefix endpoints with the API base URL.
- * - Attach the admin credentials. Phase 1 still uses the DRF token from
- *   localStorage (behaviour identical to the retired `authFetch`); Phase 2
- *   swaps `getCredentials()`/401 handling for the session-cookie + CSRF
- *   model — the CSRF header plumbing below already works once the backend
- *   starts issuing a `csrftoken` cookie.
+ * - Authenticate via the ambient Django session cookie (httpOnly `sessionid`).
+ *   No credentials are attached by JavaScript — Phase 2 of the senior refactor
+ *   removed the DRF-token-in-localStorage model. Any leftover `admin_token`
+ *   key is purged once by AuthContext.
+ * - Send `X-CSRFToken` (read from the non-HttpOnly `csrftoken` cookie the
+ *   backend bootstraps via @ensure_csrf_cookie on login and /auth/session/)
+ *   on state-changing methods. DRF only enforces CSRF for session-authenticated
+ *   unsafe requests, which is exactly when this header is present.
  * - Normalize non-2xx DRF bodies (`detail` / `non_field_errors` /
  *   `{field: [errors]}`) into a typed `ApiError { message, fieldErrors }`.
- * - Central 401 policy: clear stored credentials and send the browser to
- *   the admin login page.
+ * - Central 401 policy: send the browser to the admin login page (expired
+ *   session). Nothing to clear — the session cookie is server-side state.
  * - `AbortSignal` passthrough (listings abort in-flight fetches).
  *
  * Deliberately thin: no axios, no retry/interceptor stack, no request
@@ -24,7 +27,6 @@ import type { ApiError } from '@/types/api'
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
-const TOKEN_STORAGE_KEY = 'admin_token'
 const CSRF_COOKIE_NAME = 'csrftoken'
 const UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
 
@@ -49,13 +51,10 @@ export interface RequestOptions {
   signal?: AbortSignal
 }
 
-/** Credentials source. Phase 1: DRF token (localStorage); Phase 2: cookie. */
-function getCredentialsHeader(): Record<string, string> | null {
-  if (typeof window === 'undefined') return null
-  const token = window.localStorage.getItem(TOKEN_STORAGE_KEY)
-  return token ? { Authorization: `Token ${token}` } : null
-}
-
+/**
+ * Read the CSRF cookie Django sets (@ensure_csrf_cookie on login and
+ * /auth/session/). It is deliberately NOT HttpOnly — the client must echo it.
+ */
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
   const match = document.cookie
@@ -65,13 +64,12 @@ function getCsrfToken(): string | null {
 }
 
 /**
- * Central 401 policy: drop stored credentials and redirect to the admin
- * login page. Phase 2 makes the redirect the expiry UX for session cookies;
- * under token auth it only triggers on an invalid/expired token.
+ * Central 401 policy: an expired/invalid session must take the admin back to
+ * the login page. No client-side credentials exist to clear — the session is
+ * destroyed server-side on its own.
  */
 function handleUnauthorized(): void {
   if (typeof window === 'undefined') return
-  window.localStorage.removeItem(TOKEN_STORAGE_KEY)
   if (!window.location.pathname.startsWith('/admin/login')) {
     window.location.assign('/admin/login')
   }
@@ -144,13 +142,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const method = (options.method || 'GET').toUpperCase()
   const headers = new Headers(options.headers)
 
-  const credentials = getCredentialsHeader()
-  if (credentials) {
-    for (const [name, value] of Object.entries(credentials)) {
-      headers.set(name, value)
-    }
-  }
-
   let body: BodyInit | null = null
   if (isPlainObjectBody(options.body)) {
     body = JSON.stringify(options.body)
@@ -162,9 +153,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers.set('Content-Type', 'application/json')
   }
 
-  // CSRF: forwarded when the backend issues a csrftoken cookie (Phase 2
-  // session auth). Inert today — token-auth bypasses CSRF and no cookie is
-  // present — so sending it is harmless and future-proof.
+  // Session auth: unsafe methods carry X-CSRFToken when the backend has
+  // issued a csrftoken cookie (login / /auth/session/ bootstrap).
   if (UNSAFE_METHODS.includes(method)) {
     const csrf = getCsrfToken()
     if (csrf) headers.set('X-CSRFToken', csrf)

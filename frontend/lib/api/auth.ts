@@ -1,8 +1,10 @@
 /**
- * Auth endpoints (token auth in Phase 1; session-cookie in Phase 2).
- * `login` returns `{ token, user }` — the token is stored by the caller
- * (`AuthContext`) exactly as before; the session bootstrap moves to
- * `/auth/session/` in Phase 2.
+ * Auth endpoints (session-cookie auth, Phase 2).
+ *
+ * Authentication is the ambient httpOnly `sessionid` cookie; `http.ts` echoes
+ * `X-CSRFToken` from the `csrftoken` cookie on unsafe methods. Login still
+ * returns `{ token, user }` because the backend is in dual-mode and keeps
+ * minting DRF tokens for legacy clients — this client ignores `token`.
  */
 
 import { request } from './http'
@@ -24,6 +26,12 @@ export function logout(): Promise<{ message: string }> {
   return request<{ message: string }>('/auth/logout/', { method: 'POST' })
 }
 
-export function getCurrentUser(): Promise<User> {
-  return request<User>('/auth/user/')
+/**
+ * Admin bootstrap: returns the current user when the session cookie (or, in
+ * dual mode, a legacy token) authenticates the request; 401 otherwise. The
+ * backend decorates it with @ensure_csrf_cookie so the browser holds a
+ * `csrftoken` cookie before its first state-changing request.
+ */
+export function getSession(): Promise<User> {
+  return request<User>('/auth/session/')
 }

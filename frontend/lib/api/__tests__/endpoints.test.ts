@@ -251,10 +251,11 @@ describe('auth module', () => {
     expect(lastCall().init.method).toBe('POST')
   })
 
-  it('getCurrentUser GETs the current user', async () => {
+  it('getSession GETs the session bootstrap endpoint', async () => {
     const user = { id: 1, username: 'admin' }
     mockFetch.mockResolvedValueOnce(okJson(user))
-    await expect(auth.getCurrentUser()).resolves.toEqual(user)
-    expect(lastCall().url).toBe('/api/v1/auth/user/')
+    await expect(auth.getSession()).resolves.toEqual(user)
+    expect(lastCall().url).toBe('/api/v1/auth/session/')
+    expect(lastCall().init.method || 'GET').toBe('GET')
   })
 })

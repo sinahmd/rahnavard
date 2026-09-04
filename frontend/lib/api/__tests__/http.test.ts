@@ -114,8 +114,7 @@ describe('request error envelope', () => {
 })
 
 describe('request headers', () => {
-  it('attaches the stored token as an Authorization header', async () => {
-    localStorage.setItem('admin_token', 'secret-token')
+  it('never sends an Authorization header (session-cookie auth)', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -126,17 +125,18 @@ describe('request headers', () => {
 
     const [, init] = mockFetch.mock.calls[0]
     const headers = new Headers(init.headers)
-    expect(headers.get('Authorization')).toBe('Token secret-token')
+    expect(headers.get('Authorization')).toBeNull()
   })
 
-  it('does not attach Authorization when no token is stored', async () => {
+  it('ignores any legacy admin_token left in storage', async () => {
+    localStorage.setItem('admin_token', 'stale-token')
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ ok: true }),
     })
 
-    await request('/public-ok/')
+    await request('/admin/cars/')
 
     const [, init] = mockFetch.mock.calls[0]
     const headers = new Headers(init.headers)
@@ -234,8 +234,8 @@ describe('request status handling', () => {
     expect(data).toBeUndefined()
   })
 
-  it('clears the stored token and redirects on 401', async () => {
-    localStorage.setItem('admin_token', 'expired-token')
+  it('redirects to the admin login on 401 without touching storage', async () => {
+    const removeSpy = jest.spyOn(window.localStorage, 'removeItem')
     const assign = jest.fn()
     Object.defineProperty(window, 'location', {
       value: { pathname: '/admin/cars', assign },
@@ -250,9 +250,13 @@ describe('request status handling', () => {
 
     const error = await apiErrorOf(request('/admin/cars/'))
     expect(error.status).toBe(401)
-    expect(localStorage.getItem('admin_token')).toBeNull()
     expect(assign).toHaveBeenCalledWith('/admin/login')
+    // Session cookies are server-side state; 401 handling must not clear
+    // anything from localStorage (the one-time admin_token purge lives in
+    // AuthContext, not in the transport layer).
+    expect(removeSpy).not.toHaveBeenCalled()
 
+    removeSpy.mockRestore()
     Object.defineProperty(window, 'location', {
       value: { pathname: '/admin/cars' },
       configurable: true,
@@ -261,7 +265,6 @@ describe('request status handling', () => {
   })
 
   it('does not redirect when already on the login page', async () => {
-    localStorage.setItem('admin_token', 'expired-token')
     const assign = jest.fn()
     Object.defineProperty(window, 'location', {
       value: { pathname: '/admin/login', assign },
