@@ -1,36 +1,12 @@
 'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
-import { authFetch } from '@/lib/authFetch'
 import ImageUpload from '@/components/admin/ImageUpload'
+import { ApiRequestError } from '@/lib/api/http'
+import { getSiteSettings, updateSiteSettings } from '@/lib/api/settings'
+import type { SiteSettings } from '@/types/settings'
 
-interface SiteSettingsData {
-  site_name: string
-  site_description: string
-  logo: string | null
-  phone: string
-  address: string
-  instagram: string
-  telegram: string
-  whatsapp: string
-  hero_cta_primary_text: string
-  hero_cta_primary_link: string
-  hero_cta_secondary_text: string
-  hero_cta_secondary_link: string
-  why_title: string
-  why_description: string
-  cars_section_title: string
-  cars_section_description: string
-  articles_section_title: string
-  articles_section_description: string
-  branches_section_title: string
-  form_title: string
-  form_description: string
-  footer_description: string
-  footer_copyright: string
-}
-
-const defaultSettings: SiteSettingsData = {
+const defaultSettings: SiteSettings = {
   site_name: '',
   site_description: '',
   logo: null,
@@ -54,10 +30,11 @@ const defaultSettings: SiteSettingsData = {
   form_description: '',
   footer_description: '',
   footer_copyright: '',
+  default_og_image: null,
 }
 
 export default function AdminSettingsPage() {
-  const [settings, setSettings] = useState<SiteSettingsData>(defaultSettings)
+  const [settings, setSettings] = useState<SiteSettings>(defaultSettings)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -71,11 +48,8 @@ export default function AdminSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const response = await authFetch('/api/v1/admin/settings/')
-      if (response.ok) {
-        const data = await response.json()
-        setSettings(data)
-      }
+      const data = await getSiteSettings()
+      setSettings(data)
     } catch {
       setError('خطا در بارگذاری تنظیمات')
     } finally {
@@ -130,36 +104,23 @@ export default function AdminSettingsPage() {
     }
 
     try {
-      const response = await authFetch('/api/v1/admin/settings/', {
-        method: 'PATCH',
-        body: submitData,
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSettings(data)
-        setLogoFile(null)
-        setSuccess(true)
-        setTimeout(() => setSuccess(false), 3000)
-      } else {
-        const errorData = await response.json().catch(() => null)
-        if (errorData) {
-          const errors: Record<string, string> = {}
-          Object.entries(errorData).forEach(([key, val]) => {
-            if (Array.isArray(val) && val.length > 0) {
-              errors[key] = String(val[0])
-            }
-          })
-          if (Object.keys(errors).length > 0) {
-            setFieldErrors(errors)
-            setError('لطفاً خطاهای فرم را برطرف کنید.')
-          } else {
-            setError(errorData.detail || 'خطا در ذخیره‌سازی')
-          }
+      const data = await updateSiteSettings(submitData)
+      setSettings(data)
+      setLogoFile(null)
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        const errors = err.fieldErrors
+        if (Object.keys(errors).length > 0) {
+          setFieldErrors(errors)
+          setError('لطفاً خطاهای فرم را برطرف کنید.')
+        } else {
+          setError(err.message || 'خطا در ذخیره‌سازی')
         }
+      } else {
+        setError('خطا در اتصال به سرور')
       }
-    } catch {
-      setError('خطا در اتصال به سرور')
     } finally {
       setSaving(false)
     }

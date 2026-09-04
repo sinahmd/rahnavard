@@ -1,8 +1,10 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import AdminForm, { FormField } from '@/components/admin/AdminForm'
+import type { FormField } from '@/types/admin-form'
+import AdminForm from '@/components/admin/AdminForm'
 import LinkPicker from '@/components/admin/LinkPicker'
+import { getHeroSlide, saveHeroSlide } from '@/lib/api/heroSlides'
 
 const slideFields: FormField[] = [
   { name: 'title', label: 'عنوان', type: 'text', placeholder: 'عنوان اختیاری اسلاید', section: 'اطلاعات اسلاید' },
@@ -26,12 +28,12 @@ export default function EditHeroSlidePage() {
 
   return (
     <AdminForm
-      entityName="hero-slide"
       entityNamePersian="اسلاید هیرو"
-      apiBase="/api/v1/admin/hero-slides/"
       id={id}
       fields={slideFields}
       backUrl="/admin/hero-slides"
+      load={(slideId) => getHeroSlide(Number(slideId))}
+      save={(formData) => saveHeroSlide(formData, Number(id))}
     />
   )
 }

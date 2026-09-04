@@ -2,37 +2,30 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { authFetch } from '@/lib/authFetch'
-
-interface Car {
-  id: number
-  brand: string
-  model: string
-  persian_name: string
-  slug: string
-  year: number
-  is_active: boolean
-  is_featured: boolean
-  catalog_file: string | null
-}
+import type { CarAdmin } from '@/types/car'
+import {
+  deleteCar,
+  listCars,
+  setCarActive,
+  setCarFeatured,
+} from '@/lib/api/cars'
 
 export default function AdminCarsPage() {
-  const [cars, setCars] = useState<Car[]>([])
+  const [cars, setCars] = useState<CarAdmin[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch cars from API
     fetchCars()
   }, [])
 
   const fetchCars = async () => {
     try {
-      const response = await authFetch(`/api/v1/admin/cars/`)
-      if (response.ok) {
-        const data = await response.json()
-        setCars(data.results || data)
-      }
+      setError(null)
+      const data = await listCars()
+      setCars(data.results || [])
     } catch {
+      setError('خطا در بارگذاری خودروها')
     } finally {
       setLoading(false)
     }
@@ -40,43 +33,33 @@ export default function AdminCarsPage() {
 
   const toggleActive = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/v1/admin/cars/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: !currentStatus }),
-      })
-      if (response.ok) {
-        fetchCars()
-      }
+      setError(null)
+      await setCarActive(id, !currentStatus)
+      await fetchCars()
     } catch {
+      setError('خطا در ذخیره تغییرات')
     }
   }
 
   const toggleFeatured = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/v1/admin/cars/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_featured: !currentStatus }),
-      })
-      if (response.ok) {
-        fetchCars()
-      }
+      setError(null)
+      await setCarFeatured(id, !currentStatus)
+      await fetchCars()
     } catch {
+      setError('خطا در ذخیره تغییرات')
     }
   }
 
-  const deleteCar = async (id: number) => {
+  const deleteCarRow = async (id: number) => {
     if (!confirm('آیا از حذف این خودرو اطمینان دارید؟')) return
 
     try {
-      const response = await authFetch(`/api/v1/admin/cars/${id}/`, {
-        method: 'DELETE',
-      })
-      if (response.ok) {
-        fetchCars()
-      }
+      setError(null)
+      await deleteCar(id)
+      await fetchCars()
     } catch {
+      setError('خطا در حذف خودرو')
     }
   }
 
@@ -95,6 +78,12 @@ export default function AdminCarsPage() {
           + خودرو جدید
         </Link>
       </div>
+
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">
@@ -169,7 +158,7 @@ export default function AdminCarsPage() {
                       ویرایش
                     </Link>
                     <button
-                      onClick={() => deleteCar(car.id)}
+                      onClick={() => deleteCarRow(car.id)}
                       className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors"
                     >
                       حذف

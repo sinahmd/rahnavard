@@ -1,6 +1,8 @@
 'use client'
 
-import AdminForm, { FormField } from '@/components/admin/AdminForm'
+import type { FormField } from '@/types/admin-form'
+import AdminForm from '@/components/admin/AdminForm'
+import { saveArticle } from '@/lib/api/articles'
 
 const articleFields: FormField[] = [
   // Section: محتوا
@@ -23,11 +25,10 @@ const articleFields: FormField[] = [
 export default function NewArticlePage() {
   return (
     <AdminForm
-      entityName="article"
       entityNamePersian="مقاله"
-      apiBase="/api/v1/admin/articles/"
       fields={articleFields}
       backUrl="/admin/articles"
+      save={(formData) => saveArticle(formData)}
     />
   )
 }

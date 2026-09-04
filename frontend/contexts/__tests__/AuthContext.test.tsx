@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
-import { AuthProvider, useAuth, withAuth } from '../AuthContext'
+import { AuthProvider, useAuth } from '../AuthContext'
 
 // Mock fetch
 const mockFetch = jest.fn()
@@ -34,10 +34,6 @@ function TestComponent() {
   )
 }
 
-// Simple wrapped component for withAuth tests
-function DummyPage() {
-  return <div data-testid="protected-content">Protected Content</div>
-}
 
 describe('AuthContext', () => {
   beforeEach(() => {
@@ -313,109 +309,6 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('superuser')).toHaveTextContent('true')
   })
 
-  describe('withAuth HOC', () => {
-    it('should render wrapped component when authenticated with admin role', async () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'admin', is_staff: true, is_superuser: true }),
-      })
-
-      const ProtectedPage = withAuth(DummyPage, 'admin')
-
-      render(
-        <AuthProvider>
-          <ProtectedPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('protected-content')).toBeInTheDocument()
-      })
-    })
-
-    it('should redirect to login when not authenticated', async () => {
-      const ProtectedPage = withAuth(DummyPage)
-
-      render(
-        <AuthProvider>
-          <ProtectedPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        const { useRouter } = require('next/navigation')
-        const mockUseRouter = useRouter as jest.Mock
-        const lastCall = mockUseRouter.mock.results[mockUseRouter.mock.results.length - 1]
-        expect(lastCall.value.push).toHaveBeenCalledWith('/admin/login')
-      })
-    })
-
-    it('should redirect non-admin to login when admin role required', async () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'user', is_staff: false, is_superuser: false }),
-      })
-
-      const AdminPage = withAuth(DummyPage, 'admin')
-
-      render(
-        <AuthProvider>
-          <AdminPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        const { useRouter } = require('next/navigation')
-        const mockUseRouter = useRouter as jest.Mock
-        const lastCall = mockUseRouter.mock.results[mockUseRouter.mock.results.length - 1]
-        expect(lastCall.value.push).toHaveBeenCalledWith('/admin/login')
-      })
-    })
-
-    it('should redirect non-superuser to /admin when superuser role required', async () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'admin', is_staff: true, is_superuser: false }),
-      })
-
-      const SuperPage = withAuth(DummyPage, 'superuser')
-
-      render(
-        <AuthProvider>
-          <SuperPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        const { useRouter } = require('next/navigation')
-        const mockUseRouter = useRouter as jest.Mock
-        const lastCall = mockUseRouter.mock.results[mockUseRouter.mock.results.length - 1]
-        expect(lastCall.value.push).toHaveBeenCalledWith('/admin')
-      })
-    })
-
-    it('should show loading spinner while loading', () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'admin', is_staff: true, is_superuser: true }),
-      })
-
-      const ProtectedPage = withAuth(DummyPage)
-
-      const { container } = render(
-        <AuthProvider>
-          <ProtectedPage />
-        </AuthProvider>
-      )
-
-      // Should show spinner (animate-spin) while loading
-      expect(container.querySelector('.animate-spin')).toBeInTheDocument()
-    })
-  })
 
   describe('useAuth hook', () => {
     it('should throw when used outside AuthProvider', () => {

@@ -1,6 +1,8 @@
 'use client'
 
-import AdminForm, { FormField } from '@/components/admin/AdminForm'
+import type { FormField } from '@/types/admin-form'
+import AdminForm from '@/components/admin/AdminForm'
+import { saveFeature } from '@/lib/api/features'
 
 const featureFields: FormField[] = [
   { name: 'title', label: 'عنوان', type: 'text', required: true, placeholder: 'مثال: ضمانت رسمی', section: 'اطلاعات ویژگی' },
@@ -13,11 +15,10 @@ const featureFields: FormField[] = [
 export default function NewFeaturePage() {
   return (
     <AdminForm
-      entityName="feature"
       entityNamePersian="ویژگی"
-      apiBase="/api/v1/admin/features/"
       fields={featureFields}
       backUrl="/admin/features"
+      save={(formData) => saveFeature(formData)}
     />
   )
 }

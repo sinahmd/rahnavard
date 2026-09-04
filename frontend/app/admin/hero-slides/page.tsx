@@ -3,21 +3,17 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { authFetch } from '@/lib/authFetch'
-
-interface HeroSlide {
-  id: number
-  title: string
-  image: string
-  alt_text: string
-  link: string
-  is_active: boolean
-  display_order: number
-}
+import type { HeroSlide } from '@/types/heroSlide'
+import {
+  deleteHeroSlide,
+  listHeroSlides,
+  setHeroSlideActive,
+} from '@/lib/api/heroSlides'
 
 export default function AdminHeroSlidesPage() {
   const [slides, setSlides] = useState<HeroSlide[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchSlides()
@@ -25,12 +21,11 @@ export default function AdminHeroSlidesPage() {
 
   const fetchSlides = async () => {
     try {
-      const response = await authFetch('/api/v1/admin/hero-slides/')
-      if (response.ok) {
-        const data = await response.json()
-        setSlides(data.results || data || [])
-      }
+      setError(null)
+      const data = await listHeroSlides()
+      setSlides(data.results || [])
     } catch {
+      setError('خطا در بارگذاری اسلایدها')
     } finally {
       setLoading(false)
     }
@@ -38,22 +33,22 @@ export default function AdminHeroSlidesPage() {
 
   const toggleActive = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/v1/admin/hero-slides/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: !currentStatus }),
-      })
-      if (response.ok) fetchSlides()
+      setError(null)
+      await setHeroSlideActive(id, !currentStatus)
+      await fetchSlides()
     } catch {
+      setError('خطا در ذخیره تغییرات')
     }
   }
 
   const deleteSlide = async (id: number) => {
     if (!confirm('آیا از حذف این اسلاید اطمینان دارید؟')) return
     try {
-      const response = await authFetch(`/api/v1/admin/hero-slides/${id}/`, { method: 'DELETE' })
-      if (response.ok) fetchSlides()
+      setError(null)
+      await deleteHeroSlide(id)
+      await fetchSlides()
     } catch {
+      setError('خطا در حذف اسلاید')
     }
   }
 
@@ -70,6 +65,12 @@ export default function AdminHeroSlidesPage() {
           + اسلاید جدید
         </Link>
       </div>
+
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">

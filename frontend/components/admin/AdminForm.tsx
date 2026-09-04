@@ -3,33 +3,22 @@
 import { useState, useEffect, FormEvent, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { authFetch } from '@/lib/authFetch'
+import { ApiRequestError } from '@/lib/api/http'
 import ImageUpload from './ImageUpload'
 import FileUpload from './FileUpload'
 import GalleryUpload from './GalleryUpload'
+import type { FormField, FormFieldValue } from '@/types/admin-form'
 
-export interface FormField {
-  name: string
-  label: string
-  type: 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'file' | 'datetime-local' | 'url' | 'gallery' | 'custom'
-  required?: boolean
-  placeholder?: string
-  options?: { value: string; label: string }[]
-  section?: string
-  accept?: string
-  helpText?: string
-  defaultValue?: string | boolean
-  validate?: (value: string | boolean | File | null | File[]) => string | null
-  renderField?: (value: string, onChange: (val: string) => void) => React.ReactNode
-}
-
-interface AdminFormProps {
-  entityName: string
+interface AdminFormProps<TEntity extends object> {
   entityNamePersian: string
-  apiBase: string
+  /** Present in edit mode; also triggers `load` on mount. */
   id?: string
   fields: FormField[]
   backUrl: string
+  /** Edit-mode loader — resolves the record to seed the form. */
+  load?: (id: string) => Promise<TEntity>
+  /** Persist the serialized FormData (create vs update decided by `id`). */
+  save: (formData: FormData) => Promise<TEntity>
 }
 
 // Default validators for common field types
@@ -86,20 +75,20 @@ function getDefaultValidator(field: FormField): ((value: string | boolean | File
   }
 }
 
-export default function AdminForm({
-  entityName,
+export default function AdminForm<TEntity extends object = Record<string, unknown>>({
   entityNamePersian,
-  apiBase,
   id,
   fields,
   backUrl,
-}: AdminFormProps) {
+  load,
+  save,
+}: AdminFormProps<TEntity>) {
   const router = useRouter()
   const isEdit = !!id
 
-  const [formData, setFormData] = useState<Record<string, string | boolean | File | null | File[]>>(() => {
+  const [formData, setFormData] = useState<Record<string, FormFieldValue>>(() => {
     // Initialize with default values for new items
-    const initial: Record<string, string | boolean | File | null | File[]> = {}
+    const initial: Record<string, FormFieldValue> = {}
     if (!id) {
       fields.forEach((field) => {
         if (field.defaultValue !== undefined) {
@@ -129,47 +118,52 @@ export default function AdminForm({
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchItem = async () => {
+    if (!load) return
     try {
-      const response = await authFetch(`${apiBase}${id}/`)
-      if (response.ok) {
-        const data = await response.json()
-        const initial: Record<string, string | boolean | File | null | File[]> = {}
-        const images: Record<string, string> = {}
+      // Wire payload is unvalidated by design here; per-field reads below
+      // treat values as the FormFieldValue union the configs describe.
+      const data = (await load(id as string)) as unknown as Record<string, FormFieldValue>
+      const initial: Record<string, FormFieldValue> = {}
+      const images: Record<string, string> = {}
 
-        const fileNames: Record<string, string> = {}
-        const galleryUrls: Record<string, string[]> = {}
+      const fileNames: Record<string, string> = {}
+      const galleryUrls: Record<string, string[]> = {}
 
-        fields.forEach((field) => {
-          if (field.type === 'checkbox') {
-            initial[field.name] = !!data[field.name]
-          } else if (field.type === 'gallery') {
-            galleryUrls[field.name] = Array.isArray(data[field.name]) ? (data[field.name] as string[]) : []
-            initial[field.name] = []
-          } else if (field.type === 'file') {
-            if (data[field.name]) {
-              images[field.name] = data[field.name]
-              // Extract filename from URL for non-image files
-              const parts = data[field.name].split('/')
-              fileNames[field.name] = parts[parts.length - 1]
-            }
-            initial[field.name] = null
-          } else if (field.type === 'datetime-local' && data[field.name]) {
-            const dt = new Date(data[field.name])
-            initial[field.name] = dt.toISOString().slice(0, 16)
-          } else {
-            initial[field.name] = data[field.name] ?? ''
+      fields.forEach((field) => {
+        if (field.type === 'checkbox') {
+          initial[field.name] = !!data[field.name]
+        } else if (field.type === 'gallery') {
+          galleryUrls[field.name] = Array.isArray(data[field.name])
+            ? (data[field.name] as unknown as string[])
+            : []
+          initial[field.name] = []
+        } else if (field.type === 'file') {
+          if (data[field.name]) {
+            images[field.name] = String(data[field.name])
+            // Extract filename from URL for non-image files
+            const parts = String(data[field.name]).split('/')
+            fileNames[field.name] = parts[parts.length - 1]
           }
-        })
+          initial[field.name] = null
+        } else if (field.type === 'datetime-local' && data[field.name]) {
+          const dt = new Date(String(data[field.name]))
+          initial[field.name] = dt.toISOString().slice(0, 16)
+        } else {
+          initial[field.name] = data[field.name] ?? ''
+        }
+      })
 
-        setFormData(initial)
-        setExistingImages(images)
-        setExistingFileNames(fileNames)
-        setExistingGalleryUrls(galleryUrls)
-      } else {
-        setError('خطا در بارگذاری اطلاعات')
-      }
-    } catch {
-      setError('خطا در اتصال به سرور')
+      setFormData(initial)
+      setExistingImages(images)
+      setExistingFileNames(fileNames)
+      setExistingGalleryUrls(galleryUrls)
+    } catch (err) {
+      // Failed loads show the same generic message as before.
+      setError(
+        err instanceof ApiRequestError
+          ? 'خطا در بارگذاری اطلاعات'
+          : 'خطا در اتصال به سرور'
+      )
     } finally {
       setLoading(false)
     }
@@ -301,42 +295,23 @@ export default function AdminForm({
     })
 
     try {
-      const url = isEdit ? `${apiBase}${id}/` : apiBase
-      const method = isEdit ? 'PATCH' : 'POST'
-
-      const response = await authFetch(url, {
-        method,
-        body: submitData,
-      })
-
-      if (response.ok) {
-        router.push(backUrl)
-        router.refresh()
-      } else {
-        const errorData = await response.json().catch(() => null)
-        if (errorData && typeof errorData === 'object') {
-          // Handle field-level errors from backend
-          const errors: Record<string, string> = {}
-          Object.entries(errorData).forEach(([key, val]) => {
-            if (Array.isArray(val) && val.length > 0) {
-              errors[key] = String(val[0])
-            } else if (typeof val === 'string') {
-              errors[key] = val
-            }
-          })
-
-          if (Object.keys(errors).length > 0) {
-            setFieldErrors(errors)
-            setError('لطفاً خطاهای فرم را برطرف کنید.')
-          } else {
-            setError(errorData.detail || 'خطا در ذخیره‌سازی')
-          }
+      // Transport is fully delegated to the injected `save` (typed endpoint
+      // module); server field errors arrive normalized as ApiRequestError.
+      await save(submitData)
+      router.push(backUrl)
+      router.refresh()
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        const errors = err.fieldErrors
+        if (Object.keys(errors).length > 0) {
+          setFieldErrors(errors)
+          setError('لطفاً خطاهای فرم را برطرف کنید.')
         } else {
-          setError('خطا در ذخیره‌سازی')
+          setError(err.message || 'خطا در ذخیره‌سازی')
         }
+      } else {
+        setError('خطا در اتصال به سرور')
       }
-    } catch {
-      setError('خطا در اتصال به سرور')
     } finally {
       setSaving(false)
     }

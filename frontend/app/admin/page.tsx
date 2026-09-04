@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { authFetch } from '@/lib/authFetch'
+import { listCarsPublic } from '@/lib/api/cars'
+import { listArticlesPublic } from '@/lib/api/articles'
+import { listBranchesPublic } from '@/lib/api/branches'
+import { listInquiries } from '@/lib/api/inquiries'
+import type { Inquiry } from '@/types/inquiry'
 
 interface Stats {
   cars: number
@@ -10,43 +14,32 @@ interface Stats {
   branches: number
 }
 
-interface Inquiry {
-  id: number
-  name: string
-  phone: string
-  subject: string
-  created_at: string
-}
-
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats>({ cars: 0, articles: 0, inquiries: 0, branches: 0 })
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [carsRes, articlesRes, inquiriesRes, branchesRes] = await Promise.all([
-          authFetch('/api/v1/cars/'),
-          authFetch('/api/v1/articles/'),
-          authFetch('/api/v1/admin/inquiries/'),
-          authFetch('/api/v1/branches/'),
+        const [cars, articles, inquiriesData, branches] = await Promise.all([
+          listCarsPublic(),
+          listArticlesPublic(),
+          listInquiries(),
+          listBranchesPublic(),
         ])
 
-        const cars = carsRes.ok ? await carsRes.json() : { results: [] }
-        const articles = articlesRes.ok ? await articlesRes.json() : { results: [] }
-        const inquiriesData = inquiriesRes.ok ? await inquiriesRes.json() : { results: [] }
-        const branches = branchesRes.ok ? await branchesRes.json() : { results: [] }
-
         setStats({
-          cars: (cars.results || cars || []).length,
-          articles: (articles.results || articles || []).length,
-          inquiries: (inquiriesData.results || inquiriesData || []).length,
-          branches: (branches.results || branches || []).length,
+          cars: cars.results.length,
+          articles: articles.results.length,
+          inquiries: inquiriesData.results.length,
+          branches: branches.results.length,
         })
 
-        setInquiries((inquiriesData.results || inquiriesData || []).slice(0, 5))
+        setInquiries(inquiriesData.results.slice(0, 5))
       } catch {
+        setError('خطا در بارگذاری داشبورد')
       } finally {
         setLoading(false)
       }
@@ -77,6 +70,12 @@ export default function AdminDashboard() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">داشبورد</h1>
+
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {statsDisplay.map((stat, index) => (

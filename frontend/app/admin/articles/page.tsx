@@ -2,20 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { authFetch } from '@/lib/authFetch'
-
-interface Article {
-  id: number
-  title: string
-  slug: string
-  is_published: boolean
-  published_at: string
-  created_at: string
-}
+import type { ArticleAdmin } from '@/types/article'
+import {
+  deleteArticle,
+  listArticles,
+  setArticlePublished,
+} from '@/lib/api/articles'
 
 export default function AdminArticlesPage() {
-  const [articles, setArticles] = useState<Article[]>([])
+  const [articles, setArticles] = useState<ArticleAdmin[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchArticles()
@@ -23,12 +20,11 @@ export default function AdminArticlesPage() {
 
   const fetchArticles = async () => {
     try {
-      const response = await authFetch('/api/v1/admin/articles/')
-      if (response.ok) {
-        const data = await response.json()
-        setArticles(data.results || data || [])
-      }
+      setError(null)
+      const data = await listArticles()
+      setArticles(data.results || [])
     } catch {
+      setError('خطا در بارگذاری مقالات')
     } finally {
       setLoading(false)
     }
@@ -36,26 +32,26 @@ export default function AdminArticlesPage() {
 
   const togglePublished = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/v1/admin/articles/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_published: !currentStatus }),
-      })
-      if (response.ok) fetchArticles()
+      setError(null)
+      await setArticlePublished(id, !currentStatus)
+      await fetchArticles()
     } catch {
+      setError('خطا در ذخیره تغییرات')
     }
   }
 
-  const deleteArticle = async (id: number) => {
+  const deleteArticleRow = async (id: number) => {
     if (!confirm('آیا از حذف این مقاله اطمینان دارید؟')) return
     try {
-      const response = await authFetch(`/api/v1/admin/articles/${id}/`, { method: 'DELETE' })
-      if (response.ok) fetchArticles()
+      setError(null)
+      await deleteArticle(id)
+      await fetchArticles()
     } catch {
+      setError('خطا در حذف مقاله')
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'
     try {
       return new Date(dateString).toLocaleDateString('fa-IR')
@@ -74,6 +70,12 @@ export default function AdminArticlesPage() {
           + مقاله جدید
         </Link>
       </div>
+
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">
@@ -108,7 +110,7 @@ export default function AdminArticlesPage() {
                       <Link href={`/admin/articles/${article.id}/edit`} className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors">
                         ویرایش
                       </Link>
-                      <button onClick={() => deleteArticle(article.id)} className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors">
+                      <button onClick={() => deleteArticleRow(article.id)} className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors">
                         حذف
                       </button>
                     </div>

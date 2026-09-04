@@ -1,22 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { authFetch } from '@/lib/authFetch'
-
-interface Inquiry {
-  id: number
-  name: string
-  phone: string
-  subject: string
-  message: string
-  is_read: boolean
-  is_contacted: boolean
-  created_at: string
-}
+import type { Inquiry } from '@/types/inquiry'
+import { listInquiries, patchInquiryStatus } from '@/lib/api/inquiries'
 
 export default function AdminInquiriesPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchInquiries()
@@ -24,26 +15,23 @@ export default function AdminInquiriesPage() {
 
   const fetchInquiries = async () => {
     try {
-      const response = await authFetch('/api/v1/admin/inquiries/')
-      if (response.ok) {
-        const data = await response.json()
-        setInquiries(data.results || data || [])
-      }
+      setError(null)
+      const data = await listInquiries()
+      setInquiries(data.results || [])
     } catch {
+      setError('خطا در بارگذاری استعلامات')
     } finally {
       setLoading(false)
     }
   }
 
-  const updateStatus = async (id: number, field: string, value: boolean) => {
+  const updateStatus = async (id: number, field: 'is_read' | 'is_contacted', value: boolean) => {
     try {
-      const response = await authFetch(`/api/v1/admin/inquiries/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: value }),
-      })
-      if (response.ok) fetchInquiries()
+      setError(null)
+      await patchInquiryStatus(id, { [field]: value })
+      await fetchInquiries()
     } catch {
+      setError('خطا در ذخیره تغییرات')
     }
   }
 
@@ -61,6 +49,12 @@ export default function AdminInquiriesPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">مدیریت استعلامات</h1>
+
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">

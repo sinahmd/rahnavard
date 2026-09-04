@@ -3,20 +3,17 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { authFetch } from '@/lib/authFetch'
-
-interface WhyFeature {
-  id: number
-  title: string
-  description: string
-  icon: string
-  is_active: boolean
-  display_order: number
-}
+import type { WhyFeature } from '@/types/feature'
+import {
+  deleteFeature,
+  listFeatures,
+  setFeatureActive,
+} from '@/lib/api/features'
 
 export default function AdminFeaturesPage() {
   const [features, setFeatures] = useState<WhyFeature[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchFeatures()
@@ -24,12 +21,11 @@ export default function AdminFeaturesPage() {
 
   const fetchFeatures = async () => {
     try {
-      const response = await authFetch('/api/v1/admin/features/')
-      if (response.ok) {
-        const data = await response.json()
-        setFeatures(data.results || data || [])
-      }
+      setError(null)
+      const data = await listFeatures()
+      setFeatures(data.results || [])
     } catch {
+      setError('خطا در بارگذاری ویژگی‌ها')
     } finally {
       setLoading(false)
     }
@@ -37,22 +33,22 @@ export default function AdminFeaturesPage() {
 
   const toggleActive = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/v1/admin/features/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: !currentStatus }),
-      })
-      if (response.ok) fetchFeatures()
+      setError(null)
+      await setFeatureActive(id, !currentStatus)
+      await fetchFeatures()
     } catch {
+      setError('خطا در ذخیره تغییرات')
     }
   }
 
-  const deleteFeature = async (id: number) => {
+  const deleteFeatureRow = async (id: number) => {
     if (!confirm('آیا از حذف این ویژگی اطمینان دارید؟')) return
     try {
-      const response = await authFetch(`/api/v1/admin/features/${id}/`, { method: 'DELETE' })
-      if (response.ok) fetchFeatures()
+      setError(null)
+      await deleteFeature(id)
+      await fetchFeatures()
     } catch {
+      setError('خطا در حذف ویژگی')
     }
   }
 
@@ -69,6 +65,12 @@ export default function AdminFeaturesPage() {
           + ویژگی جدید
         </Link>
       </div>
+
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">
@@ -131,7 +133,7 @@ export default function AdminFeaturesPage() {
                         ویرایش
                       </Link>
                       <button
-                        onClick={() => deleteFeature(feature.id)}
+                        onClick={() => deleteFeatureRow(feature.id)}
                         className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors"
                       >
                         حذف

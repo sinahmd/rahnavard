@@ -1,7 +1,9 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import AdminForm, { FormField } from '@/components/admin/AdminForm'
+import type { FormField } from '@/types/admin-form'
+import AdminForm from '@/components/admin/AdminForm'
+import { getBranch, saveBranch } from '@/lib/api/branches'
 
 const branchFields: FormField[] = [
   // Section: اطلاعات شعبه
@@ -24,12 +26,12 @@ export default function EditBranchPage() {
 
   return (
     <AdminForm
-      entityName="branch"
       entityNamePersian="شعبه"
-      apiBase="/api/v1/admin/branches/"
       id={id}
       fields={branchFields}
       backUrl="/admin/branches"
+      load={(branchId) => getBranch(Number(branchId))}
+      save={(formData) => saveBranch(formData, Number(id))}
     />
   )
 }

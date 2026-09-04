@@ -1,7 +1,9 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import AdminForm, { FormField } from '@/components/admin/AdminForm'
+import type { FormField } from '@/types/admin-form'
+import AdminForm from '@/components/admin/AdminForm'
+import { getArticle, saveArticle } from '@/lib/api/articles'
 
 const articleFields: FormField[] = [
   // Section: محتوا
@@ -27,12 +29,12 @@ export default function EditArticlePage() {
 
   return (
     <AdminForm
-      entityName="article"
       entityNamePersian="مقاله"
-      apiBase="/api/v1/admin/articles/"
       id={id}
       fields={articleFields}
       backUrl="/admin/articles"
+      load={(articleId) => getArticle(Number(articleId))}
+      save={(formData) => saveArticle(formData, Number(id))}
     />
   )
 }

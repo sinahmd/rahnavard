@@ -1,6 +1,8 @@
 'use client'
 
-import AdminForm, { FormField } from '@/components/admin/AdminForm'
+import type { FormField } from '@/types/admin-form'
+import AdminForm from '@/components/admin/AdminForm'
+import { saveCar } from '@/lib/api/cars'
 
 const carFields: FormField[] = [
   // Section: اطلاعات اصلی
@@ -66,11 +68,10 @@ const carFields: FormField[] = [
 export default function NewCarPage() {
   return (
     <AdminForm
-      entityName="car"
       entityNamePersian="خودرو"
-      apiBase="/api/v1/admin/cars/"
       fields={carFields}
       backUrl="/admin/cars"
+      save={(formData) => saveCar(formData)}
     />
   )
 }

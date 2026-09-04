@@ -27,8 +27,12 @@ export default function LoginPage() {
     try {
       await login(username, password);
       router.push('/admin');
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+    } catch (err: unknown) {
+      // apiLogin throws ApiRequestError (a subclass of Error) for DRF error
+      // bodies; anything else (network failure) falls back to a generic
+      // message.
+      const message = err instanceof Error ? err.message : ''
+      setError(message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

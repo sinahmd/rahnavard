@@ -2,20 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { authFetch } from '@/lib/authFetch'
-
-interface Branch {
-  id: number
-  name: string
-  address: string
-  phone: string
-  is_active: boolean
-  display_order: number
-}
+import type { BranchAdmin } from '@/types/branch'
+import {
+  deleteBranch,
+  listBranches,
+  setBranchActive,
+} from '@/lib/api/branches'
 
 export default function AdminBranchesPage() {
-  const [branches, setBranches] = useState<Branch[]>([])
+  const [branches, setBranches] = useState<BranchAdmin[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchBranches()
@@ -23,12 +20,11 @@ export default function AdminBranchesPage() {
 
   const fetchBranches = async () => {
     try {
-      const response = await authFetch('/api/v1/admin/branches/')
-      if (response.ok) {
-        const data = await response.json()
-        setBranches(data.results || data || [])
-      }
+      setError(null)
+      const data = await listBranches()
+      setBranches(data.results || [])
     } catch {
+      setError('خطا در بارگذاری شعب')
     } finally {
       setLoading(false)
     }
@@ -36,22 +32,22 @@ export default function AdminBranchesPage() {
 
   const toggleActive = async (id: number, currentStatus: boolean) => {
     try {
-      const response = await authFetch(`/api/v1/admin/branches/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: !currentStatus }),
-      })
-      if (response.ok) fetchBranches()
+      setError(null)
+      await setBranchActive(id, !currentStatus)
+      await fetchBranches()
     } catch {
+      setError('خطا در ذخیره تغییرات')
     }
   }
 
-  const deleteBranch = async (id: number) => {
+  const deleteBranchRow = async (id: number) => {
     if (!confirm('آیا از حذف این شعبه اطمینان دارید؟')) return
     try {
-      const response = await authFetch(`/api/v1/admin/branches/${id}/`, { method: 'DELETE' })
-      if (response.ok) fetchBranches()
+      setError(null)
+      await deleteBranch(id)
+      await fetchBranches()
     } catch {
+      setError('خطا در حذف شعبه')
     }
   }
 
@@ -65,6 +61,12 @@ export default function AdminBranchesPage() {
           + شعبه جدید
         </Link>
       </div>
+
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full">
@@ -99,7 +101,7 @@ export default function AdminBranchesPage() {
                       <Link href={`/admin/branches/${branch.id}/edit`} className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors">
                         ویرایش
                       </Link>
-                      <button onClick={() => deleteBranch(branch.id)} className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors">
+                      <button onClick={() => deleteBranchRow(branch.id)} className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors">
                         حذف
                       </button>
                     </div>
