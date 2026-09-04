@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
+import type { SiteSettings } from '@/types/settings'
 
 function getQuickLinks(pathname: string) {
   const isHome = pathname === '/'
@@ -15,8 +15,7 @@ function getQuickLinks(pathname: string) {
   ]
 }
 
-export default function Footer() {
-  const settings = useSettings()
+export default function Footer({ settings }: { settings: SiteSettings }) {
   const pathname = usePathname()
   const quickLinks = getQuickLinks(pathname)
 

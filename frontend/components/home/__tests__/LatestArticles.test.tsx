@@ -1,13 +1,12 @@
 import '@testing-library/jest-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import LatestArticles from '../LatestArticles'
+import type { SiteSettings } from '@/types/settings'
 
-jest.mock('@/contexts/SettingsContext', () => ({
-  useSettings: jest.fn(() => ({
-    articles_section_title: 'مقاله و اطلاعیه',
-    articles_section_description: 'آخرین اخبار، اطلاعیه‌ها و راهنماهای خرید خودرو را دنبال کنید.',
-  })),
-}))
+const settings = {
+  articles_section_title: 'مقاله و اطلاعیه',
+  articles_section_description: 'آخرین اخبار، اطلاعیه‌ها و راهنماهای خرید خودرو را دنبال کنید.',
+} as SiteSettings
 
 const mockFetch = jest.fn()
 global.fetch = mockFetch
@@ -36,7 +35,7 @@ describe('LatestArticles', () => {
 
   it('should show loading state initially', () => {
     mockFetch.mockReturnValue(new Promise(() => {}))
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
     expect(screen.getByText('در حال بارگذاری...')).toBeInTheDocument()
   })
 
@@ -46,7 +45,7 @@ describe('LatestArticles', () => {
       json: async () => ({ results: mockArticles }),
     })
 
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument()
@@ -61,7 +60,7 @@ describe('LatestArticles', () => {
       json: async () => ({ results: mockArticles }),
     })
 
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('نکات مهم هنگام خرید خودرو')).toBeInTheDocument()
@@ -76,7 +75,7 @@ describe('LatestArticles', () => {
       json: async () => ({ results: mockArticles }),
     })
 
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument()
@@ -93,7 +92,7 @@ describe('LatestArticles', () => {
       json: async () => ({ results: [] }),
     })
 
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText(/مقاله‌ای یافت نشد/)).toBeInTheDocument()
@@ -114,7 +113,7 @@ describe('LatestArticles', () => {
       json: async () => ({ results: manyArticles }),
     })
 
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('مقاله 1')).toBeInTheDocument()
@@ -125,42 +124,32 @@ describe('LatestArticles', () => {
     expect(links).toHaveLength(3)
   })
 
-  it('should use custom section title from settings', async () => {
-    const { useSettings } = require('@/contexts/SettingsContext')
-    useSettings.mockReturnValueOnce({
-      articles_section_title: 'اخبار جدید',
-      articles_section_description: 'توضیحات سفارشی',
-    })
-
+  it('should use custom section title from settings prop', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ results: [] }),
     })
 
-    render(<LatestArticles />)
+    render(
+      <LatestArticles
+        settings={
+          {
+            articles_section_title: 'اخبار جدید',
+            articles_section_description: 'توضیحات سفارشی',
+          } as SiteSettings
+        }
+      />
+    )
 
     await waitFor(() => {
       expect(screen.getByText('اخبار جدید')).toBeInTheDocument()
     })
   })
 
-  it('should use default section title when settings unavailable', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: [] }),
-    })
-
-    render(<LatestArticles />)
-
-    await waitFor(() => {
-      expect(screen.getByText('مقاله و اطلاعیه')).toBeInTheDocument()
-    })
-  })
-
   it('should handle fetch error gracefully', async () => {
     mockFetch.mockRejectedValue(new Error('Network error'))
 
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
 
     await waitFor(() => {
       expect(screen.queryByText('در حال بارگذاری...')).not.toBeInTheDocument()
@@ -173,10 +162,10 @@ describe('LatestArticles', () => {
       json: async () => mockArticles, // Direct array
     })
 
-    render(<LatestArticles />)
+    render(<LatestArticles settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument()
     })
   })
-})
+})

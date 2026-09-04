@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
 import type { Branch } from '@/types/branch'
+import type { SiteSettings } from '@/types/settings'
 
-export default function Branches() {
+export default function Branches({ settings }: { settings: SiteSettings }) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
 

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import CarCard from '@/components/car/CarCard'
 import CarSearchBar from '@/components/car/CarSearchBar'
 import CarFilters, { FilterOptions, FilterState } from '@/components/car/CarFilters'
@@ -235,7 +233,6 @@ export default function CarsPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-28 pb-20">
         <div className="wrap">
           {/* Page Header */}
@@ -429,7 +426,6 @@ export default function CarsPage() {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   )
 }

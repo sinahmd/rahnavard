@@ -1,7 +1,5 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import JsonLd from '@/components/seo/JsonLd'
 import Tabs from '@/components/ui/Tabs'
 import RelatedCarsSlider from '@/components/car/RelatedCarsSlider'
@@ -144,24 +142,20 @@ export default async function CarDetailPage({ params }: Props) {
 
   if (!car) {
     return (
-      <>
-        <Header />
-        <main className="pt-32 pb-20">
-          <div className="wrap text-center">
-            <div className="w-24 h-24 mx-auto mb-6 bg-gray-light rounded-full flex items-center justify-center">
-              <svg className="w-12 h-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-bold mb-4">خودرو یافت نشد</h1>
-            <p className="text-gray mb-8 text-lg">متأسفانه خودروی مورد نظر شما یافت نشد.</p>
-            <Link href="/cars" className="btn btn-primary">
-              بازگشت به لیست خودروها
-            </Link>
+      <main className="pt-32 pb-20">
+        <div className="wrap text-center">
+          <div className="w-24 h-24 mx-auto mb-6 bg-gray-light rounded-full flex items-center justify-center">
+            <svg className="w-12 h-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
           </div>
-        </main>
-        <Footer />
-      </>
+          <h1 className="text-3xl font-bold mb-4">خودرو یافت نشد</h1>
+          <p className="text-gray mb-8 text-lg">متأسفانه خودروی مورد نظر شما یافت نشد.</p>
+          <Link href="/cars" className="btn btn-primary">
+            بازگشت به لیست خودروها
+          </Link>
+        </div>
+      </main>
     )
   }
 
@@ -187,7 +181,6 @@ export default async function CarDetailPage({ params }: Props) {
           modelDate: car.year.toString(),
         }}
       />
-      <Header />
       <main className="pt-28 pb-20">
         <div className="wrap">
           {/* Breadcrumb */}
@@ -309,7 +302,6 @@ export default async function CarDetailPage({ params }: Props) {
           <RelatedCarsSlider currentSlug={car.slug} />
         </div>
       </main>
-      <Footer />
     </>
   )
 }

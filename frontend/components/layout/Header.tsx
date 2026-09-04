@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import MobileNav from './MobileNav'
-import { useSettings } from '@/contexts/SettingsContext'
+import type { SiteSettings } from '@/types/settings'
 
 function getNavLinks(pathname: string) {
   const isHome = pathname === '/'
@@ -19,10 +19,9 @@ function getNavLinks(pathname: string) {
   ]
 }
 
-export default function Header() {
+export default function Header({ settings }: { settings: SiteSettings }) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const settings = useSettings()
   const pathname = usePathname()
   const navLinks = getNavLinks(pathname)
   const isHome = pathname === '/'

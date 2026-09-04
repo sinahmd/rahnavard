@@ -1,11 +1,6 @@
-import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
-
 export default function ArticlesLoading() {
   return (
-    <>
-      <Header />
-      <main className="pt-28 pb-20">
+    <main className="pt-28 pb-20">
         <div className="wrap">
           {/* Page Header */}
           <div className="mb-8">
@@ -37,7 +32,5 @@ export default function ArticlesLoading() {
           </div>
         </div>
       </main>
-      <Footer />
-    </>
   )
 }

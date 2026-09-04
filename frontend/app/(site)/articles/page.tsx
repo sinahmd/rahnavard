@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 
 import Pagination from '@/components/ui/Pagination'
@@ -138,7 +136,6 @@ export default function ArticlesPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-28 pb-20">
         <div className="wrap">
           {/* Page Header */}
@@ -309,7 +306,6 @@ export default function ArticlesPage() {
           )}
         </div>
       </main>
-      <Footer />
     </>
   )
 }

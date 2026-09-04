@@ -1,9 +1,21 @@
-'use client'
+/**
+ * Server-only settings data layer.
+ *
+ * `getSiteSettings()` is called from app/(site)/layout.tsx and the home
+ * page; Next fetch dedupe collapses repeated calls in one request into a
+ * single backend hit. The payload is merged over Persian defaults so the
+ * public site always renders even if the endpoint is down (matching the
+ * old SettingsContext behavior — settings must never take down the site).
+ *
+ * Server-only: reads `BACKEND_INTERNAL_URL` via lib/data/media.ts; never
+ * runs in the browser and never touches cookies/localStorage.
+ */
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import type { SiteSettings } from '@/types/settings'
+import { normalizeMediaUrls } from './media'
+import { fetchDataJson } from './request'
 
-const defaults: SiteSettings = {
+export const DEFAULT_SETTINGS: SiteSettings = {
   site_name: 'راهنورد خودرو',
   site_description: '',
   logo: null,
@@ -30,27 +42,18 @@ const defaults: SiteSettings = {
   default_og_image: null,
 }
 
-const SettingsContext = createContext<SiteSettings>(defaults)
+const REVALIDATE_SECONDS = 60
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<SiteSettings>(defaults)
-
-  useEffect(() => {
-    fetch('/api/v1/settings/')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) setSettings((prev) => ({ ...prev, ...data }))
-      })
-      .catch(() => {})
-  }, [])
-
-  return (
-    <SettingsContext.Provider value={settings}>
-      {children}
-    </SettingsContext.Provider>
-  )
-}
-
-export function useSettings() {
-  return useContext(SettingsContext)
+/**
+ * Fetch site settings over BACKEND_INTERNAL_URL with ISR-style
+ * revalidation. Never throws: on any failure the Persian defaults are
+ * returned so the public site still renders.
+ */
+export async function getSiteSettings(): Promise<SiteSettings> {
+  const data = await fetchDataJson<Record<string, unknown>>('/api/v1/settings/', {
+    revalidate: REVALIDATE_SECONDS,
+  })
+  if (data === null) return DEFAULT_SETTINGS
+  const normalized = normalizeMediaUrls(data, ['logo', 'default_og_image'])
+  return { ...DEFAULT_SETTINGS, ...(normalized as Partial<SiteSettings>) }
 }

@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
 import type { WhyFeature } from '@/types/feature'
+import type { SiteSettings } from '@/types/settings'
 
-export default function WhyRahnavard() {
+export default function WhyRahnavard({ settings }: { settings: SiteSettings }) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
   const [features, setFeatures] = useState<WhyFeature[]>([])
   const [loading, setLoading] = useState(true)
 

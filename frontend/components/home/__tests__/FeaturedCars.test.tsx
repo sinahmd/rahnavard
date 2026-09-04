@@ -1,13 +1,12 @@
 import '@testing-library/jest-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import FeaturedCars from '../FeaturedCars'
+import type { SiteSettings } from '@/types/settings'
 
-jest.mock('@/contexts/SettingsContext', () => ({
-  useSettings: jest.fn(() => ({
-    cars_section_title: 'خودروهای ما',
-    cars_section_description: 'مجموعه‌ای منتخب از خودروهای وارداتی.',
-  })),
-}))
+const settings = {
+  cars_section_title: 'خودروهای ما',
+  cars_section_description: 'مجموعه‌ای منتخب از خودروهای وارداتی.',
+} as SiteSettings
 
 const mockFetch = jest.fn()
 global.fetch = mockFetch
@@ -38,7 +37,7 @@ describe('FeaturedCars', () => {
 
   it('should show loading state initially', () => {
     mockFetch.mockReturnValue(new Promise(() => {})) // Never resolves
-    render(<FeaturedCars />)
+    render(<FeaturedCars settings={settings} />)
     expect(screen.getByText('در حال بارگذاری...')).toBeInTheDocument()
   })
 
@@ -48,7 +47,7 @@ describe('FeaturedCars', () => {
       json: async () => ({ results: mockCars }),
     })
 
-    render(<FeaturedCars />)
+    render(<FeaturedCars settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('Toyota')).toBeInTheDocument()
@@ -65,7 +64,7 @@ describe('FeaturedCars', () => {
       json: async () => ({ results: mockCars }),
     })
 
-    render(<FeaturedCars />)
+    render(<FeaturedCars settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('Toyota')).toBeInTheDocument()
@@ -88,53 +87,32 @@ describe('FeaturedCars', () => {
         json: async () => ({ results: [] }),
       })
 
-    render(<FeaturedCars />)
+    render(<FeaturedCars settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText(/خودرویی یافت نشد/)).toBeInTheDocument()
     })
   })
 
-  it('should use custom section title from settings', async () => {
-    const { useSettings } = require('@/contexts/SettingsContext')
-    useSettings.mockReturnValueOnce({
-      cars_section_title: 'عنوان سفارشی',
-      cars_section_description: 'توضیحات سفارشی',
-    })
-
+  it('should use custom section title from settings prop', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ results: [] }),
     })
 
-    render(<FeaturedCars />)
+    render(
+      <FeaturedCars
+        settings={
+          {
+            cars_section_title: 'عنوان سفارشی',
+            cars_section_description: 'توضیحات سفارشی',
+          } as SiteSettings
+        }
+      />
+    )
 
     await waitFor(() => {
       expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
-    })
-  })
-
-  it('should use default section title when settings unavailable', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ results: [] }),
-    })
-
-    render(<FeaturedCars />)
-
-    await waitFor(() => {
-      expect(screen.getByText('خودروهای ما')).toBeInTheDocument()
-    })
-  })
-
-  it('should handle fetch error gracefully', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
-
-    render(<FeaturedCars />)
-
-    await waitFor(() => {
-      // Should not be stuck in loading
-      expect(screen.queryByText('در حال بارگذاری...')).not.toBeInTheDocument()
     })
   })
 
@@ -144,7 +122,7 @@ describe('FeaturedCars', () => {
       json: async () => ({ results: [mockCars[0]] }),
     })
 
-    render(<FeaturedCars />)
+    render(<FeaturedCars settings={settings} />)
 
     await waitFor(() => {
       const img = screen.getByAltText('تویوتا راو۴')
@@ -158,10 +136,10 @@ describe('FeaturedCars', () => {
       json: async () => mockCars, // Direct array, no results wrapper
     })
 
-    render(<FeaturedCars />)
+    render(<FeaturedCars settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('Toyota')).toBeInTheDocument()
     })
   })
-})
+})

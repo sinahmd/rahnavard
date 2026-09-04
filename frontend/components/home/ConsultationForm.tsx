@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
-import { useSettings } from '@/contexts/SettingsContext'
+import type { SiteSettings } from '@/types/settings'
 
 
-export default function ConsultationForm() {
-  const settings = useSettings()
+export default function ConsultationForm({ settings }: { settings: SiteSettings }) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',

@@ -1,11 +1,19 @@
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { getSiteSettings } from '@/lib/data/settings'
 
-export default function NotFound() {
+/**
+ * Root not-found — lives outside the (site) route group (it serves
+ * unmatched URLs and bubbled notFound() calls), so it fetches settings
+ * itself and renders the same chrome as public pages.
+ */
+export default async function NotFound() {
+  const settings = await getSiteSettings()
+
   return (
     <>
-      <Header />
+      <Header settings={settings} />
       <main className="pt-32 pb-20 min-h-screen flex items-center justify-center">
         <div className="wrap text-center">
           <h1 className="text-6xl font-bold mb-4">۴۰۴</h1>
@@ -18,7 +26,7 @@ export default function NotFound() {
           </Link>
         </div>
       </main>
-      <Footer />
+      <Footer settings={settings} />
     </>
   )
 }

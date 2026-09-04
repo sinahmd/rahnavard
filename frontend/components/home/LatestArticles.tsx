@@ -3,12 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
 import type { ArticleListItem } from '@/types/article'
+import type { SiteSettings } from '@/types/settings'
 
-export default function LatestArticles() {
+export default function LatestArticles({ settings }: { settings: SiteSettings }) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
   const [articles, setArticles] = useState<ArticleListItem[]>([])
   const [loading, setLoading] = useState(true)
 

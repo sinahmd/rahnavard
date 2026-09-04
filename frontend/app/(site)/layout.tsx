@@ -1,17 +1,25 @@
-'use client'
-
-import { SettingsProvider } from '@/contexts/SettingsContext'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
+import { getSiteSettings } from '@/lib/data/settings'
 
 /**
- * Public (site) layout. Interim phase-3 step: SettingsProvider moves here
- * from the root layout so root stays minimal. The next commit replaces this
- * client provider with a server-side settings fetch (lib/data/settings.ts)
- * rendering Header/Footer with props.
+ * Public (site) layout — server component (Phase 3). Fetches site settings
+ * once per request (Next fetch dedupe + revalidate: 60) and renders the
+ * Header/Footer chrome with them, so every public page ships its settings
+ * in the initial HTML instead of a client fetch + defaults flash.
  */
-export default function SiteLayout({
+export default async function SiteLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return <SettingsProvider>{children}</SettingsProvider>
+  const settings = await getSiteSettings()
+
+  return (
+    <>
+      <Header settings={settings} />
+      {children}
+      <Footer settings={settings} />
+    </>
+  )
 }

@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import Header from '../Header'
+import type { SiteSettings } from '@/types/settings'
+
+const settings = { logo: null, site_name: 'Test' } as SiteSettings
 
 // Mock MobileNav
 jest.mock('../MobileNav', () => {
@@ -29,14 +32,6 @@ describe('Header', () => {
   beforeEach(() => {
     // Reset scroll position
     Object.defineProperty(window, 'scrollY', { value: 0, writable: true })
-
-    // Mock fetch for settings API
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ logo: null, site_name: 'Test' }),
-      })
-    ) as jest.Mock
   })
 
   afterEach(() => {
@@ -44,14 +39,14 @@ describe('Header', () => {
   })
 
   it('should render the logo or brand name', () => {
-    render(<Header />)
-    // When API returns no logo, shows text fallback
+    render(<Header settings={settings} />)
+    // When no logo, shows text fallback
     const brandText = screen.getByText('راهنورد')
     expect(brandText).toBeInTheDocument()
   })
 
   it('should render all navigation links', () => {
-    render(<Header />)
+    render(<Header settings={settings} />)
     // Links appear in both desktop nav and mocked MobileNav, so use getAllByText
     expect(screen.getAllByText('خانه').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('درباره ما').length).toBeGreaterThanOrEqual(1)
@@ -62,13 +57,13 @@ describe('Header', () => {
   })
 
   it('should render mobile menu toggle button', () => {
-    render(<Header />)
+    render(<Header settings={settings} />)
     const button = screen.getByRole('button', { name: /باز کردن منو/ })
     expect(button).toBeInTheDocument()
   })
 
   it('should toggle mobile menu on button click', () => {
-    render(<Header />)
+    render(<Header settings={settings} />)
     const button = screen.getByRole('button', { name: /باز کردن منو/ })
 
     act(() => {
@@ -81,13 +76,13 @@ describe('Header', () => {
   })
 
   it('should pass nav links to MobileNav', () => {
-    render(<Header />)
+    render(<Header settings={settings} />)
     const mobileNav = screen.getByTestId('mobile-nav')
     expect(mobileNav).toBeInTheDocument()
   })
 
   it('should add scrolled class when window is scrolled', () => {
-    const { container } = render(<Header />)
+    const { container } = render(<Header settings={settings} />)
     const header = container.querySelector('header')!
 
     act(() => {
@@ -99,7 +94,7 @@ describe('Header', () => {
   })
 
   it('should not have scrolled class initially', () => {
-    const { container } = render(<Header />)
+    const { container } = render(<Header settings={settings} />)
     const header = container.querySelector('header')!
     expect(header.className).toContain('bg-transparent')
   })

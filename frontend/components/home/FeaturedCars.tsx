@@ -3,12 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
 import type { CarListItem } from '@/types/car'
+import type { SiteSettings } from '@/types/settings'
 
-export default function FeaturedCars() {
+export default function FeaturedCars({ settings }: { settings: SiteSettings }) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
   const [cars, setCars] = useState<CarListItem[]>([])
   const [loading, setLoading] = useState(true)
 

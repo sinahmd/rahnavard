@@ -1,8 +1,6 @@
 import { Metadata } from 'next'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import Link from 'next/link'
-import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import JsonLd from '@/components/seo/JsonLd'
 import type { ArticleDetail } from '@/types/article'
 import { normalizeMediaUrls } from '@/lib/data/media'
@@ -78,19 +76,15 @@ export default async function ArticleDetailPage({ params }: Props) {
 
   if (!article) {
     return (
-      <>
-        <Header />
-        <main className="pt-32 pb-20">
-          <div className="wrap text-center">
-            <h1 className="text-3xl font-bold mb-4">مقاله یافت نشد</h1>
-            <p className="text-gray mb-8">متأسفانه مقاله مورد نظر شما یافت نشد.</p>
-            <Link href="/articles" className="btn btn-primary">
-              بازگشت به لیست مقالات
-            </Link>
-          </div>
-        </main>
-        <Footer />
-      </>
+      <main className="pt-32 pb-20">
+        <div className="wrap text-center">
+          <h1 className="text-3xl font-bold mb-4">مقاله یافت نشد</h1>
+          <p className="text-gray mb-8">متأسفانه مقاله مورد نظر شما یافت نشد.</p>
+          <Link href="/articles" className="btn btn-primary">
+            بازگشت به لیست مقالات
+          </Link>
+        </div>
+      </main>
     )
   }
 
@@ -114,7 +108,6 @@ export default async function ArticleDetailPage({ params }: Props) {
           },
         }}
       />
-      <Header />
       <main className="pt-32 pb-20">
         <div className="wrap max-w-[800px] mx-auto">
           {/* Breadcrumb */}
@@ -193,7 +186,6 @@ export default async function ArticleDetailPage({ params }: Props) {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   )
 }
