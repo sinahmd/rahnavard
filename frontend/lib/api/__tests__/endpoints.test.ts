@@ -12,6 +12,7 @@ import * as features from '../features'
 import * as heroSlides from '../heroSlides'
 import * as inquiries from '../inquiries'
 import * as settings from '../settings'
+import * as stats from '../stats'
 
 const mockFetch = jest.fn()
 
@@ -61,20 +62,34 @@ describe('cars module', () => {
     expect(lastCall().url).toBe('/api/v1/admin/cars/7/')
   })
 
-  it('saveCar without id POSTs, with id PATCHes FormData', async () => {
-    const fd = new FormData()
-    fd.append('brand', 'Toyota')
+  it('saveCar without id POSTs, with id PATCHes serialized values', async () => {
+    const values = { brand: 'Toyota', model: 'RAV4' }
 
     mockFetch.mockResolvedValueOnce(okJson(car))
-    await cars.saveCar(fd)
+    await cars.saveCar(values)
     expect(lastCall().init.method).toBe('POST')
     expect(lastCall().url).toBe('/api/v1/admin/cars/')
+    expect(lastCall().init.body).toBeInstanceOf(FormData)
 
     mockFetch.mockResolvedValueOnce(okJson(car))
-    await cars.saveCar(fd, 3)
+    await cars.saveCar(values, 3)
     expect(lastCall().init.method).toBe('PATCH')
     expect(lastCall().url).toBe('/api/v1/admin/cars/3/')
-    expect(lastCall().init.body).toBe(fd)
+    expect(lastCall().init.body).toBeInstanceOf(FormData)
+  })
+
+  it('serializes gallery File[] values as gallery_0..N multipart keys', async () => {
+    const fileA = new File(['a'], 'a.jpg', { type: 'image/jpeg' })
+    const fileB = new File(['b'], 'b.jpg', { type: 'image/jpeg' })
+
+    mockFetch.mockResolvedValueOnce(okJson(car))
+    await cars.saveCar({ brand: 'Toyota', gallery: [fileA, fileB] })
+
+    const body = lastCall().init.body as FormData
+    expect(body.get('brand')).toBe('Toyota')
+    expect(body.get('gallery_0')).toBe(fileA)
+    expect(body.get('gallery_1')).toBe(fileB)
+    expect(body.has('gallery')).toBe(false)
   })
 
   it('flag toggles PATCH JSON subsets', async () => {
@@ -109,14 +124,16 @@ describe('articles module', () => {
 
     const fd = new FormData()
     mockFetch.mockResolvedValueOnce(okJson(row))
-    await articles.saveArticle(fd, 2)
+    await articles.saveArticle({ title: 't', content: 'c' }, 2)
     expect(lastCall().url).toBe('/api/v1/admin/articles/2/')
     expect(lastCall().init.method).toBe('PATCH')
+    expect(lastCall().init.body).toBeInstanceOf(FormData)
 
     mockFetch.mockResolvedValueOnce(okJson(row))
-    await articles.saveArticle(fd)
+    await articles.saveArticle({ title: 't', content: 'c' })
     expect(lastCall().url).toBe('/api/v1/admin/articles/')
     expect(lastCall().init.method).toBe('POST')
+    expect(lastCall().init.body).toBeInstanceOf(FormData)
 
     mockFetch.mockResolvedValueOnce(okJson(row))
     await articles.setArticlePublished(2, true)
@@ -146,10 +163,10 @@ describe('branches module', () => {
     await branches.getBranch(1)
     expect(lastCall().url).toBe('/api/v1/admin/branches/1/')
 
-    const fd = new FormData()
     mockFetch.mockResolvedValueOnce(okJson(row))
-    await branches.saveBranch(fd)
+    await branches.saveBranch({ name: 'b' })
     expect(lastCall().init.method).toBe('POST')
+    expect(lastCall().init.body).toBeInstanceOf(FormData)
 
     mockFetch.mockResolvedValueOnce(okJson(row))
     await branches.setBranchActive(1, true)
@@ -189,15 +206,16 @@ describe('heroSlides / features modules', () => {
     await features.listFeatures()
     expect(lastCall().url).toBe('/api/v1/admin/features/')
 
-    const fd = new FormData()
     mockFetch.mockResolvedValueOnce(okJson({ id: 2 }))
-    await features.saveFeature(fd, 2)
+    await features.saveFeature({ title: 'x' }, 2)
     expect(lastCall().url).toBe('/api/v1/admin/features/2/')
     expect(lastCall().init.method).toBe('PATCH')
+    expect(lastCall().init.body).toBeInstanceOf(FormData)
 
     mockFetch.mockResolvedValueOnce(okJson({ id: 2 }))
-    await features.saveFeature(fd)
+    await features.saveFeature({ title: 'x' })
     expect(lastCall().init.method).toBe('POST')
+    expect(lastCall().init.body).toBeInstanceOf(FormData)
 
     mockFetch.mockResolvedValueOnce(okJson({ id: 2 }))
     await features.setFeatureActive(2, true)
@@ -227,6 +245,16 @@ describe('inquiries / settings modules', () => {
     expect(lastCall().url).toBe('/api/v1/admin/settings/')
     expect(lastCall().init.method).toBe('PATCH')
     expect(lastCall().init.body).toBe(fd)
+  })
+})
+
+describe('stats module', () => {
+  it('getAdminStats GETs the dashboard aggregate endpoint', async () => {
+    const counts = { cars: 3, articles: 4, branches: 2, inquiries: 11 }
+    mockFetch.mockResolvedValueOnce(okJson(counts))
+    await expect(stats.getAdminStats()).resolves.toEqual(counts)
+    expect(lastCall().url).toBe('/api/v1/admin/stats/')
+    expect(lastCall().init.method || 'GET').toBe('GET')
   })
 })
 
