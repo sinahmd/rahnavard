@@ -1,6 +1,8 @@
+import os
 import struct
 import zlib
 import pytest
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
@@ -824,3 +826,128 @@ class TestCarEdgeCases:
         response = api_client.get('/api/v1/cars/?search=آزمایشی')
         assert response.status_code == 200
         assert response.data['count'] == 1
+
+
+@pytest.mark.django_db
+class TestCarAdminGalleryAndPagination:
+    """Tests for the admin gallery_0..N upload convention and list pagination.
+
+    These pin the wire contract the frontend form split relies on: multipart
+    gallery files arrive as gallery_0..N (see frontend/lib/api/formData.ts),
+    edits preserve existing gallery URLs, catalog uploads work through the
+    admin API, and the paginated admin list exposes the page_size envelope
+    key while 404-ing out-of-range pages (the frontend AdminListPage falls
+    back to the previous page on that 404).
+    """
+
+    def _car_data(self, slug):
+        return {
+            'brand': 'Toyota',
+            'model': 'RAV4',
+            'persian_name': 'تویوتا راو۴',
+            'slug': slug,
+            'year': 2025,
+            'fuel_type': 'gasoline',
+            'transmission': 'automatic',
+            'is_active': True,
+            'main_image': SimpleUploadedFile('main.png', _make_tiny_png(), 'image/png'),
+        }
+
+    def _gallery_files(self, count):
+        return {
+            f'gallery_{i}': SimpleUploadedFile(f'g{i}.png', _make_tiny_png(), 'image/png')
+            for i in range(count)
+        }
+
+    @staticmethod
+    def _cleanup_media(paths):
+        for path in paths:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_admin_create_with_gallery_files(self, admin_client):
+        """gallery_0..N multipart keys are stored as a gallery URL list on disk."""
+        data = self._car_data('gallery-create')
+        data.update(self._gallery_files(2))
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+
+        car = Car.objects.get(slug='gallery-create')
+        assert len(car.gallery) == 2
+        created = []
+        for url in car.gallery:
+            relative = url.replace(settings.MEDIA_URL, '')
+            path = os.path.join(settings.MEDIA_ROOT, relative)
+            assert os.path.exists(path)
+            created.append(path)
+        self._cleanup_media(created)
+
+    def test_admin_update_preserves_existing_gallery_and_appends(self, admin_client, sample_car):
+        """A PATCH with new gallery files keeps existing URLs and appends."""
+        sample_car.gallery = [f'{settings.MEDIA_URL}cars/gallery/existing.jpg']
+        sample_car.save()
+
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {**self._gallery_files(1)},
+            format='multipart',
+        )
+        assert response.status_code == 200
+
+        sample_car.refresh_from_db()
+        assert sample_car.gallery[0].endswith('existing.jpg')
+        assert len(sample_car.gallery) == 2
+
+        created = []
+        for url in sample_car.gallery:
+            relative = url.replace(settings.MEDIA_URL, '')
+            path = os.path.join(settings.MEDIA_ROOT, relative)
+            if url != f'{settings.MEDIA_URL}cars/gallery/existing.jpg':
+                created.append(path)
+        self._cleanup_media(created)
+
+    def test_admin_create_with_catalog_file(self, admin_client):
+        """catalog_file uploads through the admin multipart API."""
+        data = self._car_data('catalog-create')
+        data['catalog_file'] = SimpleUploadedFile(
+            'catalog.pdf', b'%PDF-1.4\n%', 'application/pdf'
+        )
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+        assert response.data['catalog_file'].endswith('.pdf')
+
+        car = Car.objects.get(slug='catalog-create')
+        path = os.path.join(settings.MEDIA_ROOT, car.catalog_file.name)
+        assert os.path.exists(path)
+        self._cleanup_media([path])
+
+    @staticmethod
+    def _make_cars(count):
+        for i in range(count):
+            Car.objects.create(
+                brand='Toyota',
+                model='RAV4',
+                persian_name=f'خودرو {i}',
+                slug=f'page-car-{i}',
+                year=2025,
+                fuel_type='gasoline',
+                transmission='automatic',
+                is_active=True,
+                main_image='cars/page.jpg',
+            )
+
+    def test_admin_list_pagination_second_page(self, admin_client):
+        """25 cars paginate: page 2 holds the remainder and the envelope
+        carries page_size so the frontend can derive total pages."""
+        self._make_cars(25)
+        response = admin_client.get('/api/v1/admin/cars/', {'page': 2})
+        assert response.status_code == 200
+        assert response.data['count'] == 25
+        assert response.data['page_size'] == 20
+        assert len(response.data['results']) == 5
+
+    def test_admin_list_out_of_range_page_returns_404(self, admin_client):
+        """An out-of-range page 404s (the frontend falls back a page on this)."""
+        self._make_cars(25)
+        response = admin_client.get('/api/v1/admin/cars/', {'page': 999})
+        assert response.status_code == 404
