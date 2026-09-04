@@ -1,6 +1,7 @@
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status, permissions
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
@@ -51,22 +52,34 @@ def login_view(request):
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
     """
-    Log out through every active mechanism.
+    Log out through the authenticator that actually authenticated the request
+    (read from `request.successful_authenticator` — never inferred from
+    whether a token happens to exist).
 
-    - Session-authenticated (new client): `logout()` flushes the Django session
-      (CSRF applies here — the client sends `X-CSRFToken`).
-    - Token-authenticated (legacy client): the user's DRF token is deleted
-      server-side (existing behavior; token auth bypasses CSRF because
-      TokenAuthentication is listed first in dual mode).
+    - SessionAuthentication (new cookie client): DRF enforces CSRF here; the
+      Django session is destroyed but any legacy DRF token is PRESERVED so
+      dual-mode rollback and legacy clients keep working.
+    - TokenAuthentication (legacy client): the presented DRF token is deleted;
+      token auth bypasses CSRF during dual mode because TokenAuthentication is
+      deliberately listed first in settings.
+
+    Both branches are idempotent.
     """
-    # Delete the user's DRF token when one exists (legacy token logout).
-    try:
-        request.user.auth_token.delete()
-    except Exception:
-        pass
-
-    # Destroy the session (safe no-op for pure token-authenticated requests).
-    logout(request)
+    authenticator = getattr(request, 'successful_authenticator', None)
+    if isinstance(authenticator, SessionAuthentication):
+        # Session logout: destroy the session only; the legacy DRF token is
+        # PRESERVED so dual-mode rollback / legacy clients keep working.
+        logout(request)
+    elif isinstance(getattr(request, 'auth', None), Token):
+        # Token logout: request.auth is the presented Token. This covers real
+        # TokenAuthentication and DRF's force_authenticate() test shortcut
+        # (ForcedAuthentication), whose authenticator is neither of the two
+        # above but still carries the Token in request.auth. Deleting it
+        # cannot raise (it exists).
+        request.auth.delete()
+    else:
+        # Defensive: any other authenticator state keeps logout idempotent.
+        logout(request)
 
     return Response({
         'message': 'Successfully logged out.'
