@@ -347,6 +347,48 @@ class TestCarAdminAPI:
         assert response.status_code == 200
         assert response.data['brand'] == 'Updated Brand'
 
+    def test_admin_create_sanitizes_technical_description(self, admin_client):
+        """Dirty HTML posted via the admin API never reaches the database."""
+        data = {
+            'brand': 'Honda',
+            'model': 'Civic',
+            'persian_name': 'هوندا سیویک',
+            'slug': 'honda-civic-xss',
+            'year': 2025,
+            'fuel_type': 'gasoline',
+            'transmission': 'automatic',
+            'is_active': True,
+            'technical_description': (
+                '<p>متن</p><script>alert(1)</script>'
+                '<img src="x" onerror="alert(1)">'
+                '<a href="JaVaScRiPt:alert(1)">bad</a>'
+            ),
+            'main_image': SimpleUploadedFile('test.png', _make_tiny_png(), 'image/png')
+        }
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+
+        stored = Car.objects.get(slug='honda-civic-xss')
+        assert '<script' not in stored.technical_description
+        assert 'onerror' not in stored.technical_description
+        assert 'javascript:' not in stored.technical_description
+        assert 'متن' in stored.technical_description
+
+    def test_admin_update_sanitizes_technical_description(
+        self, admin_client, sample_car
+    ):
+        """Dirty HTML posted via PATCH is sanitized before storage."""
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {'technical_description': '<p>x</p><a href="javascript:alert(1)">bad</a>'},
+            format='json'
+        )
+        assert response.status_code == 200
+
+        sample_car.refresh_from_db()
+        assert 'javascript:' not in sample_car.technical_description
+        assert 'x' in sample_car.technical_description
+
     def test_admin_soft_delete_car(self, admin_client, sample_car):
         """Test soft deleting a car via admin API (DELETE now does soft delete)."""
         response = admin_client.delete(f'/api/v1/admin/cars/{sample_car.pk}/')
