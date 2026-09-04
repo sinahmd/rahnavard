@@ -15,16 +15,6 @@ class InquiryCreateView(generics.CreateAPIView):
     # See DEVELOPMENT.md section 11 for details.
 
 
-class InquiryCreateView(generics.CreateAPIView):
-    """Public endpoint for creating inquiries."""
-
-    serializer_class = InquiryCreateSerializer
-    permission_classes = [permissions.AllowAny]
-
-    # Note: IP address and User-Agent are NOT stored for GDPR compliance.
-    # See DEVELOPMENT.md section 11 for details.
-
-
 class InquiryAdminListView(generics.ListAPIView):
     """Admin endpoint for listing inquiries."""
 
