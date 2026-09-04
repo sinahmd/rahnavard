@@ -1,3 +1,14 @@
+# ⚠️ SUPERSEDED — Historical Document
+
+> **Do not rely on or follow this file.** It predates the senior refactor and
+> describes the pre-refactor architecture — including the removed
+> DRF-token/`localStorage` auth model and outdated endpoint paths.
+>
+> **Source of truth:** [`docs/SENIOR_REFACTOR_PLAN.md`](./docs/SENIOR_REFACTOR_PLAN.md)
+> · Current status: [`README.md`](./README.md) · Workflow: [`DEVELOPMENT.md`](./DEVELOPMENT.md)
+
+---
+
 # Rahnavard Automotive — Architecture & Implementation Plan
 
 ## 1. Existing Design Analysis

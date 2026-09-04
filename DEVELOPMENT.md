@@ -201,9 +201,9 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green on 2026-09-04 (after Phase 3): backend **275 passed**
-(97.73% coverage, SQLite :memory: via `config.test_settings`), frontend
-**209 passed**, `tsc` clean, lint clean except the known Google-font `<link>`
+Verified green on 2026-09-05 (after Phase 4): backend **283 passed**
+(98.29% coverage, SQLite :memory: via `config.test_settings`), frontend
+**265 passed**, `tsc` clean, lint clean except the known Google-font `<link>`
 warning (`app/layout.tsx`) — do not "fix" it with `next/font/google` (prod image
 builds run where Google Fonts is blocked). Backend tests need no Postgres;
 frontend needs no API server.
@@ -244,6 +244,43 @@ browser/admin-only; no application code references `SettingsContext` or calls
 > the login response still carries a legacy `token` field. Removal is gated on
 > the §3.6 staging smoke checklist + owner approval — do not treat Phase 3 as
 > auth cutover.
+
+### 3.8 Phase 4 — admin correctness & reuse (status)
+
+Phase 4 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.E/§6.F).
+
+- **`AdminListPage`** (`components/admin/list/`): one typed, generic table
+  shell used by all six admin list pages. Owns fetch state, loading,
+  error/retry, empty state, and pagination derived from the backend envelope
+  (`count` / `page_size`) — lists beyond the 20-row page size are now fully
+  navigable. Edge cases pinned by tests: an empty page after deleting the
+  last row of a last page refetches page 1; a 404 on a stale higher page
+  falls back one page; row actions receive `refresh`/`error` helpers.
+- **Stats endpoint**: `GET /api/v1/admin/stats/` (staff-only) returns four
+  direct SQL counts. The dashboard uses it instead of counting page-1 rows.
+  The inquiry count includes soft-deleted rows to match the admin inquiries
+  list total (`with_deleted()`).
+- **`AdminForm` split** (the 575-line god-file is gone):
+  - `components/admin/form/useAdminForm.ts` — transport-free form state
+    machine (values/touched/validation/submit). `load` and `submit` are
+    injected by the page; the load effect keys on `loadId` (the record
+    identity), never on the inline loader callback, so edit pages fetch once
+    per record. It imports nothing from `lib/api`.
+  - `components/admin/form/fields.tsx` — one renderer per field type;
+    `fieldSpanClass` preserves the legacy full-width behavior for the named
+    content fields (including single-line inputs).
+  - `lib/api/formData.ts` — the single home of the multipart conventions:
+    files under their field name, `File[]` as `<field>_0..N`, booleans as
+    `'true'/'false'`, null/undefined skipped so edits keep existing files.
+    Entity endpoint modules own `saveX(values)` (create-vs-edit = one
+    signature). The `gallery_0..N` contract is pinned by frontend tests
+    (formData + endpoints) AND backend tests (`TestCarAdminGalleryAndPagination`).
+- **Coverage scope**: jest `collectCoverageFrom` now also measures
+  `components/admin/form/**` and `components/admin/list/**`.
+- The settings admin page intentionally keeps its own hand-rolled form
+  (different shape: singleton PATCH + toast) — not part of the split.
+- Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
+  gated on the §3.6 staging smoke checklist + owner approval.
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
@@ -694,4 +731,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-04 (Phase 3 server/client boundary + route architecture committed)*
+*Last updated: 2026-09-05 (Phase 4 admin correctness & reuse committed)*

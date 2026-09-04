@@ -22,7 +22,7 @@ venv/node_modules, unless the owner says otherwise.
 ```bash
 # Backend — the dev image now installs requirements-dev.txt (pytest included)
 # at build time, so a rebuilt backend image runs tests directly:
-docker compose exec -T backend python -m pytest -q          # 275 passed, ~98% cov (2026-09-04)
+docker compose exec -T backend python -m pytest -q          # 283 passed, 98.29% cov (2026-09-05)
 docker compose exec -T backend python manage.py check
 docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
@@ -31,7 +31,7 @@ docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # The LOCAL dev frontend/Dockerfile uses the China npm mirror
 # (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
 # Iran — so `docker compose up --build` works locally.
-docker compose exec -T frontend npm test -- --runInBand      # 209 passed (2026-09-04)
+docker compose exec -T frontend npm test -- --runInBand      # 265 passed (2026-09-05)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -39,8 +39,8 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-04 (backend 275 passed / 97.73% cov,
-frontend 209 passed, tsc clean, lint clean except the known Google-font `<link>`
+Verified green inside Docker on 2026-09-05 (backend 283 passed / 98.29% cov,
+frontend 265 passed, tsc clean, lint clean except the known Google-font `<link>`
 warning in `app/layout.tsx` — do NOT switch to `next/font/google`: prod images are
 built on a server where Google Fonts is blocked, see plan §J).
 
@@ -637,6 +637,21 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-05 — Phase 4 (admin correctness & reuse)
+- **Goal**: Review Phase 3, then complete Phase 4 of docs/SENIOR_REFACTOR_PLAN.md (AdminListPage + pagination + stats endpoint + AdminForm split) to senior quality gates: fix the in-flight work's defects, add the missing test coverage, commit in green conventional commits, refresh docs.
+- **Done** (6 commits on `develop`):
+  - `a9b50d7` feat(admin): `GET /api/v1/admin/stats/` (staff-only, four SQL COUNTs) + `lib/api/stats.ts` + `AdminStats` type; dashboard now uses one call instead of four page-1 fetches. Inquiry count deliberately includes soft-deleted rows (`with_deleted()`) to match the admin inquiries list total; stale docstring fixed.
+  - `b848429` refactor(forms): the 575-line `AdminForm.tsx` deleted, split into `form/useAdminForm.ts` (transport-free; load effect keyed on `loadId` — **fixed a real blocker: the inline `load: () => load(id)` arrow changed identity every render, so edit pages refetched in a loop and reverted user edits**), `form/fields.tsx` (per-type renderers; `fieldSpanClass` restored full-width behavior for named content fields including single-line inputs — features `description` had regressed to half width), `lib/api/formData.ts` (single home of multipart conventions). Entity modules own `saveX(values)`; 10 form pages keep byte-identical schemas. renderHook tests pin load-once/validation/field-error mapping.
+  - `30a9299` feat(admin): shared `AdminListPage` — all six list pages; pagination from `count`/`page_size` envelope; empty-page→page-1 and 404→previous-page fallbacks; row-action `refresh`/`error` helpers; inquiries dead `statusButton` label params removed.
+  - `277df0f` test(admin): `formData.test.ts` (gallery_0..N / boolean / null-skip contract), endpoints tests for stats + gallery keys, jest coverage scope now measures `components/admin/{form,list}`.
+  - `4cd4f8a` test(cars): backend pins for the same contract — admin multipart create with `gallery_0/1`, PATCH preserves existing gallery URLs and appends, `catalog_file` via admin API, `?page=2` remainder + `page_size` envelope key, `?page=999` → 404.
+  - Docs commit: README/DEVELOPMENT §3.8/CLAUDE.md refreshed; SUPERSEDED banners on ARCHITECTURE.md, IMPLEMENTATION_REPORT.md, FINAL_PRODUCTION_REPORT.md, PRODUCTION_READINESS_CHECKLIST.md, PRODUCTION_DEPLOYMENT_CHECKLIST.md (token-auth era — do not run its commands), STEP_BY_STEP_ROADMAP.md, agents/developer_car_feature_implementation.md; `.opencode/agents/developer.md` rewritten for session-cookie/lib-api-lib-data boundaries (it taught localStorage-token auth); devops.md + DEVELOP_RULES.md stale lines fixed; PHASE1 status table updated.
+- **Validation (Docker, 2026-09-05)**: backend **283 passed / 98.29% cov** (was 275; scratch `backend/test_dbg{,2,3}.py` deleted — they were pytest-collected and 2 failed), frontend **265 passed** (was 209), tsc clean, lint clean (known Google-font warning only), `next build` green in a throwaway container.
+- **In progress / Next steps**: Phase 5 (ConfirmDialog replaces `confirm()`, skip link, reduced motion); Phase 6 (CSP, compose consolidation, ADRs). Phase 2 cutover still gated on §3.6 staging smoke + owner approval. Optional manual smoke before staging: 25+ car paging, car form gallery create/edit/save-with-server-400.
+- **Decisions made**: `useAdminForm` stays transport-free — `load` read through a ref, effect keyed on `loadId`, never on function identity. Settings page intentionally not migrated to the split (singleton PATCH + toast shape). Endpoint module changes (page param + save signature) landed with the form commit so every commit builds; test files pin the module they exercise in the same commit.
+
+---
+
 ### Session — 2026-09-04 — Phase 3 (server/client boundary + routes)
 - **Goal**: Implement Phase 3 of the Senior Refactor Plan — public content pages server-rendered, settings via RSC, URL-derived listing state, admin login outside the protected guard — with Docker validation.
 - **Done**: Five commits on `develop`:
@@ -739,4 +754,4 @@ These are inferred from commit history since no prior session logs existed.
 
 ---
 
-*Last updated: 2026-09-04 (Phase 3 committed; public RSC + URL-state listings + route groups; Docker verification workflow documented)*
+*Last updated: 2026-09-05 (Phase 4 committed: AdminListPage + pagination + stats endpoint + AdminForm split, test contracts pinned both sides)*
