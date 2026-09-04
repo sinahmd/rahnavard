@@ -1,42 +1,20 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import JsonLd from '@/components/seo/JsonLd'
 import Tabs from '@/components/ui/Tabs'
 import RelatedCarsSlider from '@/components/car/RelatedCarsSlider'
 import CarImageGallery from '@/components/car/CarImageGallery'
 import PdfViewer from '@/components/car/PdfViewer'
 import CarCTAButtons from '@/components/car/CarCTAButtons'
-import type { CarDetail } from '@/types/car'
-import { normalizeMediaUrls } from '@/lib/data/media'
+import { getCarDetail } from '@/lib/data/car'
 
 type Props = {
   params: { slug: string }
 }
 
-async function getCar(slug: string): Promise<CarDetail | null> {
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(`${backendUrl}/api/v1/cars/${slug}/`, {
-        next: { revalidate: 60 },
-        signal: AbortSignal.timeout(8000),
-      })
-      if (!res.ok) return null
-      const data = await res.json()
-      // Strip the internal backend origin from media URLs so client
-      // components get same-origin relative paths (see lib/data/media.ts).
-      normalizeMediaUrls(data, ['main_image', 'catalog_file', 'og_image'])
-      return data
-    } catch {
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
-    }
-  }
-  return null
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const car = await getCar(params.slug)
+  const car = await getCarDetail(params.slug)
 
   if (!car) {
     return {
@@ -138,25 +116,10 @@ function SpecItem({
 }
 
 export default async function CarDetailPage({ params }: Props) {
-  const car = await getCar(params.slug)
+  const car = await getCarDetail(params.slug)
 
   if (!car) {
-    return (
-      <main className="pt-32 pb-20">
-        <div className="wrap text-center">
-          <div className="w-24 h-24 mx-auto mb-6 bg-gray-light rounded-full flex items-center justify-center">
-            <svg className="w-12 h-12 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold mb-4">خودرو یافت نشد</h1>
-          <p className="text-gray mb-8 text-lg">متأسفانه خودروی مورد نظر شما یافت نشد.</p>
-          <Link href="/cars" className="btn btn-primary">
-            بازگشت به لیست خودروها
-          </Link>
-        </div>
-      </main>
-    )
+    notFound()
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rahnavard.co'

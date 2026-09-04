@@ -1,38 +1,16 @@
 import { Metadata } from 'next'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import JsonLd from '@/components/seo/JsonLd'
-import type { ArticleDetail } from '@/types/article'
-import { normalizeMediaUrls } from '@/lib/data/media'
+import { getArticleDetail } from '@/lib/data/article'
 
 type Props = {
   params: { slug: string }
 }
 
-async function getArticle(slug: string): Promise<ArticleDetail | null> {
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:8000'
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(`${backendUrl}/api/v1/articles/${slug}/`, {
-        next: { revalidate: 60 },
-        signal: AbortSignal.timeout(8000),
-      })
-      if (!res.ok) return null
-      const data = await res.json()
-      // Strip the internal backend origin from media URLs so client
-      // components get same-origin relative paths (see lib/data/media.ts).
-      normalizeMediaUrls(data, ['cover_image', 'og_image'])
-      return data
-    } catch {
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000))
-    }
-  }
-  return null
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const article = await getArticle(params.slug)
+  const article = await getArticleDetail(params.slug)
 
   if (!article) {
     return {
@@ -72,20 +50,10 @@ function formatDate(dateString: string) {
 }
 
 export default async function ArticleDetailPage({ params }: Props) {
-  const article = await getArticle(params.slug)
+  const article = await getArticleDetail(params.slug)
 
   if (!article) {
-    return (
-      <main className="pt-32 pb-20">
-        <div className="wrap text-center">
-          <h1 className="text-3xl font-bold mb-4">مقاله یافت نشد</h1>
-          <p className="text-gray mb-8">متأسفانه مقاله مورد نظر شما یافت نشد.</p>
-          <Link href="/articles" className="btn btn-primary">
-            بازگشت به لیست مقالات
-          </Link>
-        </div>
-      </main>
-    )
+    notFound()
   }
 
   return (
