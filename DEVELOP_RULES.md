@@ -53,12 +53,18 @@ Each commit must be:
 
 ### Rule 3: Code Must Pass Before Commit
 
-```bash
-# Frontend
-cd frontend && npm run lint && npx tsc --noEmit && npm test
+Run checks inside the local Docker stack — the owner's dev environment (see DEVELOPMENT.md §3.4–3.5 for details):
 
-# Backend
-cd backend && python manage.py check && pytest
+```bash
+# Frontend (jest/tsc/eslint/next are installed in the image)
+docker compose exec -T frontend npm run lint
+docker compose exec -T frontend npx tsc --noEmit
+docker compose exec -T frontend npm test -- --runInBand
+
+# Backend (dev requirements are NOT in the image — install once per image rebuild)
+docker compose exec -T backend pip install -r requirements-dev.txt
+docker compose exec -T backend python manage.py check
+docker compose exec -T backend python -m pytest -q
 
 # If any of these fail → fix before committing
 ```
@@ -74,12 +80,11 @@ If a change should NOT go to production:
 | File | Why it's local-only |
 |------|-------------------|
 | `frontend/Dockerfile` | Removed Arvan npm mirror (403 outside Iran) |
-| `frontend/lib/authFetch.ts` | Uses `NEXT_PUBLIC_API_URL` for full URL (no nginx locally) |
 
-**Why authFetch is local-only:**
-In production, nginx proxies `/api/*` → backend. Relative URLs work.
-In local dev (no nginx), relative URLs hit port 3000 (Next.js) → 404.
-The fix prepends `NEXT_PUBLIC_API_URL` to build the full backend URL.
+> `frontend/lib/authFetch.ts` was deleted in Phase 1 of the senior refactor — all
+> admin requests now go through the typed `lib/api/*` boundary. Local dev reaches
+> the API through the nginx proxy (`docker compose up`, http://localhost), so no
+> URL-prefixing workaround exists or is needed anymore.
 
 ### Rule 5: Keep Merges Clean
 
@@ -94,8 +99,7 @@ Before merging `develop` → `main`:
 
 **Local-only changes to revert before merge:**
 ```bash
-# 1. Restore Arvan mirror in frontend/Dockerfile
-# 2. Revert authFetch.ts to use relative URLs
+# Restore Arvan mirror in frontend/Dockerfile
 # See DEVELOPMENT.md Section 11 for exact code
 ```
 
@@ -177,7 +181,6 @@ Before merging `develop` → `main`:
 - ✅ Unique slug constraint fix
 - ✅ Restore endpoints
 - ✅ SiteSettings singleton protection
-- ✅ Frontend local dev fix (authFetch)
 
 ### Planned:
 - 🔲 Car comparison tool

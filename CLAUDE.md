@@ -12,7 +12,40 @@
 
 ## 1. Testing Rules
 
-### Backend Tests (pytest)
+### ⚠️ Run everything on local Docker (owner convention)
+
+The owner develops and verifies the whole stack on **local Docker** — `docker compose up`
+(runs nginx/frontend/backend/postgres, app entry point is http://localhost).
+**Agents should run tests/checks with `docker compose exec`** rather than a host
+venv/node_modules, unless the owner says otherwise.
+
+```bash
+# Backend — the image installs requirements.txt only, so dev deps are needed
+# once per image rebuild (container-local; lost on `docker compose up --build`):
+docker compose exec -T backend pip install -r requirements-dev.txt
+
+docker compose exec -T backend python -m pytest -q          # 258 passed, ~97% cov (2026-09-04)
+docker compose exec -T backend python manage.py check
+docker compose exec -T backend python manage.py makemigrations --check --dry-run
+# pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
+
+# Frontend — all tooling (jest/tsc/eslint/next) is installed in the image
+docker compose exec -T frontend npm test -- --runInBand      # 187 passed (2026-09-04)
+docker compose exec -T frontend npx tsc --noEmit
+docker compose exec -T frontend npm run lint
+# Production build in a throwaway container so the running dev server's .next
+# volume is never touched:
+docker compose run --rm --no-deps frontend npm run build
+```
+
+Verified green inside Docker on 2026-09-04 (backend 258 passed / 97.72% cov,
+frontend 187 passed, tsc clean, lint clean except the known Google-font `<link>`
+warning in `app/layout.tsx` — do NOT switch to `next/font/google`: prod images are
+built on a server where Google Fonts is blocked, see plan §J).
+
+---
+
+### Backend Tests (pytest) — host alternative
 ```bash
 cd backend
 pip install -r requirements-dev.txt
@@ -46,10 +79,10 @@ class TestFeatureName:
 - Serializer validation
 - Edge cases (empty data, invalid data, not found)
 
-### Frontend Tests (Jest + React Testing Library)
+### Frontend Tests (Jest + React Testing Library) — host alternative
 ```bash
 cd frontend
-npm test                      # Run all tests
+npm test                      # Run all tests (prefer the docker exec form above)
 npm run test:watch           # Watch mode
 npm run test:coverage        # With coverage report
 ```
@@ -603,6 +636,21 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-04
+- **Goal**: Finish/harden Phases 0–1 of the Senior Refactor Plan (docs/SENIOR_REFACTOR_PLAN.md), then re-commit without the Codebuff attribution footer, and verify the entire workflow on local Docker
+- **Done**:
+  - Reviewed every uncommitted Phase 0/1 change against the plan; fixed all frontend test warnings (act() in ConsultationForm tests, `window.scrollTo` mock, next/image mock prop stripping, `pageSize` exhaustive-deps in cars/articles listing pages)
+  - Hardened http.ts envelope tests (non_field_errors, plain-string field errors); documented AuthContext's intentional empty logout catch; removed `any` in admin login catch
+  - Confirmed zero app imports of deleted `authFetch`/old `lib/api`/`withAuth`; admin error handling surfaces inline banners (no silent catches)
+  - Docs: README gained a "Refactor Status" section; root PHASE1_IMPLEMENTATION_COMPLETE.md rewritten as SUPERSEDED (it is gitignored/untracked — on-disk fix only)
+  - Committed 7 conventional commits on `develop` (backend sanitizer + backfill; duplicate InquiryCreateView removal; frontend/types + lib/api + lib/data layers; admin migration + legacy client deletion; public pages shared types; test hygiene; docs). The user then asked to redo these commits WITHOUT the Codebuff/Co-Authored-By footer — done via `git reset 7abc119` + recommit (same messages/boundaries, clean attribution, no content change; old hashes 18304f4…0c8c0b1 → new c1ebd46…f14ed99)
+  - **Verified the whole suite inside local Docker** (see §1 docker block): backend 258 passed / 97.72%, frontend 187 passed, tsc/lint/next build clean
+- **Files touched**: backend sanitizer/migrations/tests, frontend types/, lib/api/, lib/data/, admin pages, public components, jest.setup.js, README.md, CLAUDE.md, DEVELOPMENT.md, DEVELOP_RULES.md
+- **In progress / Next steps**: Phase 2 auth cutover (session cookies + CSRF, remove TokenAuthentication) per plan §7 — token/localStorage auth remains intentional until then; backfill preview/apply on production before the deploy that runs migrations 0008/0005
+- **Decisions made**: (1) Owner convention — ALL verification runs on local Docker via `docker compose exec` (documented in §1); never `next/font/google` (prod builds blocked from Google Fonts); (2) owner wants commits authored without the Codebuff footer going forward
+
+---
+
 ### Session — 2026-09-02
 - **Goal**: Add cross-session memory mechanism to project
 - **Done**: Added Session History section (Section 17) to CLAUDE.md so future AI sessions can recall past work
@@ -635,4 +683,4 @@ These are inferred from commit history since no prior session logs existed.
 
 ---
 
-*Last updated: 2026-09-03 (ci test)*
+*Last updated: 2026-09-04 (Phase 0/1 hardened + committed; Docker verification workflow documented)*

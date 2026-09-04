@@ -158,6 +158,10 @@ volumes:
 
 ### 3.4 Useful commands
 
+> The dev environment is Docker: `docker compose up` (nginx at http://localhost,
+> frontend + backend + postgres containers). **Run tests/checks inside the
+> containers** — both images already contain all the tooling needed.
+
 ```bash
 # Start / stop
 docker compose up --build          # Start with rebuild
@@ -169,15 +173,40 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 docker compose exec backend python manage.py shell
 
-# Frontend
-cd frontend && npm run dev         # Start dev server
-cd frontend && npm test            # Run tests
-cd frontend && npm run lint        # Lint check
+# Backend checks (run once per image rebuild: dev deps are not in the image)
+docker compose exec backend pip install -r requirements-dev.txt
+docker compose exec backend python -m pytest -q
+docker compose exec backend python manage.py check
 
-# Backend
-cd backend && pytest               # Run tests
-cd backend && python manage.py check  # Django checks
+# Frontend checks (jest/tsc/eslint/next are installed in the image)
+docker compose exec frontend npm test -- --runInBand
+docker compose exec frontend npx tsc --noEmit
+docker compose exec frontend npm run lint
 ```
+
+### 3.5 Full pre-commit verification (all inside Docker)
+
+```bash
+# Backend
+docker compose exec -T backend python -m pytest -q
+docker compose exec -T backend python manage.py check
+docker compose exec -T backend python manage.py makemigrations --check --dry-run
+
+# Frontend
+docker compose exec -T frontend npm test -- --runInBand
+docker compose exec -T frontend npx tsc --noEmit
+docker compose exec -T frontend npm run lint
+
+# Production build — run in a throwaway container so the running dev server's
+# .next volume is left untouched:
+docker compose run --rm --no-deps frontend npm run build
+```
+
+Verified green on 2026-09-04: backend **258 passed** (97.72% coverage, SQLite
+:memory: via `config.test_settings`), frontend **187 passed**, `tsc` clean, lint
+clean except the known Google-font `<link>` warning (`app/layout.tsx`) — do not
+"fix" it with `next/font/google` (prod image builds run where Google Fonts is
+blocked). Backend tests need no Postgres; frontend needs no API server.
 
 ---
 
@@ -287,10 +316,9 @@ develop ready for local dev again
 ```bash
 git checkout develop && git pull origin develop
 
-# Final checks
-cd backend && python manage.py check && pytest --no-cov
-cd frontend && npm run lint && npx tsc --noEmit && npm test -- --watchAll=false
-cd ..
+# Final checks (inside local Docker — see §3.4/§3.5)
+docker compose exec -T backend python manage.py check && docker compose exec -T backend python -m pytest -q
+docker compose exec -T frontend npm run lint && docker compose exec -T frontend npx tsc --noEmit && docker compose exec -T frontend npm test -- --runInBand
 
 # Stash local-only changes and revert them (ONE COMMAND)
 bash scripts/prepare-merge.sh
