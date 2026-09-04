@@ -1,7 +1,12 @@
 import type { Metadata } from 'next'
-import { AuthProvider } from '@/contexts/AuthContext'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import './globals.css'
+
+// NOTE: AuthProvider intentionally lives in app/admin/layout.tsx (not here).
+// Scoping auth to the admin subtree keeps anonymous public visitors from
+// calling /auth/session/ (whose 401 policy would otherwise redirect them to
+// /admin/login). This is a Phase 2 regression fix — the full route-group
+// restructure (admin/(protected)) is Phase 3.
 
 export const metadata: Metadata = {
   title: {
@@ -60,11 +65,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-vazir antialiased">
-        <AuthProvider>
-          <SettingsProvider>
-            {children}
-          </SettingsProvider>
-        </AuthProvider>
+        <SettingsProvider>
+          {children}
+        </SettingsProvider>
       </body>
     </html>
   )

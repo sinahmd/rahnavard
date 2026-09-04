@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 
 const sidebarLinks = [
   { href: '/admin', label: 'داشبورد', icon: '📊' },
@@ -16,7 +16,26 @@ const sidebarLinks = [
   { href: '/admin/settings', label: 'تنظیمات سایت', icon: '⚙️' },
 ]
 
+/**
+ * Auth is scoped to the admin subtree (Phase 2 regression fix): AuthProvider
+ * wraps only /admin routes, so public pages never bootstrap /auth/session/
+ * and anonymous visitors are never redirected to /admin/login. This is an
+ * early, targeted version of the Phase 3 admin/(protected) boundary — the
+ * guard and sidebar below behave exactly as before.
+ */
 export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <AuthProvider>
+      <AdminShell>{children}</AdminShell>
+    </AuthProvider>
+  )
+}
+
+function AdminShell({
   children,
 }: {
   children: React.ReactNode
