@@ -1,151 +1,90 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import AdminListPage from '@/components/admin/list/AdminListPage'
 import type { WhyFeature } from '@/types/feature'
-import {
-  deleteFeature,
-  listFeatures,
-  setFeatureActive,
-} from '@/lib/api/features'
+import { deleteFeature, listFeatures, setFeatureActive } from '@/lib/api/features'
 
 export default function AdminFeaturesPage() {
-  const [features, setFeatures] = useState<WhyFeature[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetchFeatures()
-  }, [])
-
-  const fetchFeatures = async () => {
-    try {
-      setError(null)
-      const data = await listFeatures()
-      setFeatures(data.results || [])
-    } catch {
-      setError('خطا در بارگذاری ویژگی‌ها')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const toggleActive = async (id: number, currentStatus: boolean) => {
-    try {
-      setError(null)
-      await setFeatureActive(id, !currentStatus)
-      await fetchFeatures()
-    } catch {
-      setError('خطا در ذخیره تغییرات')
-    }
-  }
-
-  const deleteFeatureRow = async (id: number) => {
-    if (!confirm('آیا از حذف این ویژگی اطمینان دارید؟')) return
-    try {
-      setError(null)
-      await deleteFeature(id)
-      await fetchFeatures()
-    } catch {
-      setError('خطا در حذف ویژگی')
-    }
-  }
-
-  if (loading) return <div className="text-center py-8">در حال بارگذاری...</div>
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">مدیریت ویژگی‌ها</h1>
-        <Link
-          href="/admin/features/new"
-          className="bg-accent text-dark px-4 py-2 rounded-lg font-bold hover:bg-accent-dark transition-colors"
-        >
-          + ویژگی جدید
-        </Link>
-      </div>
-
-      {error && (
-        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
-        </div>
-      )}
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr className="text-right">
-              <th className="p-4 font-bold">آیکون</th>
-              <th className="p-4 font-bold">عنوان</th>
-              <th className="p-4 font-bold">توضیحات</th>
-              <th className="p-4 font-bold">ترتیب</th>
-              <th className="p-4 font-bold">وضعیت</th>
-              <th className="p-4 font-bold">عملیات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {features.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">
-                  ویژگی‌ای وجود ندارد
-                </td>
-              </tr>
+    <AdminListPage<WhyFeature>
+      title="مدیریت ویژگی‌ها"
+      createHref="/admin/features/new"
+      createLabel="+ ویژگی جدید"
+      emptyMessage="ویژگی‌ای وجود ندارد"
+      errorMessage="خطا در بارگذاری ویژگی‌ها"
+      fetchPage={listFeatures}
+      rowKey={(feature) => feature.id}
+      columns={[
+        {
+          header: 'آیکون',
+          cell: (feature) =>
+            feature.icon ? (
+              <OptimizedImage
+                src={feature.icon}
+                alt={feature.title}
+                width={40}
+                height={40}
+                className="rounded object-contain"
+              />
             ) : (
-              features.map((feature) => (
-                <tr key={feature.id} className="border-t hover:bg-gray-50">
-                  <td className="p-4">
-                    {feature.icon ? (
-                      <OptimizedImage
-                        src={feature.icon}
-                        alt={feature.title}
-                        width={40}
-                        height={40}
-                        className="rounded object-contain"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">
-                        —
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4 font-bold">{feature.title}</td>
-                  <td className="p-4 text-sm max-w-xs truncate">{feature.description}</td>
-                  <td className="p-4">{feature.display_order}</td>
-                  <td className="p-4">
-                    <button
-                      onClick={() => toggleActive(feature.id, feature.is_active)}
-                      className={`px-3 py-1 rounded-full text-sm font-bold ${
-                        feature.is_active
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {feature.is_active ? 'فعال' : 'غیرفعال'}
-                    </button>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex gap-2">
-                      <Link
-                        href={`/admin/features/${feature.id}/edit`}
-                        className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
-                      >
-                        ویرایش
-                      </Link>
-                      <button
-                        onClick={() => deleteFeatureRow(feature.id)}
-                        className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors"
-                      >
-                        حذف
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">
+                —
+              </div>
+            ),
+        },
+        { header: 'عنوان', cell: (feature) => <span className="font-bold">{feature.title}</span> },
+        { header: 'توضیحات', cell: (feature) => <span className="text-sm max-w-xs truncate block">{feature.description}</span> },
+        { header: 'ترتیب', cell: (feature) => feature.display_order },
+        {
+          header: 'وضعیت',
+          cell: (feature, helpers) => (
+            <button
+              onClick={async () => {
+                try {
+                  await setFeatureActive(feature.id, !feature.is_active)
+                  helpers.refresh()
+                } catch {
+                  helpers.error('خطا در ذخیره تغییرات')
+                }
+              }}
+              className={`px-3 py-1 rounded-full text-sm font-bold ${
+                feature.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {feature.is_active ? 'فعال' : 'غیرفعال'}
+            </button>
+          ),
+        },
+        {
+          header: 'عملیات',
+          cell: (feature, helpers) => (
+            <div className="flex gap-2">
+              <Link
+                href={`/admin/features/${feature.id}/edit`}
+                className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
+              >
+                ویرایش
+              </Link>
+              <button
+                onClick={async () => {
+                  if (!confirm('آیا از حذف این ویژگی اطمینان دارید؟')) return
+                  try {
+                    await deleteFeature(feature.id)
+                    helpers.refresh()
+                  } catch {
+                    helpers.error('خطا در حذف ویژگی')
+                  }
+                }}
+                className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors"
+              >
+                حذف
+              </button>
+            </div>
+          ),
+        },
+      ]}
+    />
   )
 }
