@@ -819,7 +819,7 @@ git push origin main
 
 ---
 
-## 10. Current Project State (MVP as of August 2026)
+## 10. Current Project State (as of September 2026)
 
 ### What's built and working:
 - ✅ Home page with hero slider, featured cars, articles, branches, consultation form

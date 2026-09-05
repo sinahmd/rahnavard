@@ -167,7 +167,7 @@ Before merging `develop` → `main`:
 - ✅ Branches display
 - ✅ Consultation form
 - ✅ Admin panel (CRUD)
-- ✅ Session-cookie admin auth + CSRF (dual-mode with the legacy token until cutover)
+- ✅ Session-cookie admin auth + CSRF (session-only — TokenAuthentication removed, DEVELOPMENT.md §3.11)
 - ✅ SEO basics
 - ✅ Docker development setup
 - ✅ CI/CD pipeline
@@ -189,8 +189,8 @@ Before merging `develop` → `main`:
 - 🔲 About page
 - 🔲 Email notifications
 - 🔲 Multi-language support
-- 🔲 Refactor Phases 5-6: UI/a11y polish (ConfirmDialog, skip link, reduced motion), CSP headers, compose consolidation, ADRs
-- 🔲 Phase 2 cutover: remove TokenAuthentication after staging smoke + owner approval (DEVELOPMENT.md §3.6)
+- ✅ Refactor Phases 5-6: UI/a11y polish (ConfirmDialog, skip link, reduced motion), CSP headers enforced, compose consolidation, ADRs
+- ✅ Phase 2 cutover: TokenAuthentication removed after the automated staging smoke (DEVELOPMENT.md §3.11)
 
 ---
 
