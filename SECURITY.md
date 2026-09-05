@@ -2,12 +2,11 @@
 
 ## Reporting a vulnerability
 
-Use GitHub's **private vulnerability reporting** (Security → Report a
-vulnerability) on this repository. Please do not open public issues for
-security problems.
+Please do **not** open public GitHub issues for security problems.
 
-Helpful details: the affected URL/endpoint, reproduction steps or a PoC,
-and your assessment of the impact.
+Contact the repository owner directly and privately via GitHub. Include
+the affected URL/endpoint, reproduction steps or a PoC, and your
+assessment of the impact.
 
 Please avoid: automated scanning or load testing against the production
 site, and testing the public inquiry form beyond a couple of submissions.
