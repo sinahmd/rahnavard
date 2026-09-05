@@ -201,12 +201,13 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green on 2026-09-05 (after Phase 4): backend **283 passed**
+Verified green on 2026-09-05 (after Phase 5): backend **283 passed**
 (98.29% coverage, SQLite :memory: via `config.test_settings`), frontend
-**265 passed**, `tsc` clean, lint clean except the known Google-font `<link>`
-warning (`app/layout.tsx`) — do not "fix" it with `next/font/google` (prod image
-builds run where Google Fonts is blocked). Backend tests need no Postgres;
-frontend needs no API server.
+**301 passed / 39 suites** with **zero act warnings and zero console errors**
+(grep-verified on the full `npm test` output), `tsc` clean, lint clean except
+the known Google-font `<link>` warning (`app/layout.tsx`) — do not "fix" it
+with `next/font/google` (prod image builds run where Google Fonts is blocked).
+Backend tests need no Postgres; frontend needs no API server.
 
 ### 3.7 Phase 3 — server/client boundary + route architecture (status)
 
@@ -279,6 +280,56 @@ Phase 4 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.E/§6.F)
   `components/admin/form/**` and `components/admin/list/**`.
 - The settings admin page intentionally keeps its own hand-rolled form
   (different shape: singleton PATCH + toast) — not part of the split.
+- Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
+  gated on the §3.6 staging smoke checklist + owner approval.
+
+### 3.9 Phase 5 — UI/a11y polish & measured performance (status)
+
+Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/§6.J).
+
+- **UI consistency (real duplication only)**: `SectionHead`
+  (components/site/) extracted from five copies of the
+  eyebrow/title/description pattern; `CarCardImage` from the three card image
+  blocks; admin primitives `PageHeader` / `ErrorState` (with optional retry,
+  `role="alert"`) / `EmptyState` / `ConfirmDialog` under
+  components/admin/ui/. No component library, no design-token rewrite; card
+  markup stays deliberately different where it is.
+- **Accessibility**:
+  - **Skip link**: first focusable element on every public page
+    (`(site)/layout.tsx`), keyboard-visible on focus, targets
+    `#main-content` — every public `<main>` carries that id.
+  - **ConfirmDialog** replaces all five `window.confirm()` delete flows
+    (cars/articles/branches/features/hero-slides via `helpers.confirm()`):
+    `role="dialog"` + `aria-modal`, labelled/described by title+text,
+    initial focus on cancel (destructive-safe), Escape and overlay click
+    cancel, Tab trapped, focus returned to the trigger.
+  - **Focus management**: one shared `useModalA11y` hook
+    (components/ui/) powers ConfirmDialog, MobileNav, the CarFilters mobile
+    drawer, and ConsultationModal — Escape, Tab trap, initial focus, focus
+    return. Closed drawers are `aria-hidden` + `visibility:hidden`, so
+    off-screen controls leave the tab order.
+  - **Reduced motion**: the globals.css `prefers-reduced-motion` block now
+    also kills `.animate-slide-up` / `.animate-hero-zoom` and blankets
+    `transition/animation-duration: 0.01ms`; HeroSlider JS autoplay pauses
+    under the preference (manual prev/next/dots still work).
+  - **Tables**: AdminListPage renders a sr-only `<caption>` and
+    `scope="col"` headers. **Status is not color-only**: every admin status
+    toggle (active/featured/read/contacted) carries `aria-pressed`.
+  - **Announced states**: AdminListPage loading → `role="status"`;
+    ErrorState/error banners → `role="alert"`; consultation submit success →
+    `role="status"`, failure → `role="alert"`.
+- **Performance (measured, honest)**: `next build` first-load JS — `/`
+  107 kB, `/cars` 109 kB, `/cars/[slug]` 108 kB; `curl` (no JS) of `/`
+  returns 47.8 kB of SSR'd HTML with real car links. No image code change was
+  justified: media URLs already bypass the optimizer (`OptimizedImage`
+  `unoptimized`). Deferred: fonts (no local font assets exist;
+  `next/font/google` is forbidden because prod image builds cannot reach
+  Google Fonts; the Google `@import` + `display=swap` stays until a
+  self-host pass) and the local next/image media optimizer ECONNREFUSED
+  (dev-only — nginx same-origin production behavior is unaffected).
+- **Coverage**: jest scope unchanged (lib/api + lib/data + contexts + admin
+  form/list); new a11y suites live under components/{admin/ui,car,layout,
+  home}/__tests__ and app/__tests__.
 - Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
   gated on the §3.6 staging smoke checklist + owner approval.
 
@@ -734,4 +785,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (Phase 4 admin correctness & reuse committed)*
+*Last updated: 2026-09-05 (Phase 5 UI/a11y polish committed: shared useModalA11y, reduced motion, 301 frontend tests with zero warnings)*

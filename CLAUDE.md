@@ -31,7 +31,7 @@ docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # The LOCAL dev frontend/Dockerfile uses the China npm mirror
 # (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
 # Iran — so `docker compose up --build` works locally.
-docker compose exec -T frontend npm test -- --runInBand      # 265 passed (2026-09-05)
+docker compose exec -T frontend npm test -- --runInBand      # 301 passed, 39 suites, zero act/console warnings (2026-09-05)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -637,6 +637,20 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-05 — Phase 5 (UI/a11y polish + measured perf)
+- **Goal**: Complete Phase 5 of docs/SENIOR_REFACTOR_PLAN.md (§6.H/§6.I/§6.J) — UI consistency (real duplication only), accessibility (skip link, ConfirmDialog, focus management, reduced motion, table/status semantics), measured public-site performance — with Docker validation and conventional commits. Finish the in-flight focus-management work the previous agent left uncommitted.
+- **Done** (commits on `develop`):
+  - Phase 4 close-out already committed before this session: `b6b7e5c` (last-valid-page fallback + zero-act-warning suite), `57c74cc` (Phase 4 docs + SUPERSEDED banners), `4ff9b12` (refactor(ui): `SectionHead` from 5 copies, `CarCardImage` from 3, admin `PageHeader`/`ErrorState`/`EmptyState`; AdminListPage caption + `scope=col`), `2e48f43` (feat(a11y): skip link + `ConfirmDialog` replacing all five `window.confirm()` delete flows).
+  - `feat(a11y): improve focus management and reduced-motion support` — new shared `useModalA11y` hook powers ConfirmDialog/MobileNav/CarFilters drawer/ConsultationModal (Escape, Tab trap, initial focus, focus return); closed drawers are `aria-hidden` + `visibility:hidden`. **Two bugs in the in-flight work fixed**: duplicate `role`/`aria-modal`/`aria-label` JSX attrs in CarFilters (TS compile error) and a TDZ `ReferenceError` in ConsultationModal (hook read `handleClose` before its `const`). Reduced motion: globals.css block extended (`.animate-slide-up`/`.animate-hero-zoom` kill + blanket `transition/animation-duration: 0.01ms`), HeroSlider JS autoplay pauses under `prefers-reduced-motion`. Status not color-only: `aria-pressed` on every admin status toggle (cars active/featured, branches, features, hero-slides, inquiries read/contacted); AdminListPage loading gets `role="status"`.
+  - `test(a11y): cover keyboard and focus behavior` — 36 new/extended tests: ConfirmDialog (Escape/trap/focus-return/cancel/confirm), skip-link layout, reduced-motion CSS presence + HeroSlider autoplay, MobileNav/CarFilters/ConsultationModal keyboard+focus, AdminListPage caption/scope/status, branches aria-pressed. Frontend suite **265 → 301 passed, zero act warnings, zero console errors** (verified with grep on full `npm test` output).
+  - `perf: record measured public baselines` + `docs(ui): Phase 5 validation` — `next build` green: `/` 107 kB first load, `/cars` 109 kB, `/cars/[slug]` 108 kB; curl evidence of SSR'd public HTML (47.8 kB at `/`). No image code change: media URLs already `unoptimized` (OptimizedImage); the local next/image optimizer ECONNREFUSED is dev-only and never affects page rendering (nginx same-origin). Fonts documented as deferred (no local font assets; `next/font/google` forbidden — build env can't reach Google Fonts; Google `@import`+`display=swap` retained).
+- **Validation (Docker, 2026-09-05)**: backend unchanged **283 passed / 98.29% cov** (no backend changes in Phase 5); frontend **301 passed / 39 suites** with zero act + zero console warnings (grep-verified), tsc clean, lint clean (known Google-font warning only), `next build` green in a throwaway container.
+- **Files touched**: frontend/components/ui/useModalA11y.ts (new), components/admin/ui/ConfirmDialog.tsx, components/car/{CarFilters,ConsultationModal}.tsx, components/layout/MobileNav.tsx, components/home/HeroSlider.tsx, app/globals.css, jest.setup.js (matchMedia mock), 5 admin entity pages (aria-pressed), AdminListPage.tsx, new tests (ConfirmDialog, skip-link layout, HeroSlider, reducedMotionCss, CarFilters, ConsultationModal), extended tests (MobileNav, AdminListPage, branches), README.md, DEVELOPMENT.md, CLAUDE.md
+- **In progress / Next steps**: Phase 6 (CSP headers, compose consolidation, ADRs, secret-scan CI). Phase 2 cutover still gated on §3.6 staging smoke + owner approval. Font self-hosting pass (deferred). Optional manual smoke before staging: 25+ car paging, car form gallery create/edit/save-with-server-400, axe spot checks.
+- **Decisions made**: dialog/drawer focus behavior lives in ONE shared `useModalA11y` hook (not per-component copies); the hook's `onClose` is read through a ref so latest closures are used; ConsultationModal hook call placed after `handleClose` (TDZ-safe); closed overlays keep `aria-hidden` + `visibility:hidden` so they leave the tab order; native `.click()` in tests replaced with `fireEvent.click` (act-safe); fonts documented as deferred rather than adding binary assets/new deps mid-session.
+
+---
+
 ### Session — 2026-09-05 — Phase 4 (admin correctness & reuse)
 - **Goal**: Review Phase 3, then complete Phase 4 of docs/SENIOR_REFACTOR_PLAN.md (AdminListPage + pagination + stats endpoint + AdminForm split) to senior quality gates: fix the in-flight work's defects, add the missing test coverage, commit in green conventional commits, refresh docs.
 - **Done** (6 commits on `develop`):
@@ -755,4 +769,4 @@ These are inferred from commit history since no prior session logs existed.
 
 ---
 
-*Last updated: 2026-09-05 (Phase 4 committed: AdminListPage + pagination + stats endpoint + AdminForm split, test contracts pinned both sides)*
+*Last updated: 2026-09-05 (Phase 5 committed: focus management + reduced motion + ConfirmDialog/skip-link + 36 a11y tests; frontend 301 green, zero warnings; perf baselines recorded)*
