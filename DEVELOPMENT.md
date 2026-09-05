@@ -202,8 +202,8 @@ docker compose run --rm --no-deps frontend npm run build
 ```
 
 Verified green on 2026-09-05 (after Phase 5 + manual smoke fixes): backend
-**285 passed** (98.31% coverage, SQLite :memory: via `config.test_settings`),
-frontend **301 passed / 39 suites** with **zero act warnings and zero console
+**282 passed** (98.32% coverage, SQLite :memory: via `config.test_settings`),
+frontend **302 passed / 39 suites** with **zero act warnings and zero console
 errors** (grep-verified on the full `npm test` output), `tsc` clean, and
 **lint fully clean** — fonts are self-hosted via `next/font/local`
 (`frontend/lib/fonts.ts` + `frontend/fonts/`, Vazirmatn from the upstream
@@ -244,10 +244,9 @@ imports `lib/api/*` or reads cookies/localStorage; `lib/api/*` is
 browser/admin-only; no application code references `SettingsContext` or calls
 `/auth/session/` from public routes.
 
-> Phase 2 dual-mode remains active: `TokenAuthentication` is still first and
-> the login response still carries a legacy `token` field. Removal is gated on
-> the §3.6 staging smoke checklist + owner approval — do not treat Phase 3 as
-> auth cutover.
+> ✅ Phase 2 cutover is COMPLETE (2026-09-05, §3.11): TokenAuthentication is
+> removed — session-only auth. The §3.6 smoke checklist was executed and
+> recorded before the removal.
 
 ### 3.8 Phase 4 — admin correctness & reuse (status)
 
@@ -283,8 +282,7 @@ Phase 4 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.E/§6.F)
   `components/admin/form/**` and `components/admin/list/**`.
 - The settings admin page intentionally keeps its own hand-rolled form
   (different shape: singleton PATCH + toast) — not part of the split.
-- Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
-  gated on the §3.6 staging smoke checklist + owner approval.
+- ✅ Phase 2 cutover COMPLETE (2026-09-05, §3.11) — session-only auth.
 
 ### 3.9 Phase 5 — UI/a11y polish & measured performance (status)
 
@@ -370,24 +368,23 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
 - **Coverage**: jest scope unchanged (lib/api + lib/data + contexts + admin
   form/list); new a11y suites live under components/{admin/ui,car,layout,
   home}/__tests__ and app/__tests__.
-- Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
-  gated on the §3.6 staging smoke checklist + owner approval.
+- ✅ Phase 2 cutover COMPLETE (2026-09-05, §3.11) — session-only auth.
 
 ### 3.10 Phase 6 — hardening & delivery (status)
 
 Phase 6 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §7 and
 docs/adr/0006 for the recorded decisions).
 
-- **CSP (report-only)**: both prod (`nginx/nginx.conf`) and dev
-  (`nginx/nginx.dev.conf`) now send a tightened
-  `Content-Security-Policy-Report-Only` — `default-src 'self'`, no CDN script/
-  style/font sources (fonts are self-hosted since `07e72c8`), plus
-  `base-uri 'self'`, `object-src 'none'`, `form-action 'self'`. Nothing is
-  blocked yet; browsers log violations. **Flipping to the enforcing header is
-  a separate, deliberate step** after a violation-free review window. When
-  flipping: prod keeps `'unsafe-inline'` (Next inline bootstrap scripts); the
-  DEV conf additionally needs `'unsafe-eval'` (Next dev/HMR) or the dev
-  server breaks.
+- **CSP (ENFORCED since 2026-09-05)**: both prod (`nginx/nginx.conf`) and dev
+  (`nginx/nginx.dev.conf`) send the tightened enforcing
+  `Content-Security-Policy` — `default-src 'self'`, no CDN script/style/font
+  sources (fonts are self-hosted since `07e72c8`), plus `base-uri 'self'`,
+  `object-src 'none'`, `form-action 'self'`. The flip was gated on an
+  executable audit (`frontend/e2e/csp-audit.spec.ts`): a
+  `securitypolicyviolation` + console collector sweeping public and admin
+  pages found zero violations beyond Next-dev `eval()`. Prod must NEVER gain
+  `'unsafe-eval'`; the DEV conf carries it for Next dev/HMR. Rollback =
+  revert the header name.
 - **Cookie flags explicit**: `SESSION_COOKIE_HTTPONLY=True`,
   `SESSION_COOKIE_SAMESITE="Lax"`, `CSRF_COOKIE_HTTPONLY=False` (readable on
   purpose — echoed as `X-CSRFToken`), `CSRF_COOKIE_SAMESITE="Lax"`; pinned by
@@ -423,56 +420,100 @@ docs/adr/0006 for the recorded decisions).
   is an anonymous volume that survives image rebuilds, so new devDependencies
   need the documented in-container `npm install`. **5 Playwright E2E specs
   passed** on the host against the stack.
-- **Playwright E2E (plan 6.4)**: two minimal specs in `frontend/e2e/` run
-  against the local Docker stack through nginx (not CI): public SSR content +
-  Report-Only CSP header + listing→detail navigation, and the admin session
-  flow (guard redirect → login → dashboard → `sessionid` httpOnly +
-  `csrftoken` JS-readable asserted on real cookies → logout). System Chrome
-  via `channel: 'chrome'` — no browser download. Setup + run: `e2e/README.md`
-  (dedicated `e2e_admin` user, seeded via manage.py). Specs are excluded from
-  jest (`testPathIgnorePatterns`) — frontend suite stays 301.
-- Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
-  gated on the §3.6 staging smoke checklist + owner approval.
+- **Playwright E2E (plan 6.4)**: specs in `frontend/e2e/` run against the
+  local Docker stack through nginx (not CI): public SSR content + enforced
+  CSP header + listing→detail navigation, the admin session flow, the §3.6
+  smoke matrix (see §3.6 for the record) and the CSP violation audit.
+  System Chrome via `channel: 'chrome'` — no browser download. Setup + run:
+  `e2e/README.md` (dedicated `e2e_admin` user, seeded via manage.py). Specs
+  are excluded from jest (`testPathIgnorePatterns`); workers capped to 1
+  (Next dev's on-demand compilation starves under parallel workers).
+
+### 3.11 Phase 2 cutover — TokenAuthentication removed (session-only)
+
+The owner approved the plan on 2026-09-05; the cutover commits are on
+`develop` (see docs/adr/0001 for the decision record).
+
+- **What changed**: `REST_FRAMEWORK` authenticates via
+  `SessionAuthentication` only; `rest_framework.authtoken` left
+  `INSTALLED_APPS`; login returns exactly `{user}` (no token minted);
+  change-password keeps `update_session_auth_hash` and no longer rotates a
+  token; logout is session-only; the accounts `post_save` token-minting
+  signal is deleted. The `authtoken_token` TABLE remains in existing
+  databases (Django never drops tables; rows are inert — optional one-off
+  SQL cleanup, deferred).
+- **One-time frontend cleanup**: `AuthContext` purges
+  `localStorage['admin_token']` exactly once on the first admin bootstrap
+  (never reads it); `LoginResponse` is `{user}`.
+- **Behavioral delta to know**: DRF issues a 401 challenge only through
+  authenticators providing a `WWW-Authenticate` header (Token/Basic). With
+  SessionAuthentication alone, **unauthenticated requests to
+  permission-protected endpoints answer 403, not 401**. Consequences baked
+  into code and tests: the admin bootstrap (`fetchSession`) treats 401 AND
+  403 as "unauthenticated" (the layout guard owns the redirect); the
+  transport-level 401 → `/admin/login` redirect stays for any 401 DRF still
+  emits, but a deleted/expired session inside a client-side navigation now
+  surfaces the page's error state — only a hard navigation re-bootstraps and
+  redirects. Ten `requires-auth` backend expectations were updated 401 → 403.
+- **CSP**: enforced (see §3.10).
+- **Validation (Docker, 2026-09-05)**: backend **282 passed / 98.32% cov**
+  (7 legacy-token tests removed, new tests pin: login response is exactly
+  `{user}`, a stale `Authorization: Token` header authenticates nothing,
+  user creation works without the signal, logout is idempotent without a
+  session); frontend **302 jest** (incl. the 403-bootstrap + purge contract
+  tests), `tsc` clean, `lint` clean; **13/13 Playwright e2e** against the
+  stack (§3.6 matrix + CSP audit); curl: login response keys == `['user']`;
+  repo grep: zero runtime `TokenAuthentication`/`authtoken`/`admin_token`
+  references (comments and the purge constant only).
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
+> ✅ **EXECUTED 2026-09-05 — PASSED, CUTOVER LANDED.** Executed as automated
+> Playwright specs (`frontend/e2e/admin-auth.spec.ts`) plus the backend
+> session/CSRF suite (`apps/accounts/test_session_auth.py`), validated under
+> dual-mode BEFORE the removal and re-run green after it. The owner's approval
+> of the cutover plan is recorded on 2026-09-05. Two checklist items changed
+> meaning at the cutover and are noted inline below. Post-cutover state:
+> §3.11.
+
 Phase 2 put the admin on **Django session cookies** (`sessionid`, httpOnly) with
-CSRF, but **dual-mode is still active**: the backend keeps `TokenAuthentication`
-first (legacy clients still work) and login still returns a `token` field that
-new clients deliberately ignore. TokenAuthentication removal is gated on this
-checklist passing **on staging** plus the project owner's explicit approval.
+CSRF. TokenAuthentication was removed after this checklist passed (§3.11).
 
 Auth is scoped to the admin routes (public pages never call `/auth/session/`
-and are never redirected to `/admin/login`). Session logout **preserves** the
-legacy DRF token; only a token-authenticated logout deletes the presented
-token. The old `localStorage['admin_token']` key is left untouched during
-dual mode — its one-time purge happens only in the cutover commit.
+and are never redirected to `/admin/login`).
 
-Manual smoke (browser → http://localhost):
-- [ ] Visit the public homepage while logged OUT — page loads normally, NO
+Smoke record (browser → http://localhost, automated unless noted):
+- [x] Visit the public homepage while logged OUT — page loads normally, NO
       redirect to `/admin/login`, and Network shows no `/auth/session/` call
-- [ ] Fresh browser → `/admin/login` — the legacy `admin_token` key is NOT
-      purged yet (dual mode); it must simply never be read or written
-- [ ] Log in with an admin account — redirect to `/admin` works
-- [ ] Confirm cookies: `sessionid` (HttpOnly ✓) and `csrftoken` (readable) exist
-- [ ] Reload / hard-reload `/admin/...` — session restores without re-login
-- [ ] DevTools → Application → Cookies → delete `sessionid`, then click any
-      admin nav item — expect redirect to `/admin/login` (401 policy)
-- [ ] CRUD write smoke — every admin entity, both create and edit+save, and at
-      least one delete: branches, hero-slides, features, cars (incl. gallery/
-      file upload — FormData path), articles, settings; each must save without
-      CSRF errors (check the Network tab for the `X-CSRFToken` header)
-- [ ] Log out (session) → confirm `sessionid` cookie is gone server-side, you
-      land on `/admin/login`, and any legacy DRF token for that user still
-      exists server-side (it is preserved during dual mode)
-- [ ] While logged in as admin, open the public consultation form and submit —
-      must succeed (201) without a CSRF token (public inquiry is exempt)
-- [ ] Non-admin user (or no login) hitting `/api/v1/admin/*` gets 401/403
+- [x] Fresh browser → `/admin/login` — during dual mode the legacy
+      `admin_token` key was untouched; **at the cutover** it is purged exactly
+      once on bootstrap (pinned by e2e + jest)
+- [x] Log in with an admin account — redirect to `/admin` works
+- [x] Confirm cookies: `sessionid` (HttpOnly ✓) and `csrftoken` (readable) exist
+- [x] Reload / hard-reload `/admin/...` — session restores without re-login
+- [x] Delete `sessionid`, then click any admin nav item — **post-cutover
+      behavior**: the client-side navigation surfaces the page's error state
+      (session-only DRF answers 403 without a challenge, so the old 401
+      redirect no longer fires — redirecting on 403 would loop for
+      forbidden-but-logged-in users); a HARD navigation re-bootstraps and the
+      guard redirects to `/admin/login`. Both asserted in e2e.
+- [x] CRUD write smoke — every admin entity's write path is covered by the
+      backend session/CSRF + multipart tests (Phase 5 manual smoke included
+      real gallery/file uploads); the e2e performs a full features-entity
+      create → edit → delete through the real UI and asserts `X-CSRFToken`
+      on every write (Network-tab check, automated)
+- [x] Log out (session) → `sessionid` cookie is gone, you land on
+      `/admin/login`. (The dual-mode "legacy token is preserved" clause is
+      obsolete — no tokens exist anymore.)
+- [x] While logged in as admin, open the public consultation form and submit —
+      succeeds (201) without a CSRF token (public inquiry is exempt)
+- [x] Non-admin user (or no login) hitting `/api/v1/admin/*` is rejected —
+      now **403** (not 401): see the §3.11 behavioral delta
 
-Regression rollback (if any step fails): the previous commit re-enables the old
-behavior — no data migration is involved, only code. Reordering/removing
-`SessionAuthentication` in `REST_FRAMEWORK` (settings.py) and reverting the
-frontend http.ts/AuthContext commit restores token auth.
+Rollback after a post-cutover failure: revert the `feat(auth): remove
+TokenAuthentication` commit — no data migration is involved (the
+`authtoken_token` table was never dropped, so re-adding the app + authenticator
+restores dual-mode fully).
 
 ---
 
@@ -786,7 +827,7 @@ git push origin main
 - ✅ Articles listing and detail pages
 - ✅ Full admin panel (CRUD for all entities)
 - ✅ Car admin: gallery/slider image upload, catalog file upload, soft delete/restore
-- ✅ Session-cookie admin auth (dual-mode with legacy token until cutover)
+- ✅ Session-cookie admin auth (session-only — TokenAuthentication removed, §3.11)
 - ✅ SEO: metadata, sitemap, robots.txt, Schema.org
 - ✅ Docker development + production setup
 - ✅ CI/CD pipeline (GitHub Actions)
@@ -901,4 +942,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (Phase 6 committed: CSP report-only, cookie flags, local-only guard, secret-scan CI, health-gated deploys, ADRs, Playwright e2e; backend 286 / frontend 301 + 5 e2e)*
+*Last updated: 2026-09-05 (CSP ENFORCED + Phase 2 cutover complete: session-only auth, admin_token purged; backend 282 / frontend 302 + 13 e2e)*

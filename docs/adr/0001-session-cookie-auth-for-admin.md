@@ -1,6 +1,6 @@
 # ADR-0001: Session-cookie auth for the admin API
 
-**Status:** Accepted (implemented, dual-mode cutover pending)
+**Status:** Implemented — cutover complete (session-only, 2026-09-05)
 **Date:** 2026-09-04 · **Plan ref:** SENIOR_REFACTOR_PLAN §6.A, §17#1
 
 ## Context
@@ -24,11 +24,17 @@ from Next.js server code: public RSC pages only call anonymous public GETs.
 - No credential is readable by JS; expiry/rotation/logout are server semantics.
 - Same-origin by construction (nginx serves app + API in prod and dev) — no
   CORS, no `SameSite=None`, no `credentials` flags.
-- Dual-mode transition: `TokenAuthentication` stays FIRST in
-  `DEFAULT_AUTHENTICATION_CLASSES` so legacy clients bypass CSRF until cutover.
-  Removal is gated on the DEVELOPMENT.md §3.6 staging smoke + owner approval.
-- Logout branches on the presented credential: session logout preserves the
-  legacy token; token logout deletes the token.
+- **Cutover (2026-09-05):** the dual-mode window is closed —
+  `TokenAuthentication` and `rest_framework.authtoken` are removed, login
+  returns exactly `{user}`, and the stale `localStorage['admin_token']` key is
+  purged once on the first admin bootstrap. The `authtoken_token` TABLE was
+  never dropped (rows are inert; optional one-off SQL cleanup deferred).
+- **Behavioral delta:** DRF issues a 401 challenge only through authenticators
+  providing a `WWW-Authenticate` header (Token/Basic). With
+  SessionAuthentication alone, unauthenticated requests to
+  permission-protected endpoints answer **403, not 401**; the admin bootstrap
+  (`fetchSession`) treats both statuses as "unauthenticated".
+- Logout is session-only: `logout(request)` destroys the Django session.
 
 ## Alternatives rejected
 

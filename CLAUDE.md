@@ -22,7 +22,7 @@ venv/node_modules, unless the owner says otherwise.
 ```bash
 # Backend — the dev image now installs requirements-dev.txt (pytest included)
 # at build time, so a rebuilt backend image runs tests directly:
-docker compose exec -T backend python -m pytest -q          # 286 passed, 98.32% cov (2026-09-05)
+docker compose exec -T backend python -m pytest -q          # 282 passed, 98.32% cov (2026-09-05)
 docker compose exec -T backend python manage.py check
 docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
@@ -31,7 +31,7 @@ docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # The LOCAL dev frontend/Dockerfile uses the China npm mirror
 # (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
 # Iran — so `docker compose up --build` works locally.
-docker compose exec -T frontend npm test -- --runInBand      # 301 passed, 39 suites, zero act/console warnings (2026-09-05)
+docker compose exec -T frontend npm test -- --runInBand      # 302 passed, 40 suites, zero act/console warnings (2026-09-05)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -39,8 +39,8 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-05 (backend **286 passed** / 98.32%
-cov, frontend **301 passed**, tsc clean, **lint fully clean** — fonts are
+Verified green inside Docker on 2026-09-05 (backend **282 passed** / 98.32%
+cov, frontend **302 passed**, tsc clean, **lint fully clean** — fonts are
 self-hosted via `next/font/local` (frontend/lib/fonts.ts), so the old Google
 Fonts `<link>` warning is gone. Never switch to `next/font/google`: prod
 images are built on a server where Google Fonts is blocked, see plan §J —
@@ -639,6 +639,23 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-05 — CSP enforcement + Phase 2 cutover (session-only auth)
+- **Goal**: Land the two remaining gates of the refactor plan: (A) flip CSP from Report-Only to enforcing, (B) remove TokenAuthentication (Phase 2 cutover) — both gated on explicit owner approval, which the approved plan provided. All §3.6 checklist items automated and executed.
+- **Done** (7 commits on `develop`):
+  - `9a1769b` test(e2e): **CSP violation audit** (`e2e/csp-audit.spec.ts` + `helpers.ts`) — `securitypolicyviolation` collector (all frames) + console net over `/`, `/cars`, `/articles`, live car/article details, `/admin/login`, logged-in dashboard/branches/branches-new. Zero violations is the flip precondition; sole allowance = Next-dev `eval()` (empty blockedURL AND empty sample, `_next/static/chunks` sourceFile + exact Chromium console wording `'unsafe-eval' is not an allowed source of script`). adminLogin() extracted to helpers.
+  - `153d71a` feat(security): **CSP ENFORCED** — header name flip in prod nginx (server + /media/) and dev; dev adds `'unsafe-eval'` (Next dev/HMR); prod must never. public.spec asserts the enforced header + the dev/prod eval split. Rollback = revert header name.
+  - `4691380` test(e2e): **§3.6 checklist automated** — logged-out public page never calls /auth/session/ nor redirects; legacy admin_token key preserved during dual-mode (assertion flipped at cutover); hard-reload session restore; deleted-session-cookie behavior; full features-entity create→edit→delete through the real UI with `X-CSRFToken` asserted on every write (login POST excluded — anonymous by design); public consultation form submitted while logged in (exemption) → `role="status"`; logout destroys the session cookie. Playwright `workers: 1` — parallel workers starve Next dev's on-demand compilation.
+  - `e8d61f0` **feat(auth): remove TokenAuthentication** — SessionAuthentication only; `rest_framework.authtoken` out of INSTALLED_APPS; login returns exactly `{user}`; change-password keeps `update_session_auth_hash` (no token rotation); logout session-only; **deleted the accounts `post_save` signal** that minted a token per user (would crash every user creation post-removal). `authtoken_token` TABLE left in place (Django never drops; rows inert). **Behavioral delta**: unauthenticated requests to protected endpoints now answer **403** (no WWW-Authenticate challenge without Token) — ten requires-auth expectations updated.
+  - `f366cd0` refactor(auth): **one-time `admin_token` purge** in AuthContext bootstrap (never reads/writes credentials); `LoginResponse` → `{user}`; `fetchSession` treats 401 AND 403 as unauthenticated (guard owns the redirect); e2e flipped to post-cutover contracts (purge polled hydration-safe; deleted-cookie soft-nav surfaces the error state while hard-nav re-bootstraps and redirects); CSP collector fixed to read `blockedURI` (`blockedURL` doesn't exist on the DOM event — it silently returned undefined).
+  - Docs commit: DEVELOPMENT.md §3.6 marked **EXECUTED/PASSED** with the two post-cutover behavior deltas recorded inline, new §3.11 (cutover record), §3.10 CSP → enforced, README dual-mode section → session-only, ADR-0001 status → Implemented/cutover complete, ADR-0006 CSP → enforced.
+- **Gotchas hit** (all real, all documented): (1) e2e batch failures were Next-dev compile starvation under 4 parallel workers — `workers: 1` fixed it; (2) the 401→403 DRF challenge change broke 10 tests AND would have silently weakened the bootstrap (fetchSession now handles both); (3) the CSP audit's blockedUrl was always empty because the DOM event property is `blockedURI` — found by tsc in the container; (4) the e2e purge test failed because the SSR'd heading renders before hydration — `expect.poll` instead of assert-after-visible; (5) after editing frontend source on Windows, `next dev` in the container kept serving OLD chunks (Docker Desktop fs-event gap, known since Phase 2) — fix: stop → `docker compose rm -f frontend` → up (fresh `.next`); (6) `/app/node_modules` is an anonymous volume — image rebuilds don't add deps; use in-container `npm install`.
+- **Validation (Docker + stack, 2026-09-05)**: backend **282 passed / 98.32% cov** (286 → 282: 7 legacy-token tests replaced by 4 new contracts); frontend **302 jest** (new: purge contract + 403-bootstrap-no-redirect), `tsc` clean, `lint` clean; **13/13 e2e** post-cutover; `nginx -t` on both confs; curl: login response keys exactly `['user']`, no token; repo grep zero runtime `TokenAuthentication`/`authtoken`/`admin_token`.
+- **Files touched**: backend/config/settings.py, backend/apps/accounts/{views,models,tests,test_session_auth}.py + the 4 apps' tests (401→403), nginx/{nginx,nginx.dev}.conf, frontend/e2e/{helpers,csp-audit.spec,admin-auth.spec,public.spec}.ts + README, frontend/playwright.config.ts, frontend/contexts/AuthContext.tsx + tests, frontend/lib/api/{auth,http}.ts, README.md, DEVELOPMENT.md, CLAUDE.md, docs/adr/{0001,0006}
+- **In progress / Next steps**: merge develop → main when ready (auto-deploys); one manual spot-check on rahnavard.co after deploy: login, one CRUD save, public form submit while logged in, check CSP headers. Optional: drop the inert `authtoken_token` table via one-off SQL.
+- **Decisions made**: (1) plan approval = the owner approval §6.A.4 required; the checklist was automated and executed BEFORE the removal commit. (2) Do NOT redirect on 403 in http.ts — that would loop for authenticated-but-forbidden (non-staff) users; the guard owns post-bootstrap redirects. (3) Keep the `authtoken_token` table (no destructive SQL). (4) CSP audit allowance is surgically scoped to dev-eval; everything else fails the gate.
+
+---
+
 ### Session — 2026-09-05 — Phase 6 (hardening & delivery)
 - **Goal**: Complete Phase 6 of docs/SENIOR_REFACTOR_PLAN.md — finish the in-flight work a previous agent left uncommitted (CSP, cookie flags, local-only guard, secret-scan CI, deploy hardening), verify it in Docker, land it as conventional commits, then do 6.3 (ADRs + README + scratch-doc consolidation) and 6.4 (minimal Playwright e2e).
 - **State found**: 12 modified files + 2 untracked scripts, unverified and uncommitted. **One real blocker**: the new CI `secret-scan` job referenced `scripts/scan-secrets.sh`, but `.gitignore`'s `*secret*` rule ignored the script itself (it could never be committed; the job would fail on push). Also `nginx/nginx.conf` had been rewritten with mixed CRLF/CR line endings (whole-file noise diff), and `scripts/_local_only_guard.sh` was untracked while three committed scripts sourced it.
@@ -813,4 +830,4 @@ These are inferred from commit history since no prior session logs existed.
 
 ---
 
-*Last updated: 2026-09-05 (Gallery filename scheme accepted as deferred debt + collision test; backend 285, frontend 301)*
+*Last updated: 2026-09-05 (CSP enforced + Phase 2 cutover complete — session-only auth, admin_token purged; backend 282, frontend 302, e2e 13)*

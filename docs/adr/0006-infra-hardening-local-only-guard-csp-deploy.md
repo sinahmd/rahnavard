@@ -28,11 +28,14 @@ Three infrastructure hazards:
    the remaining three local-only files (dev compose, dev nginx conf, dev
    frontend Dockerfile) are genuinely dev-only.
 2. **CSP as Report-Only first.** Tightened policy (no CDN script/style/font
-   sources; `base-uri`/`object-src`/`form-action` pinned) ships as
-   `Content-Security-Policy-Report-Only` in prod and dev nginx. Flip to the
-   enforcing header only after a violation-free review window. Note for that
-   flip: prod keeps `'unsafe-inline'` for Next's inline bootstrap scripts; the
-   dev server additionally needs `'unsafe-eval'` for HMR.
+   sources; `base-uri`/`object-src`/`form-action` pinned) shipped as
+   `Content-Security-Policy-Report-Only` in prod and dev nginx. **Enforced
+   2026-09-05**: the "violation-free review window" was executed as an
+   automated audit (`frontend/e2e/csp-audit.spec.ts` — a
+   `securitypolicyviolation` + console collector sweeping public and admin
+   pages; zero findings beyond Next-dev `eval()`). Prod keeps `'unsafe-inline'`
+   for Next's inline bootstrap scripts and must never carry `'unsafe-eval'`;
+   the dev conf adds it for Next dev/HMR. Rollback = revert the header name.
 3. **Health-gated deploys** (deploy.yml + scripts/quick-deploy.sh): explicit
    idempotent `migrate` before the new code serves (entrypoint re-runs it as a
    safety net), recreate backend → health gate → frontend → bounce nginx last
