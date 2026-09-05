@@ -104,3 +104,4 @@ PRODUCTION_READINESS_CHECKLIST.md
 
 # Local agent planning artifacts (never committed).
 .zcode/
+CLAUDE.local.md
