@@ -85,6 +85,15 @@ const paginated = (results: CarListItem[], count: number) => ({
 
 const jsonResponse = (payload: unknown) => ({ ok: true, status: 200, json: async () => payload })
 
+/**
+ * Drain pending microtask chains (fetch → setState) inside act so tests end
+ * with no state updates in flight — keeps the suite warning-free.
+ */
+const flush = async () => {
+  await act(async () => {})
+  await act(async () => {})
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   currentParams = new URLSearchParams()
@@ -141,6 +150,7 @@ describe('CarsExplorer — URL-derived listing state', () => {
       )
     })
     await waitFor(() => expect(screen.getByText('Toyota')).toBeInTheDocument())
+    await flush()
   })
 
   it('mutates the URL when the page changes (router.replace)', async () => {
@@ -162,6 +172,9 @@ describe('CarsExplorer — URL-derived listing state', () => {
         expect.anything()
       )
     })
+    // The refetched page renders and all state settles before the test ends.
+    await waitFor(() => expect(screen.getByText('Toyota')).toBeInTheDocument())
+    await flush()
   })
 
   it('mutates the URL on sort change', async () => {
@@ -169,9 +182,13 @@ describe('CarsExplorer — URL-derived listing state', () => {
 
     render(<CarsExplorer />)
 
+    // Let the mount fetch settle before interacting.
+    await waitFor(() => expect(screen.getAllByText('Toyota').length).toBeGreaterThan(0))
+
     fireEvent.change(screen.getByLabelText('مرتب‌سازی:'), { target: { value: '-created_at' } })
 
     expect(replaceMock).toHaveBeenCalledWith('/cars?sort=-created_at', { scroll: false })
+    await flush()
   })
 
   it('refetches when the URL changes (back/forward / direct links)', async () => {
@@ -191,6 +208,8 @@ describe('CarsExplorer — URL-derived listing state', () => {
         expect.anything()
       )
     })
+    await waitFor(() => expect(screen.getAllByText('Toyota').length).toBeGreaterThan(0))
+    await flush()
   })
 
   it('corrects an out-of-range page via a single URL replace (no loop)', async () => {
@@ -203,6 +222,7 @@ describe('CarsExplorer — URL-derived listing state', () => {
     await waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith('/cars', { scroll: false })
     })
+    await flush()
     expect(replaceMock).toHaveBeenCalledTimes(1)
   })
 })

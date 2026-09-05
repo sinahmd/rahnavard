@@ -68,8 +68,11 @@ export default function AdminListPage<T>({
         setLoading(true)
         const result = await fetchPage(pageNumber)
         // Out-of-range correction: deleting the last row of the last page.
+        // Land on the NEW last valid page derived from count/page_size, not
+        // page 1 — the user's context is the end of the list.
         if (pageNumber > 1 && result.count > 0 && result.results.length === 0) {
-          setPage(1)
+          const size = result.page_size ?? DEFAULT_PAGE_SIZE
+          setPage(Math.max(1, Math.ceil(result.count / size)))
           return
         }
         setRows(result.results)

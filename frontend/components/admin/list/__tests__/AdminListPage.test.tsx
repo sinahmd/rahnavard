@@ -104,21 +104,21 @@ describe('AdminListPage', () => {
     await waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith(1))
   })
 
-  it('returns to page 1 when a page beyond the data comes back empty', async () => {
-    const firstPage = pageOf([1, 2], 45)
+  it('lands on the last valid page when a page beyond the data comes back empty', async () => {
+    // 45 rows → 3 pages. Deleting the last row of page 3 leaves 40 rows →
+    // 2 pages, so the empty page-3 response must land the user on page 2.
     const fetchPage = jest
       .fn()
-      .mockResolvedValueOnce(firstPage)
-      // Deleting the last row of the last page yields an empty page 3…
-      .mockResolvedValueOnce({ count: 41, next: null, previous: null, results: [] })
-      // …and the component must refetch page 1.
-      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce(pageOf([1, 2], 45))
+      .mockResolvedValueOnce({ count: 40, next: null, previous: null, results: [] })
+      .mockResolvedValueOnce(pageOf([21], 40))
     renderList(fetchPage)
     await screen.findByText('ردیف 1')
 
     fireEvent.click(screen.getByRole('button', { name: 'صفحه 3' }))
-    await waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith(1))
-    expect(fetchPage.mock.calls.map((c) => c[0])).toEqual([1, 3, 1])
+    await waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith(2))
+    expect(fetchPage.mock.calls.map((c) => c[0])).toEqual([1, 3, 2])
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('falls back to the previous page when a higher page 404s', async () => {

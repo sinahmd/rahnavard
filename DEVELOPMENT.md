@@ -590,13 +590,16 @@ The nginx proxy routes `/api/*` → backend. Without it, browser fetch calls to 
 
 ### "npm install fails with 403 Forbidden (npm mirror)"
 
-The Arvan npm mirror (`npm.arvancloud.ir`) blocks some packages outside Iran. The local `frontend/Dockerfile` should have the mirror **commented out**:
+The Arvan npm mirror (`npm.arvancloud.ir`) returns 403 outside Iran. Both the
+local `frontend/Dockerfile` and `frontend/Dockerfile.prod` therefore set the
+China mirror — this is current and correct:
 
 ```dockerfile
-# RUN npm config set registry https://npm.arvancloud.ir/
+RUN npm config set registry https://registry.npmmirror.com/
 ```
 
-> ⚠️ **Do NOT change `frontend/Dockerfile.prod`** — production uses `registry.npmmirror.com` and works fine from Arvan Cloud.
+> ⚠️ **Do NOT switch the local `frontend/Dockerfile` to the Arvan mirror**
+> (commented or not) — it 403s outside Iran and breaks `docker compose up --build`.
 
 ### "I accidentally committed to main"
 ```bash

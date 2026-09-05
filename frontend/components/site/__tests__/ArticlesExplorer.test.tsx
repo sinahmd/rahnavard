@@ -51,6 +51,15 @@ const paginated = (results: ArticleListItem[], count: number) => ({
 
 const jsonResponse = (payload: unknown) => ({ ok: true, status: 200, json: async () => payload })
 
+/**
+ * Drain pending microtask chains (fetch → setState) inside act so tests end
+ * with no state updates in flight — keeps the suite warning-free.
+ */
+const flush = async () => {
+  await act(async () => {})
+  await act(async () => {})
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   currentParams = new URLSearchParams()
@@ -97,6 +106,8 @@ describe('ArticlesExplorer — URL-derived listing state', () => {
         expect.anything()
       )
     })
+    await waitFor(() => expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument())
+    await flush()
   })
 
   it('mutates the URL when the page changes (router.replace)', async () => {
@@ -118,6 +129,8 @@ describe('ArticlesExplorer — URL-derived listing state', () => {
         expect.anything()
       )
     })
+    await waitFor(() => expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument())
+    await flush()
   })
 
   it('debounces the search input and commits to the URL', async () => {
@@ -136,6 +149,8 @@ describe('ArticlesExplorer — URL-derived listing state', () => {
       })
 
       expect(replaceMock).toHaveBeenCalledWith('/articles?search=' + encodeURIComponent('راهنما'), { scroll: false })
+      // Drain the mount fetch chain (fake timers do not flush microtasks).
+      await flush()
     } finally {
       jest.useRealTimers()
     }
@@ -157,5 +172,7 @@ describe('ArticlesExplorer — URL-derived listing state', () => {
         expect.anything()
       )
     })
+    await waitFor(() => expect(screen.getByText('راهنمای خرید خودرو')).toBeInTheDocument())
+    await flush()
   })
 })

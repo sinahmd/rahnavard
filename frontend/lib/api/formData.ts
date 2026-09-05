@@ -37,4 +37,3 @@ export function formValuesToFormData(values: FormValues): FormData {
 
 /** Entity-named alias used by the car module (gallery field is `gallery`). */
 export const carFormData = formValuesToFormData
-
