@@ -373,6 +373,67 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
 - Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
   gated on the §3.6 staging smoke checklist + owner approval.
 
+### 3.10 Phase 6 — hardening & delivery (status)
+
+Phase 6 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §7 and
+docs/adr/0006 for the recorded decisions).
+
+- **CSP (report-only)**: both prod (`nginx/nginx.conf`) and dev
+  (`nginx/nginx.dev.conf`) now send a tightened
+  `Content-Security-Policy-Report-Only` — `default-src 'self'`, no CDN script/
+  style/font sources (fonts are self-hosted since `07e72c8`), plus
+  `base-uri 'self'`, `object-src 'none'`, `form-action 'self'`. Nothing is
+  blocked yet; browsers log violations. **Flipping to the enforcing header is
+  a separate, deliberate step** after a violation-free review window. When
+  flipping: prod keeps `'unsafe-inline'` (Next inline bootstrap scripts); the
+  DEV conf additionally needs `'unsafe-eval'` (Next dev/HMR) or the dev
+  server breaks.
+- **Cookie flags explicit**: `SESSION_COOKIE_HTTPONLY=True`,
+  `SESSION_COOKIE_SAMESITE="Lax"`, `CSRF_COOKIE_HTTPONLY=False` (readable on
+  purpose — echoed as `X-CSRFToken`), `CSRF_COOKIE_SAMESITE="Lax"`; pinned by
+  `test_cookie_flags_session_httponly_csrf_readable` (backend suite 286).
+- **Local-only merge dance hardened** (deviation from the plan's "retire",
+  recorded in docs/adr/0006): shared `scripts/_local_only_guard.sh` refuses
+  protected production paths in `LOCAL_ONLY_FILES.txt` or restore backups;
+  `settings.py` removed from the list (it previously would have been reverted
+  on every develop → main merge, dropping the auth config from production).
+  Local-only is now exactly 3 genuinely dev-only files (§11).
+- **CI secret-scan**: `secret-scan` job runs `scripts/scan-secrets.sh` on
+  every push/PR — `git grep` over TRACKED files for secret formats
+  (private-key headers, token prefixes, high-entropy values), never printing
+  matched content. `.gitignore` carries `!scripts/scan-secrets.sh` so the
+  scanner isn't caught by its own `*secret*` rule.
+- **Health-gated deploys**: `deploy.yml` and `scripts/quick-deploy.sh` no
+  longer do a blind `down`/`up`. Flow: build (deploy.yml) → explicit
+  idempotent `migrate --noinput` → `up` backend → backend health gate
+  (12×5s) → `up` frontend → `--force-recreate` nginx LAST (it caches upstream
+  IPs at startup) → end-to-end health through nginx (12×5s) → logs + non-zero
+  exit on failure. The entrypoint's own migrate remains as a safety net.
+- **ADRs**: docs/adr/0001–0006 record the §17 decisions (session auth, route
+  structure, data boundaries, SSR + URL single-source, no new deps, Phase 6
+  infra hardening). Superseded pre-refactor docs moved to `docs/archive/`
+  (see its README for the mapping).
+- **Validation (Docker, 2026-09-05)**: backend **286 passed / 98.32% cov**;
+  `nginx -t` green on BOTH the dev conf (running container) and the prod conf
+  (mounted into a container); report-only header verified through dev nginx
+  via curl; `bash -n` on all changed scripts; `scan-secrets.sh` exits 0 on the
+  repo; `check-local-only.sh` runs green against main..develop. Frontend:
+  **301 jest tests** (e2e excluded), `tsc` clean, `lint` clean in-container
+  after `docker compose exec frontend npm install` — note `/app/node_modules`
+  is an anonymous volume that survives image rebuilds, so new devDependencies
+  need the documented in-container `npm install`. **5 Playwright E2E specs
+  passed** on the host against the stack.
+- **Playwright E2E (plan 6.4)**: two minimal specs in `frontend/e2e/` run
+  against the local Docker stack through nginx (not CI): public SSR content +
+  Report-Only CSP header + listing→detail navigation, and the admin session
+  flow (guard redirect → login → dashboard → `sessionid` httpOnly +
+  `csrftoken` JS-readable asserted on real cookies → logout). System Chrome
+  via `channel: 'chrome'` — no browser download. Setup + run: `e2e/README.md`
+  (dedicated `e2e_admin` user, seeded via manage.py). Specs are excluded from
+  jest (`testPathIgnorePatterns`) — frontend suite stays 301.
+- Phase 2 dual-mode remains active: `TokenAuthentication` removal is still
+  gated on the §3.6 staging smoke checklist + owner approval.
+
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
 Phase 2 put the admin on **Django session cookies** (`sessionid`, httpOnly) with
@@ -569,13 +630,12 @@ cd ..
 #### Step 3: Stash local-only changes
 ```bash
 # Save local-only changes to a named stash
-# (Only 4 files — the nginx proxy eliminated component-level changes)
-git stash push -m "local-only-$(date +%Y%m%d)" -- \
+# (Only 3 files — settings.py is protected and must never be stashed/reverted;
+# see scripts/_local_only_guard.sh)
+git stash push -m "local-only-$(date +%Y%m%d)" --include-untracked -- \
   docker-compose.yml \
-  frontend/Dockerfile \
-  backend/config/settings.py
-# Note: nginx/nginx.dev.conf is untracked, use --include-untracked if present
-git stash push -m "local-only-$(date +%Y%m%d)" --include-untracked -- nginx/nginx.dev.conf 2>/dev/null || true
+  nginx/nginx.dev.conf \
+  frontend/Dockerfile
 ```
 
 #### Step 4: Revert local-only files to main versions
@@ -780,14 +840,24 @@ bash scripts/check-local-only.sh
 
 The script reads `LOCAL_ONLY_FILES.txt` and checks if any of those files appear in the diff between develop and main. If violations are found, it shows exactly which files to revert and how.
 
-### What's local-only (4 files)
+### What's local-only (3 files)
 
 | File | Why it's local-only |
 |------|--------------------|
 | `docker-compose.yml` | Adds nginx proxy service, dev volumes, port config |
-| `nginx/nginx.dev.conf` | Dev nginx config (no SSL, simplified, WebSocket HMR) |
-| `frontend/Dockerfile` | Arvan npm mirror commented out (403 outside Iran) |
-| `backend/config/settings.py` | Higher throttle rates for local testing |
+| `nginx/nginx.dev.conf` | Dev nginx config (no SSL, simplified, WebSocket HMR, report-only CSP) |
+| `frontend/Dockerfile` | Dev server image; uses the China npm mirror (`registry.npmmirror.com`, works outside Iran) |
+
+> ⚠️ **`backend/config/settings.py` is NOT local-only anymore.** It used to be
+> listed (higher local throttle rates) — but it carries the Phase-2 session
+> auth + CSRF config, so reverting it before a merge silently dropped security
+> settings from `main`. It was removed from the list, and
+> **`scripts/_local_only_guard.sh`** (sourced by prepare-merge /
+> apply-local-only / check-local-only) now refuses to run if any protected
+> production path (`backend/config/settings.py`, `docker-compose.prod.yml`,
+> `nginx/nginx.conf`, the prod Dockerfiles/entrypoint, `.github/workflows/`)
+> appears in `LOCAL_ONLY_FILES.txt` or in a restore backup. Do not work around
+> this guard.
 
 > The production stack uses `docker-compose.prod.yml` and `Dockerfile.prod` — completely separate files.
 
@@ -817,6 +887,12 @@ If you create a new file or modify an existing file for local dev purposes:
 2. Run `bash scripts/check-local-only.sh` to verify it's detected
 3. The merge workflow will now automatically include it in stashing and reverts
 
+> The guard (`scripts/_local_only_guard.sh`) will REFUSE the list if you add a
+> protected production path (settings.py, prod compose/Dockerfiles/entrypoint,
+> prod nginx conf, `.github/workflows/*`). Such files must reach `main`
+> unchanged — if a production file truly needs divergent local behavior, solve
+> it with environment variables instead of branch-local content.
+
 ### Full documentation
 
 See `LOCAL_ONLY_FILES.txt` for the complete list with reasons.
@@ -825,4 +901,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (Gallery filename scheme documented as accepted debt + collision test pinned; backend 285 / frontend 301)*
+*Last updated: 2026-09-05 (Phase 6 committed: CSP report-only, cookie flags, local-only guard, secret-scan CI, health-gated deploys, ADRs, Playwright e2e; backend 286 / frontend 301 + 5 e2e)*

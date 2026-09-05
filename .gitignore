@@ -85,9 +85,12 @@ frontend/playwright-report/
 assets/webp/
 
 # Docs & reports
-# (ignore local scratch docs, but keep the ADR directory tracked)
+# (ignore local scratch docs, but keep the ADR directory and the archive
+# README tracked — see gitignore negation rules for nested re-includes)
 docs/*
 !docs/adr/
+!docs/archive/
+docs/archive/*
 !docs/archive/README.md
 CI_CD_IMPLEMENTATION_PLAN.md
 FINAL_PRODUCTION_REPORT.md

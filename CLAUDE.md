@@ -22,7 +22,7 @@ venv/node_modules, unless the owner says otherwise.
 ```bash
 # Backend — the dev image now installs requirements-dev.txt (pytest included)
 # at build time, so a rebuilt backend image runs tests directly:
-docker compose exec -T backend python -m pytest -q          # 284 passed, 98.30% cov (2026-09-05)
+docker compose exec -T backend python -m pytest -q          # 286 passed, 98.32% cov (2026-09-05)
 docker compose exec -T backend python manage.py check
 docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
@@ -39,7 +39,7 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-05 (backend **285 passed** / 98.31%
+Verified green inside Docker on 2026-09-05 (backend **286 passed** / 98.32%
 cov, frontend **301 passed**, tsc clean, **lint fully clean** — fonts are
 self-hosted via `next/font/local` (frontend/lib/fonts.ts), so the old Google
 Fonts `<link>` warning is gone. Never switch to `next/font/google`: prod
@@ -636,6 +636,26 @@ docker compose -f docker-compose.prod.yml restart backend
 - **In progress / Next steps**: What remains
 - **Decisions made**: Any architectural or design choices
 ```
+
+---
+
+### Session — 2026-09-05 — Phase 6 (hardening & delivery)
+- **Goal**: Complete Phase 6 of docs/SENIOR_REFACTOR_PLAN.md — finish the in-flight work a previous agent left uncommitted (CSP, cookie flags, local-only guard, secret-scan CI, deploy hardening), verify it in Docker, land it as conventional commits, then do 6.3 (ADRs + README + scratch-doc consolidation) and 6.4 (minimal Playwright e2e).
+- **State found**: 12 modified files + 2 untracked scripts, unverified and uncommitted. **One real blocker**: the new CI `secret-scan` job referenced `scripts/scan-secrets.sh`, but `.gitignore`'s `*secret*` rule ignored the script itself (it could never be committed; the job would fail on push). Also `nginx/nginx.conf` had been rewritten with mixed CRLF/CR line endings (whole-file noise diff), and `scripts/_local_only_guard.sh` was untracked while three committed scripts sourced it.
+- **Done** (9 commits on `develop`):
+  - `4f312c6` feat(security): explicit cookie flags — `SESSION_COOKIE_HTTPONLY=True`, `SESSION_COOKIE_SAMESITE="Lax"`, `CSRF_COOKIE_HTTPONLY=False` (readable on purpose: echoed as X-CSRFToken), `CSRF_COOKIE_SAMESITE="Lax"`; new pytest pins flags on the login response (morsel assertions).
+  - `db8a451` feat(security): CSP → tightened **Report-Only** in prod + dev nginx (drops jsdelivr/googleapis/gstatic now that fonts are self-hosted; adds base-uri/object-src/form-action). `nginx.conf` line endings normalized back to LF first (diff: 242 lines → 2). Enforcement flip is a separate deliberate step (dev conf will need `'unsafe-eval'` for HMR when enforcing).
+  - `d30463e` ci(security): secret-scan job + `scripts/scan-secrets.sh` (git grep over TRACKED files, format-based rules, never prints matched content; passed locally) + `!scripts/scan-secrets.sh` gitignore negation (staged as a surgical hunk so the unrelated `.local-only-backup/` hunk landed in the guard commit).
+  - `f6423a7` fix(scripts): `scripts/_local_only_guard.sh` shared guard — sourced by prepare-merge/apply-local-only/check-local-only; refuses protected production paths (settings.py, prod compose/Dockerfiles/entrypoint, prod nginx, workflows) in LOCAL_ONLY_FILES.txt or restore backups; **settings.py removed from the list** (previously every develop→main merge would have reverted the Phase-2 auth config on main). `.gitignore` now ignores the real `.local-only-backup/` dir.
+  - `f36ce63` chore(deploy): deploy.yml + quick-deploy.sh — explicit idempotent migrate → rolling restart (backend → health gate → frontend → nginx force-recreated LAST) → end-to-end health through nginx, logs + non-zero exit on failure. No more blind down/up.
+  - `848bc17` docs(adr): **docs/adr/0001–0006** (session auth; route structure/login outside guard; lib/api vs lib/data boundaries; SSR + URL single-source; no-new-client-deps; Phase 6 infra hardening incl. the recorded deviation). `.gitignore` `docs/` → `docs/*` + `!docs/adr/` so ADRs track while scratch docs stay ignored.
+  - `mv`/`git mv`: superseded docs (ARCHITECTURE.md, STEP_BY_STEP_ROADMAP.md, IMPLEMENTATION_REPORT.md, FINAL_PRODUCTION_REPORT.md, PRODUCTION_* checklists, PHASE1_IMPLEMENTATION_COMPLETE.md, CI_CD_IMPLEMENTATION_PLAN.md, agents/developer_car_feature_implementation.md) → **docs/archive/** with a README mapping each to its replacement; empty `agents/` removed.
+  - Docs refresh: README Refactor Status → Phases 0–6 done + "Deliberately not used" section + archive pointer; DEVELOPMENT.md §11 (3 local-only files + guard warning), §7 manual fallback no longer stashes settings.py, new **§3.10 Phase 6 status** (a first edit accidentally deleted §3.9's coverage bullet and the §3.6 heading — caught by heading grep and restored); CLAUDE.md numbers → backend 286.
+  - `test(e2e)`: **Playwright smoke specs** (frontend/e2e/{public,admin-auth}.spec.ts + playwright.config.ts + e2e/README.md) — 5 specs against the real stack through nginx: home SSR content + Report-Only CSP header assertions, /cars first-HTML cards → detail navigation, admin guard redirect, login → dashboard with **cookie flags asserted on real cookies** (`sessionid` httpOnly, `csrftoken` JS-readable), logout. System Chrome via `channel: 'chrome'` (no browser download); dedicated `e2e_admin` seeded in the dev DB (documented in e2e/README.md); specs excluded from jest via `testPathIgnorePatterns`; `@playwright/test` added as devDependency. Fixed: first-card navigation via `page.goto` got `net::ERR_ABORTED` from the dev server → spec clicks the card like a user instead. Gotcha re-learned: **`/app/node_modules` is an anonymous volume that survives image rebuilds** — new deps need the documented `docker compose exec frontend npm install` (host-side install alone leaves container tsc failing on missing types).
+- **Validation (Docker, 2026-09-05)**: backend **286 passed / 98.32% cov** (includes the new cookie-flag test); `nginx -t` green on BOTH the dev conf (running container) and the prod conf (docker cp + `nginx -t -c`, needed `MSYS_NO_PATHCONV=1` — Git Bash mangles `-c /tmp/...` paths); CSP-Report-Only header verified via curl through dev nginx; settings API 200; `bash -n` clean on all six changed scripts; guard function tested directly (rejects settings.py/nginx.conf with exit 1); `scan-secrets.sh` exit 0; `check-local-only.sh` green on main..develop. Frontend in-container: **301 jest** (e2e excluded), `tsc` clean, `lint` clean; **5/5 Playwright specs passed** on the host against the stack.
+- **Files touched**: backend/config/settings.py, backend/apps/accounts/test_session_auth.py, nginx/nginx.conf, nginx/nginx.dev.conf, .github/workflows/{ci,deploy}.yml, scripts/{scan-secrets,_local_only_guard,prepare-merge,apply-local-only,check-local-only,quick-deploy}.sh, LOCAL_ONLY_FILES.txt, .gitignore, docs/adr/* (6 new), docs/archive/* (9 moved + README), README.md, DEVELOPMENT.md, CLAUDE.md, frontend/{playwright.config.ts, jest.config.js, package.json, package-lock.json}, frontend/e2e/{public.spec.ts, admin-auth.spec.ts, README.md}
+- **In progress / Next steps**: CSP enforcement flip after a violation-free browser window (documented in DEVELOPMENT.md §3.10). Phase 2 cutover still gated on §3.6 staging smoke + owner approval. Branch is ~74 commits ahead of origin/develop — push is the owner's call.
+- **Decisions made**: (1) **Harden the local-only dance instead of retiring it** (plan §6.L said retire; deviation recorded in ADR-0006) — the guard structurally closes the actual hazard (settings.py reverts) with far less deploy-path risk; full retirement via gitignored docker-compose.override.yml remains possible later. (2) CSP ships Report-Only per plan §6.A.5 — enforcement needs a violation review first. (3) ADRs live in tracked `docs/adr/` while `docs/*` scratch stays ignored (`!docs/archive/README.md` negated so the archive mapping is tracked). (4) E2E kept minimal (5 specs, no CI wiring): the plan marks 6.4 optional; CI lacks the stack + seeded user, and admin CRUD via UI is deliberately covered by the existing RTL integration tests instead of a brittle browser script.
 
 ---
 
