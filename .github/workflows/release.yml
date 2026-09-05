@@ -1,0 +1,33 @@
+name: Release
+
+# Tag-driven: push a tag (v1.2.3) and a GitHub Release is published with
+# notes grouped from Conventional Commits since the previous tag.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history — notes cover everything since the previous tag
+
+      - name: Generate release notes from conventional commits
+        run: python3 scripts/release-notes.py > release-notes.md
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --latest
