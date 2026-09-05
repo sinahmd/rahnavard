@@ -18,6 +18,18 @@ env:
   PYTHON_VERSION: '3.11'
 
 jobs:
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Scan tracked files for secrets
+        run: |
+          echo "🔒 Scanning tracked files for secrets..."
+          bash scripts/scan-secrets.sh
+
   check-local-only:
     name: Check Local-Only Files
     runs-on: ubuntu-latest

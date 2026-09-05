@@ -60,6 +60,8 @@ ubuntu@ubuntu---1-vcpu---1-gb-ram~$.txt
 *password*
 *secret*
 *credential*
+# Exception: the CI secret scanner itself is tracked (its name matches *secret*).
+!scripts/scan-secrets.sh
 
 # Database files
 *.sql
