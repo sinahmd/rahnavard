@@ -204,11 +204,13 @@ docker compose run --rm --no-deps frontend npm run build
 Verified green on 2026-09-05 (after Phase 5 + manual smoke fixes): backend
 **284 passed** (98.30% coverage, SQLite :memory: via `config.test_settings`),
 frontend **301 passed / 39 suites** with **zero act warnings and zero console
-errors** (grep-verified on the full `npm test` output), `tsc` clean, lint
-clean except the known Google-font `<link>` warning (`app/layout.tsx`) — do
-not "fix" it with `next/font/google` (prod image builds run where Google
-Fonts is blocked). Backend tests need no Postgres; frontend needs no API
-server.
+errors** (grep-verified on the full `npm test` output), `tsc` clean, and
+**lint fully clean** — fonts are self-hosted via `next/font/local`
+(`frontend/lib/fonts.ts` + `frontend/fonts/`, Vazirmatn from the upstream
+repo and Poppins latin), so the old Google-fonts `<link>` warning is gone.
+Never use `next/font/google` (prod image builds run where Google Fonts is
+blocked; local files only). Backend tests need no Postgres; frontend needs
+no API server.
 
 ### 3.7 Phase 3 — server/client boundary + route architecture (status)
 
@@ -323,11 +325,14 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
   107 kB, `/cars` 109 kB, `/cars/[slug]` 108 kB; `curl` (no JS) of `/`
   returns 47.8 kB of SSR'd HTML with real car links. No image code change was
   justified: media URLs already bypass the optimizer (`OptimizedImage`
-  `unoptimized`). Deferred: fonts (no local font assets exist;
-  `next/font/google` is forbidden because prod image builds cannot reach
-  Google Fonts; the Google `@import` + `display=swap` stays until a
-  self-host pass) and the local next/image media optimizer ECONNREFUSED
-  (dev-only — nginx same-origin production behavior is unaffected).
+  `unoptimized`). Fonts are now **self-hosted** (`next/font/local`, Vazirmatn
+  woff2 from the upstream repo + Poppins latin in `frontend/fonts/`): the
+  Google `<link>`/`@import` pair is gone, `display: swap` is handled by
+  next/font, and every weight is preloaded from `/_next/static/media/`
+  (verified: zero `fonts.googleapis` in built page HTML; 10 preloads on `/`).
+  `next/font/google` stays forbidden (build host cannot reach Google Fonts).
+  Deferred: the local next/image media optimizer ECONNREFUSED (dev-only —
+  nginx same-origin production behavior is unaffected).
 - **Manual smoke (local Docker, §9-style)**: seeded 26 cars → admin
   pagination verified through nginx (page1 = 20 rows, page2 = 6,
   `?page=999` → 404; no-CSRF POST → 403; with-CSRF invalid → 400 with
@@ -808,4 +813,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (Phase 5 + manual smoke: duplicate-slug 500 and gallery-append overwrite fixed; axe findings fixed; backend 284 / frontend 301)*
+*Last updated: 2026-09-05 (Fonts self-hosted via next/font/local — Google Fonts dependency removed; lint fully clean; backend 284 / frontend 301)*

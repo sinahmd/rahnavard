@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&family=Poppins:wght@500;600;700;800&display=swap');
+/* Fonts are self-hosted via next/font/local (lib/fonts.ts) — the CSS
+   variables are declared on <html> and resolve to the hashed families. */
 
 :root {
   /* Colors - Exact match from original HTML */
@@ -36,7 +37,7 @@ html {
 }
 
 body {
-  font-family: 'Vazirmatn', sans-serif;
+  font-family: var(--font-vazirmatn), sans-serif;
   background: var(--bg);
   color: var(--dark);
   line-height: 1.7;

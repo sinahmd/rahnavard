@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { poppins, vazirmatn } from '@/lib/fonts'
 
 // Minimal server shell (Phase 3): html/body/fonts/metadata only. Providers
 // are scoped by route group — AuthProvider lives in app/admin/layout.tsx and
-// site settings are server-fetched in app/(site)/layout.tsx.
+// site settings are server-fetched in app/(site)/layout.tsx. Fonts are
+// self-hosted (next/font/local, see lib/fonts.ts) — no Google Fonts request.
 
 export const metadata: Metadata = {
   title: {
@@ -52,15 +54,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="fa" dir="rtl">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&family=Poppins:wght@500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="fa" dir="rtl" className={`${vazirmatn.variable} ${poppins.variable}`}>
       <body className="font-vazir antialiased">{children}</body>
     </html>
   )

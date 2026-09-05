@@ -39,10 +39,12 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-05 (backend 283 passed / 98.29% cov,
-frontend 265 passed, tsc clean, lint clean except the known Google-font `<link>`
-warning in `app/layout.tsx` — do NOT switch to `next/font/google`: prod images are
-built on a server where Google Fonts is blocked, see plan §J).
+Verified green inside Docker on 2026-09-05 (backend **284 passed** / 98.30%
+cov, frontend **301 passed**, tsc clean, **lint fully clean** — fonts are
+self-hosted via `next/font/local` (frontend/lib/fonts.ts), so the old Google
+Fonts `<link>` warning is gone. Never switch to `next/font/google`: prod
+images are built on a server where Google Fonts is blocked, see plan §J —
+local files only).
 
 ---
 
@@ -637,6 +639,20 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-05 — Font self-hosting (plan §6.J / §7 perf)
+- **Goal**: Remove the last runtime dependency on fonts.googleapis.com by self-hosting Vazirmatn + Poppins via `next/font/local`, with Docker validation.
+- **Done** (`9f6d1a0`):
+  - Downloaded 10 woff2 files into `frontend/fonts/` — Vazirmatn weights 400–900 from the upstream repo (rastikerdar/vazirmatn `fonts/webfonts/`, via jsDelivr `gh/` mirror, ~51 KB each) and Poppins latin 500–800 from `@fontsource/poppins` files (~8 KB each, the same files Google Fonts serves). All verified wOFF2 magic + per-file HTTP 200.
+  - New `frontend/lib/fonts.ts` declares both families with per-weight `src` arrays and CSS variables (`--font-vazirmatn`, `--font-poppins`), `display: swap`.
+  - `app/layout.tsx`: the three Google `<link>` tags (preconnect ×2 + stylesheet) are DELETED; the font variables go on `<html lang="fa" dir="rtl">`. `globals.css`: the render-blocking Google `@import` (which sat AFTER the @tailwind directives — invalid CSS order, latent bug) is removed and `body` uses `var(--font-vazirmatn)`. `tailwind.config.ts`: `font-vazir`/`font-poppins` resolve through the CSS variables (next/font hashes the family names).
+  - Verified in the built output (throwaway container): 10 hashed `/_next/static/media/*.woff2` emitted, 10 `rel=preload` tags on `/`, `@font-face` with `font-display:swap` per weight, **zero `fonts.googleapis` in any page HTML** (the remaining matches in server chunks are Next.js framework internals — its font-link check code — not page output). Live dev site after restart: 0 Google refs, font file fetch HTTP 200 same-origin.
+- **Validation (Docker)**: backend untouched (**284 passed**); frontend **301 passed / 39 suites, zero act/console warnings**; `tsc` clean; **`npm run lint` now reports “No ESLint warnings or errors”** (the known Google-font warning is gone); `next build` green with unchanged sizes (`/` 107 kB first load).
+- **Files touched**: frontend/lib/fonts.ts (new), frontend/fonts/vazirmatn/* (6 woff2, new), frontend/fonts/poppins/* (4 woff2, new), frontend/app/layout.tsx, frontend/app/globals.css, frontend/tailwind.config.ts, CLAUDE.md, DEVELOPMENT.md, README.md
+- **In progress / Next steps**: Phase 6 (CSP headers, compose consolidation, ADRs, secret-scan CI) — note CSP will need `font-src 'self'` to match. Phase 2 cutover still gated on §3.6 staging smoke + owner approval. Optional: verify in a browser that Persian text renders in Vazirmatn on the deployed preview.
+- **Decisions made**: `next/font/local` over plain `@font-face` (preload + hashed cache-busted filenames + the plan's §6.J wording, at the cost of moving 2 literal family-name references to CSS variables). All 6+4 weights kept for zero visual regression (each ~8–51 KB). Font files committed to the repo — they must be fetched once on a machine that can reach GitHub/jsDelivr, not at build time.
+
+---
+
 ### Session — 2026-09-05 — Phase 5 (UI/a11y polish + measured perf)
 - **Goal**: Complete Phase 5 of docs/SENIOR_REFACTOR_PLAN.md (§6.H/§6.I/§6.J) — UI consistency (real duplication only), accessibility (skip link, ConfirmDialog, focus management, reduced motion, table/status semantics), measured public-site performance — with Docker validation and conventional commits. Finish the in-flight focus-management work the previous agent left uncommitted.
 - **Done** (commits on `develop`):
@@ -769,4 +785,4 @@ These are inferred from commit history since no prior session logs existed.
 
 ---
 
-*Last updated: 2026-09-05 (Phase 5 + smoke: manual Docker smoke fixed duplicate-slug 500 + gallery-append overwrite; axe findings fixed; backend 284, frontend 301)*
+*Last updated: 2026-09-05 (Fonts self-hosted via next/font/local — no Google Fonts anywhere; lint fully clean; backend 284, frontend 301)*
