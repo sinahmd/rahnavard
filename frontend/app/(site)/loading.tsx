@@ -1,6 +1,6 @@
 export default function SiteLoading() {
   return (
-    <main className="pt-32 pb-20">
+    <main id="main-content" className="pt-32 pb-20">
       <div className="wrap">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 6 }).map((_, i) => (

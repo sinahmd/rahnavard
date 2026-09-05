@@ -2,7 +2,7 @@ import SectionHead from '@/components/site/SectionHead'
 
 export default function CarsLoading() {
   return (
-    <main className="pt-32 pb-20">
+    <main id="main-content" className="pt-32 pb-20">
       <div className="wrap">
         <SectionHead
           eyebrow="محصولات"

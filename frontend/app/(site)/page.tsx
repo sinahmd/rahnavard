@@ -52,7 +52,7 @@ export default async function HomePage() {
           sameAs: [],
         }}
       />
-      <main>
+      <main id="main-content">
         <HeroSlider slides={slides} />
         <WhyRahnavard features={features} settings={settings} />
         <FeaturedCars cars={cars} settings={settings} />

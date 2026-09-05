@@ -60,7 +60,8 @@ export default function AdminArticlesPage() {
               </Link>
               <button
                 onClick={async () => {
-                  if (!confirm('آیا از حذف این مقاله اطمینان دارید؟')) return
+                  const ok = await helpers.confirm('آیا از حذف این مقاله اطمینان دارید؟')
+                  if (!ok) return
                   try {
                     await deleteArticle(article.id)
                     helpers.refresh()

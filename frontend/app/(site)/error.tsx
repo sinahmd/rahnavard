@@ -22,7 +22,7 @@ export default function SiteError({
   }, [error])
 
   return (
-    <main className="pt-32 pb-20">
+    <main id="main-content" className="pt-32 pb-20">
       <div className="wrap text-center">
         <div className="w-24 h-24 mx-auto mb-6 bg-gray-light rounded-full flex items-center justify-center">
           <svg

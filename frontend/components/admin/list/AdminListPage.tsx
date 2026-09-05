@@ -8,6 +8,7 @@ import type { Paginated } from '@/types/api'
 import PageHeader from '@/components/admin/ui/PageHeader'
 import ErrorState from '@/components/admin/ui/ErrorState'
 import EmptyState from '@/components/admin/ui/EmptyState'
+import ConfirmDialog from '@/components/admin/ui/ConfirmDialog'
 
 /** Helpers passed to column cells so row actions can refresh / surface errors. */
 export interface AdminListHelpers {
@@ -15,6 +16,11 @@ export interface AdminListHelpers {
   refresh: () => void
   /** Surface an action failure in the page-level alert banner. */
   error: (message: string) => void
+  /**
+   * Accessible confirm (replaces window.confirm). Resolves true only when
+   * the user confirms; focus is managed by the ConfirmDialog.
+   */
+  confirm: (description: string) => Promise<boolean>
 }
 
 export interface AdminListColumn<T> {
@@ -63,6 +69,9 @@ export default function AdminListPage<T>({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { description: string; resolve: (confirmed: boolean) => void } | null
+  >(null)
 
   const load = useCallback(
     async (pageNumber: number) => {
@@ -103,6 +112,20 @@ export default function AdminListPage<T>({
 
   const refresh = useCallback(() => setReloadKey((k) => k + 1), [])
   const reportError = useCallback((message: string) => setError(message), [])
+  const confirm = useCallback(
+    (description: string) =>
+      new Promise<boolean>((resolve) => setPendingConfirm({ description, resolve })),
+    []
+  )
+  // Stable settle handlers: ConfirmDialog's effect deps stay identity-stable.
+  const settleConfirm = useCallback(
+    (confirmed: boolean) =>
+      setPendingConfirm((pending) => {
+        pending?.resolve(confirmed)
+        return null
+      }),
+    []
+  )
 
   const totalPages = Math.max(1, Math.ceil(count / Math.max(1, pageSize)))
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -152,7 +175,7 @@ export default function AdminListPage<T>({
                   <tr key={rowKey(row)} className="border-t hover:bg-gray-50">
                     {columns.map((col) => (
                       <td key={col.header} className={`p-4 ${col.className || ''}`}>
-                        {col.cell(row, { refresh, error: reportError })}
+                        {col.cell(row, { refresh, error: reportError, confirm })}
                       </td>
                     ))}
                   </tr>
@@ -160,6 +183,15 @@ export default function AdminListPage<T>({
               )}
             </tbody>
           </table>
+
+          <ConfirmDialog
+            open={!!pendingConfirm}
+            title="تأیید حذف"
+            description={pendingConfirm?.description ?? ''}
+            confirmLabel="حذف"
+            onConfirm={() => settleConfirm(true)}
+            onCancel={() => settleConfirm(false)}
+          />
 
           {totalPages > 1 && (
             <div className="px-4 py-3 border-t flex items-center justify-between text-sm">

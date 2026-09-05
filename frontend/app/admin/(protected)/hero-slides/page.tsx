@@ -70,7 +70,8 @@ export default function AdminHeroSlidesPage() {
               </Link>
               <button
                 onClick={async () => {
-                  if (!confirm('آیا از حذف این اسلاید اطمینان دارید؟')) return
+                  const ok = await helpers.confirm('آیا از حذف این اسلاید اطمینان دارید؟')
+                  if (!ok) return
                   try {
                     await deleteHeroSlide(slide.id)
                     helpers.refresh()

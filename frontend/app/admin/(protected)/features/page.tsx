@@ -69,7 +69,8 @@ export default function AdminFeaturesPage() {
               </Link>
               <button
                 onClick={async () => {
-                  if (!confirm('آیا از حذف این ویژگی اطمینان دارید؟')) return
+                  const ok = await helpers.confirm('آیا از حذف این ویژگی اطمینان دارید؟')
+                  if (!ok) return
                   try {
                     await deleteFeature(feature.id)
                     helpers.refresh()

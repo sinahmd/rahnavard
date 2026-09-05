@@ -17,6 +17,10 @@ export default async function SiteLayout({
 
   return (
     <>
+      {/* Keyboard-visible skip link: first focusable element on every public page. */}
+      <a href="#main-content" className="skip-link">
+        پرش به محتوا
+      </a>
       <Header settings={settings} />
       {children}
       <Footer settings={settings} />

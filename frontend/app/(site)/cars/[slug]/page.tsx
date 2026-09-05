@@ -144,7 +144,7 @@ export default async function CarDetailPage({ params }: Props) {
           modelDate: car.year.toString(),
         }}
       />
-      <main className="pt-28 pb-20">
+      <main id="main-content" className="pt-28 pb-20">
         <div className="wrap">
           {/* Breadcrumb */}
           <nav className="mb-8 text-sm">

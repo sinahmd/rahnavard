@@ -91,7 +91,8 @@ export default function AdminCarsPage() {
               </Link>
               <button
                 onClick={async () => {
-                  if (!confirm('آیا از حذف این خودرو اطمینان دارید؟')) return
+                  const ok = await helpers.confirm('آیا از حذف این خودرو اطمینان دارید؟')
+                  if (!ok) return
                   try {
                     await deleteCar(car.id)
                     helpers.refresh()

@@ -189,7 +189,7 @@ export default function CarsExplorer({
 
   return (
     <>
-      <main className="pt-28 pb-20">
+      <main id="main-content" className="pt-28 pb-20">
         <div className="wrap">
           {/* Page Header */}
           <div className="mb-8">

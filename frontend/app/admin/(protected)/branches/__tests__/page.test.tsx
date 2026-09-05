@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import AdminBranchesPage from '../page'
 import {
   deleteBranch,
@@ -93,8 +93,7 @@ it('surfaces a load failure instead of silently showing an empty list', async ()
   expect(await screen.findByRole('alert')).toHaveTextContent('خطا در بارگذاری شعب')
 })
 
-it('deletes after confirmation through the typed endpoint', async () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true)
+it('deletes after confirming in the accessible dialog', async () => {
   mockListBranches.mockResolvedValueOnce({
     count: 1,
     next: null,
@@ -114,14 +113,20 @@ it('deletes after confirmation through the typed endpoint', async () => {
   const deleteButton = await screen.findByRole('button', { name: 'حذف' })
   fireEvent.click(deleteButton)
 
-  expect(confirmSpy).toHaveBeenCalled()
-  expect(mockDeleteBranch).toHaveBeenCalledWith(1)
+  // The ConfirmDialog opens instead of window.confirm.
+  const dialog = await screen.findByRole('dialog')
+  expect(dialog).toHaveTextContent('آیا از حذف این شعبه اطمینان دارید؟')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'حذف' }))
+
+  // Confirm resolves asynchronously — settle each step of the chain.
+  await waitFor(() => expect(mockDeleteBranch).toHaveBeenCalledWith(1))
+  await waitFor(() => expect(mockListBranches).toHaveBeenCalledTimes(2))
   await waitFor(() => expect(screen.getByText('شعبه‌ای وجود ندارد')).toBeInTheDocument())
-  confirmSpy.mockRestore()
+  // Dialog is closed after the action.
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
-it('skips deletion when the confirm dialog is dismissed', async () => {
-  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false)
+it('skips deletion when the confirm dialog is cancelled', async () => {
   mockListBranches.mockResolvedValueOnce({
     count: 1,
     next: null,
@@ -134,6 +139,9 @@ it('skips deletion when the confirm dialog is dismissed', async () => {
   const deleteButton = await screen.findByRole('button', { name: 'حذف' })
   fireEvent.click(deleteButton)
 
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'انصراف' }))
+
   expect(mockDeleteBranch).not.toHaveBeenCalled()
-  confirmSpy.mockRestore()
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })

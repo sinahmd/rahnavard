@@ -14,7 +14,7 @@ export default async function NotFound() {
   return (
     <>
       <Header settings={settings} />
-      <main className="pt-32 pb-20 min-h-screen flex items-center justify-center">
+      <main id="main-content" className="pt-32 pb-20 min-h-screen flex items-center justify-center">
         <div className="wrap text-center">
           <h1 className="text-6xl font-bold mb-4">۴۰۴</h1>
           <h2 className="text-2xl font-bold mb-4">صفحه مورد نظر یافت نشد</h2>

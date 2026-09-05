@@ -76,7 +76,7 @@ export default async function ArticleDetailPage({ params }: Props) {
           },
         }}
       />
-      <main className="pt-32 pb-20">
+      <main id="main-content" className="pt-32 pb-20">
         <div className="wrap max-w-[800px] mx-auto">
           {/* Breadcrumb */}
           <nav className="mb-8 text-sm">

@@ -54,7 +54,8 @@ export default function AdminBranchesPage() {
               </Link>
               <button
                 onClick={async () => {
-                  if (!confirm('آیا از حذف این شعبه اطمینان دارید؟')) return
+                  const ok = await helpers.confirm('آیا از حذف این شعبه اطمینان دارید؟')
+                  if (!ok) return
                   try {
                     await deleteBranch(branch.id)
                     helpers.refresh()
