@@ -38,7 +38,6 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
-    "rest_framework.authtoken",
     "corsheaders",
     "django_filters",
 ]
@@ -62,7 +61,7 @@ MIDDLEWARE = [
     # CsrfViewMiddleware protects Django admin / non-DRF views. DRF API views
     # are csrf_exempt at the middleware layer; DRF itself enforces CSRF for
     # session-authenticated unsafe requests inside SessionAuthentication (see
-    # REST_FRAMEWORK below) — token-authenticated requests stay exempt.
+    # REST_FRAMEWORK below).
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -170,14 +169,12 @@ CSRF_COOKIE_SAMESITE = "Lax"
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
-    # DUAL-MODE (Phase 2, pre-cutover): TokenAuthentication FIRST so legacy
-    # clients sending `Authorization: Token` are authenticated by the first
-    # authenticator and never hit DRF's CSRF enforcement inside
-    # SessionAuthentication. Cookie-only clients fall through to
-    # SessionAuthentication, where CSRF is enforced for unsafe methods.
-    # Order is load-bearing for the migration and rollback — do not reorder.
+    # SESSION-ONLY (Phase 2 cutover, plan §6.A.4): admin requests authenticate
+    # through the httpOnly Django session cookie; SessionAuthentication
+    # enforces CSRF for unsafe methods. The legacy DRF TokenAuthentication was
+    # removed after the §3.6 staging smoke passed — an `Authorization: Token`
+    # header is now simply ignored (the request stays anonymous).
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [

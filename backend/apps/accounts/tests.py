@@ -1,6 +1,5 @@
 import pytest
 from django.contrib.auth.models import User
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APIRequestFactory
 
 from .permissions import (
@@ -50,32 +49,21 @@ def factory():
     return APIRequestFactory()
 
 
-@pytest.fixture
-def user_with_token(db):
-    """Create a user with an auth token."""
-    user = User.objects.create_user(
-        username='testuser',
-        email='test@example.com',
-        password='testpass123'
-    )
-    token, _ = Token.objects.get_or_create(user=user)
-    return user, token
-
-
 @pytest.mark.django_db
 class TestLoginAPI:
     """Tests for login API endpoint."""
 
     def test_login_success(self, api_client, user):
-        """Test successful login."""
+        """Successful login returns the user and NO token (session-only)."""
         data = {
             'username': 'testuser',
             'password': 'testpass123'
         }
         response = api_client.post('/api/v1/auth/login/', data, format='json')
         assert response.status_code == 200
-        assert 'token' in response.data
-        assert 'user' in response.data
+        # Session-only contract (plan §6.A.4): the session cookie is the
+        # credential — no DRF token is minted or returned.
+        assert set(response.data.keys()) == {'user'}
         assert response.data['user']['username'] == 'testuser'
 
     def test_login_invalid_credentials(self, api_client, user):
@@ -96,61 +84,60 @@ class TestLoginAPI:
         response = api_client.post('/api/v1/auth/login/', data, format='json')
         assert response.status_code == 400
 
-    def test_login_creates_token(self, api_client, user):
-        """Test that login creates a token."""
-        data = {
-            'username': 'testuser',
-            'password': 'testpass123'
-        }
-        response = api_client.post('/api/v1/auth/login/', data, format='json')
-        assert Token.objects.filter(user=user).exists()
+    def test_user_creation_works_without_token_signal(self, db):
+        """The removed post_save token signal must not break user creation."""
+        user = User.objects.create_user(
+            username='signalfree',
+            email='signal@example.com',
+            password='signalpass123',
+        )
+        user.refresh_from_db()
+        assert user.username == 'signalfree'
 
 
 @pytest.mark.django_db
 class TestLogoutAPI:
     """Tests for logout API endpoint."""
 
-    def test_logout_success(self, api_client, user_with_token):
-        """Test successful logout."""
-        user, token = user_with_token
-        api_client.force_authenticate(user=user, token=token)
+    def test_logout_success(self, api_client, user):
+        """Test successful logout (session-authenticated)."""
+        api_client.force_authenticate(user=user)
         response = api_client.post('/api/v1/auth/logout/')
         assert response.status_code == 200
-        assert not Token.objects.filter(user=user).exists()
 
     def test_logout_requires_auth(self, api_client):
-        """Test that logout requires authentication."""
+        """Logout requires authentication (403: session-only auth has no
+        WWW-Authenticate challenge, so no 401)."""
         response = api_client.post('/api/v1/auth/logout/')
-        assert response.status_code == 401
+        assert response.status_code == 403
 
 
 @pytest.mark.django_db
 class TestCurrentUserAPI:
     """Tests for current user API endpoint."""
 
-    def test_get_current_user(self, api_client, user_with_token):
+    def test_get_current_user(self, api_client, user):
         """Test getting current user info."""
-        user, token = user_with_token
-        api_client.force_authenticate(user=user, token=token)
+        api_client.force_authenticate(user=user)
         response = api_client.get('/api/v1/auth/user/')
         assert response.status_code == 200
         assert response.data['username'] == 'testuser'
         assert response.data['email'] == 'test@example.com'
 
     def test_get_current_user_requires_auth(self, api_client):
-        """Test that getting current user requires authentication."""
+        """Getting current user requires authentication (403: session-only
+        auth has no WWW-Authenticate challenge, so no 401)."""
         response = api_client.get('/api/v1/auth/user/')
-        assert response.status_code == 401
+        assert response.status_code == 403
 
 
 @pytest.mark.django_db
 class TestChangePasswordAPI:
     """Tests for change password API endpoint."""
 
-    def test_change_password_success(self, api_client, user_with_token):
-        """Test successful password change."""
-        user, token = user_with_token
-        api_client.force_authenticate(user=user, token=token)
+    def test_change_password_success(self, api_client, user):
+        """Successful change: no token returned, session stays valid."""
+        api_client.force_authenticate(user=user)
         data = {
             'old_password': 'testpass123',
             'new_password': 'newpass123',
@@ -158,12 +145,13 @@ class TestChangePasswordAPI:
         }
         response = api_client.post('/api/v1/auth/change-password/', data, format='json')
         assert response.status_code == 200
-        assert 'token' in response.data  # New token returned
+        assert 'token' not in response.data  # session-only: no token minted
+        user.refresh_from_db()
+        assert user.check_password('newpass123')
 
-    def test_change_password_wrong_old(self, api_client, user_with_token):
+    def test_change_password_wrong_old(self, api_client, user):
         """Test password change with wrong old password."""
-        user, token = user_with_token
-        api_client.force_authenticate(user=user, token=token)
+        api_client.force_authenticate(user=user)
         data = {
             'old_password': 'wrongpassword',
             'new_password': 'newpass123',
@@ -172,10 +160,9 @@ class TestChangePasswordAPI:
         response = api_client.post('/api/v1/auth/change-password/', data, format='json')
         assert response.status_code == 400
 
-    def test_change_password_mismatch(self, api_client, user_with_token):
+    def test_change_password_mismatch(self, api_client, user):
         """Test password change with mismatched passwords."""
-        user, token = user_with_token
-        api_client.force_authenticate(user=user, token=token)
+        api_client.force_authenticate(user=user)
         data = {
             'old_password': 'testpass123',
             'new_password': 'newpass123',

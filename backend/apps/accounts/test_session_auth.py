@@ -1,16 +1,13 @@
 """
-Session-cookie + CSRF tests for the Phase 2 dual-mode auth cutover.
+Session-cookie + CSRF tests for the Phase 2 auth cutover (session-only).
 
 Covers the matrix from docs/SENIOR_REFACTOR_PLAN.md §6.A:
-- login bootstraps a Django session + `csrftoken` cookie (still returning the
-  legacy DRF token);
-- GET /auth/session/ restores a valid session and returns 401 without one;
+- login bootstraps a Django session + `csrftoken` cookie and returns ONLY the
+  user (no DRF token is minted or returned — TokenAuthentication is removed);
+- GET /auth/session/ restores a valid session and rejects anonymous requests
+  with 403 (session-only auth has no WWW-Authenticate challenge → no 401);
 - session-authenticated unsafe writes require X-CSRFToken (403 without it);
-- legacy `Authorization: Token` requests keep working and bypass CSRF
-  (TokenAuthentication is deliberately listed first);
-- logout is branch-scoped by the actual authenticator: a session logout
-  destroys only the session and PRESERVES any legacy DRF token (rollback
-  compatibility), while a token logout deletes the presented token;
+- logout destroys the session;
 - the public inquiry POST stays anonymous — 201 for a logged-in admin with no
   CSRF header (authentication_classes = [] exemption);
 - non-staff users stay forbidden on admin endpoints.
@@ -23,7 +20,6 @@ import json
 
 import pytest
 from django.test import Client as DjangoClient
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from apps.inquiries.models import Inquiry
@@ -99,13 +95,13 @@ def csrf_create_inquiry(client):
 
 @pytest.mark.django_db
 class TestLoginSessionBootstrap:
-    """Login must establish the session and CSRF cookie (dual-mode)."""
+    """Login must establish the session and CSRF cookie — token-free."""
 
     def test_login_creates_session_and_csrf_cookie(self, api_client, admin_user):
         resp = do_login(api_client)
         assert resp.status_code == 200
-        assert 'token' in resp.data  # legacy dual-mode field still returned
-        assert 'user' in resp.data
+        # Session-only contract (plan §6.A.4): no token field, ever.
+        assert set(resp.data.keys()) == {'user'}
         assert 'sessionid' in resp.cookies
         assert 'csrftoken' in resp.cookies
 
@@ -134,6 +130,13 @@ class TestLoginSessionBootstrap:
         again = do_login(api_client)
         assert again.status_code == 200
 
+    def test_legacy_token_header_is_ignored(self, api_client, admin_user):
+        """After the cutover a stale `Authorization: Token` header no longer
+        authenticates anything — the request is anonymous (403 on session)."""
+        legacy = APIClient()
+        legacy.credentials(HTTP_AUTHORIZATION='Token not-a-real-token')
+        assert legacy.get(SESSION_URL).status_code == 403
+
 
 @pytest.mark.django_db
 class TestSessionRestore:
@@ -146,27 +149,15 @@ class TestSessionRestore:
         assert resp.data['username'] == 'admin'
         assert resp.data['is_staff'] is True
 
-    def test_session_returns_401_without_credentials(self, api_client):
+    def test_session_rejects_anonymous_request(self, api_client):
+        """403, not 401: session-only auth has no WWW-Authenticate challenge."""
         resp = api_client.get(SESSION_URL)
-        assert resp.status_code == 401
-
-    def test_session_accepts_legacy_token_during_dual_mode(self, api_client, admin_user):
-        token = do_login(api_client).data['token']
-        legacy = APIClient()
-        legacy.credentials(HTTP_AUTHORIZATION=f'Token {token}')
-        resp = legacy.get(SESSION_URL)
-        assert resp.status_code == 200
-        assert resp.data['username'] == 'admin'
+        assert resp.status_code == 403
 
 
 @pytest.mark.django_db
 class TestCsrfEnforcement:
-    """
-    Session-authenticated unsafe writes need X-CSRFToken; token ones don't.
-
-    (TokenAuthentication listed first in dual mode means a token request never
-    reaches SessionAuthentication, so no CSRF enforcement applies to it.)
-    """
+    """Session-authenticated unsafe writes need X-CSRFToken."""
 
     def test_session_write_without_csrf_is_403(self, admin_user):
         client, _ = csrf_login_client(admin_user)
@@ -198,22 +189,6 @@ class TestCsrfEnforcement:
         resp = client.post(LOGOUT_URL)
         assert resp.status_code == 403
 
-    def test_legacy_token_unsafe_write_bypasses_csrf(self, admin_user):
-        token, _ = Token.objects.get_or_create(user=admin_user)
-        legacy = DjangoClient(enforce_csrf_checks=True)
-        inquiry_id = csrf_create_inquiry(legacy)
-        url = f'/api/v1/admin/inquiries/{inquiry_id}/'
-        # NO CSRF header + valid token → TokenAuthentication authenticates
-        # first, so DRF never runs SessionAuthentication's CSRF enforcement.
-        # The ordering is load-bearing for legacy clients.
-        resp = legacy.patch(
-            url,
-            data=json.dumps({'is_read': True}),
-            content_type='application/json',
-            HTTP_AUTHORIZATION=f'Token {token.key}',
-        )
-        assert resp.status_code == 200
-
 
 @pytest.mark.django_db
 class TestPublicInquiryExemption:
@@ -237,68 +212,25 @@ class TestPublicInquiryExemption:
 
 @pytest.mark.django_db
 class TestLogout:
-    """
-    Logout acts on the authenticator that authenticated the request:
-    session logout destroys the session but preserves the legacy token;
-    token logout deletes the presented token.
-    """
+    """Logout destroys the session (CSRF enforced for session clients)."""
 
     def test_logout_destroys_session(self, admin_user):
         client, csrf = csrf_login_client(admin_user)
         out = client.post(LOGOUT_URL, HTTP_X_CSRFTOKEN=csrf)
         assert out.status_code == 200
-        # Session gone → bootstrap endpoint now returns 401.
-        assert client.get(SESSION_URL).status_code == 401
+        # Session gone → bootstrap endpoint now rejects (403, session-only).
+        assert client.get(SESSION_URL).status_code == 403
 
-    def test_session_logout_preserves_legacy_token(self, admin_user):
-        # Give the user a legacy DRF token (as dual-mode login would have).
-        token, _ = Token.objects.get_or_create(user=admin_user)
-        client, csrf = csrf_login_client(admin_user)
-
-        out = client.post(LOGOUT_URL, HTTP_X_CSRFTOKEN=csrf)
-        assert out.status_code == 200
-
-        # Session is destroyed but the token survives for rollback/legacy use.
-        assert client.get(SESSION_URL).status_code == 401
-        assert Token.objects.filter(user=admin_user, key=token.key).exists()
-
-    def test_token_logout_deletes_presented_token(self, admin_user):
-        token, _ = Token.objects.get_or_create(user=admin_user)
-        legacy = DjangoClient(enforce_csrf_checks=True)
-        # No CSRF header needed: token auth bypasses SessionAuthentication's
-        # CSRF enforcement during dual mode.
-        out = legacy.post(LOGOUT_URL, HTTP_AUTHORIZATION=f'Token {token.key}')
-        assert out.status_code == 200
-        assert not Token.objects.filter(user=admin_user).exists()
-        # Deleting the presented token ends the legacy session.
-        assert legacy.get(SESSION_URL).status_code == 401
-
-    def test_session_logout_preserves_token_even_if_one_is_presented_alongside(self, admin_user):
-        """
-        A browser holding BOTH the session cookie and a legacy token header is
-        authenticated by TokenAuthentication (listed first), so logout deletes
-        the token and leaves the session cookie intact.
-        """
-        token, _ = Token.objects.get_or_create(user=admin_user)
-        client, _csrf = csrf_login_client(admin_user)
-        # Attach the token header to the session-holding client.
-        out = client.post(LOGOUT_URL, HTTP_AUTHORIZATION=f'Token {token.key}')
-        assert out.status_code == 200  # token auth is CSRF-exempt in dual mode
-        assert not Token.objects.filter(user=admin_user).exists()
-        # The session cookie was NOT the authenticator, so it survives.
-        assert client.get(SESSION_URL).status_code == 200
+    def test_logout_is_idempotent_without_session(self, api_client):
+        """A session-less POST to logout is still an authenticated-required
+        endpoint; with no credentials it must 403, not crash."""
+        assert api_client.post(LOGOUT_URL).status_code == 403
 
 
 @pytest.mark.django_db
 class TestAuthorizationStillEnforced:
-    """IsAdminUser still governs admin endpoints in dual mode."""
+    """IsAdminUser still governs admin endpoints (session-only)."""
 
     def test_non_staff_session_user_is_forbidden(self, api_client, user):
         do_login(api_client, username='testuser', password='testpass123')
         assert api_client.get('/api/v1/admin/branches/').status_code == 403
-
-    def test_non_staff_token_user_is_forbidden(self, api_client, user):
-        token = do_login(api_client, username='testuser', password='testpass123').data['token']
-        legacy = APIClient()
-        legacy.credentials(HTTP_AUTHORIZATION=f'Token {token}')
-        assert legacy.get('/api/v1/admin/branches/').status_code == 403

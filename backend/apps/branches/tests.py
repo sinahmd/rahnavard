@@ -188,9 +188,11 @@ class TestBranchAdminAPI:
     """Tests for Branch admin API endpoints."""
 
     def test_admin_list_requires_auth(self, api_client):
-        """Test that admin list requires authentication."""
+        """Anonymous admin-list access must be rejected. With session-only
+        auth DRF returns 403 (no WWW-Authenticate challenge exists — the
+        401 challenge died with TokenAuthentication)."""
         response = api_client.get('/api/v1/admin/branches/')
-        assert response.status_code == 401
+        assert response.status_code == 403
 
     def test_admin_list_with_auth(self, admin_client, sample_branches):
         """Test admin list with authentication."""
