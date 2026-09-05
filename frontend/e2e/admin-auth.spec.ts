@@ -1,21 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { adminLogin } from './helpers'
 
 // Session-cookie auth smoke over real nginx (Phase 2/6 behavior):
 // guard redirect, login, httpOnly sessionid + readable csrftoken,
 // dashboard reachable, logout returns to the login page.
-//
-// Credentials: a dedicated seeded admin (see e2e/README.md). Override with
-// E2E_ADMIN_USER / E2E_ADMIN_PASSWORD.
-const ADMIN_USER = process.env.E2E_ADMIN_USER || 'e2e_admin'
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'e2epass123'
-
-async function login(page: import('@playwright/test').Page) {
-  await page.goto('/admin/login')
-  await page.getByPlaceholder('نام کاربری خود را وارد کنید').fill(ADMIN_USER)
-  await page.getByPlaceholder('رمز عبور خود را وارد کنید').fill(ADMIN_PASSWORD)
-  await page.getByRole('button', { name: /ورود|submit/i }).click()
-  await page.waitForURL(/\/admin(?!\/login)/)
-}
 
 test('unauthenticated /admin is redirected to the login page', async ({ page }) => {
   await page.goto('/admin')
@@ -23,7 +11,7 @@ test('unauthenticated /admin is redirected to the login page', async ({ page }) 
 })
 
 test('login reaches the dashboard with correct cookie flags', async ({ page }) => {
-  await login(page)
+  await adminLogin(page)
 
   await expect(page.getByText('داشبورد')).toBeVisible()
 
@@ -37,7 +25,7 @@ test('login reaches the dashboard with correct cookie flags', async ({ page }) =
 })
 
 test('logout returns to the login page', async ({ page }) => {
-  await login(page)
+  await adminLogin(page)
   await page.getByRole('button', { name: 'خروج' }).first().click()
   await expect(page).toHaveURL(/\/admin\/login/)
 })
