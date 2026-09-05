@@ -23,8 +23,14 @@ NC='\033[0m'
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BACKUP_DIR="$REPO_ROOT/.local-only-backup"
+LOCAL_ONLY_FILE="$REPO_ROOT/LOCAL_ONLY_FILES.txt"
 
 cd "$REPO_ROOT"
+
+# Source the shared protected-file guard (auth-critical files must never be
+# restored over their production versions — see scripts/_local_only_guard.sh).
+# shellcheck source=scripts/_local_only_guard.sh
+source "$REPO_ROOT/scripts/_local_only_guard.sh"
 
 # Verify we're on develop
 BRANCH=$(git branch --show-current)
@@ -32,6 +38,10 @@ if [ "$BRANCH" != "develop" ]; then
     echo -e "${RED}ERROR: Must be on 'develop' branch. Currently on: $BRANCH${NC}"
     exit 1
 fi
+
+# Abort if the on-disk list names a protected production file (belt-and-braces
+# in case prepare-merge.sh's guard was bypassed by an older script version).
+guard_local_only_file || exit 1
 
 echo ""
 echo "============================================="
@@ -61,6 +71,11 @@ while IFS= read -r f; do
     [ -z "$f" ] && continue
     BACKUP_FILES+=("$f")
 done < <(cd "$BACKUP_DIR" && find . -type f | sed 's|^\./||')
+
+# Refuse to restore any protected production path from the backup.
+if [ ${#BACKUP_FILES[@]} -gt 0 ]; then
+    printf '%s\n' "${BACKUP_FILES[@]}" | check_protected_paths || exit 1
+fi
 
 if [ ${#BACKUP_FILES[@]} -eq 0 ]; then
     echo -e "${YELLOW}Backup directory is empty.${NC}"

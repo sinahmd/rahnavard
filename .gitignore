@@ -89,7 +89,8 @@ IMPLEMENTATION_REPORT.md
 PHASE1_IMPLEMENTATION_COMPLETE.md
 PRODUCTION_DEPLOYMENT_CHECKLIST.md
 PRODUCTION_READINESS_CHECKLIST.md
-STEP_BY_STEP_ROADMAP.md.local-only-backup/
+# Local-only merge backup dir (prepare-merge.sh / apply-local-only.sh)
+.local-only-backup/
 
 # Local agent planning artifacts (never committed).
 .zcode/

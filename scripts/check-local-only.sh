@@ -26,6 +26,11 @@ NC='\033[0m' # No Color
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOCAL_ONLY_FILE="$REPO_ROOT/LOCAL_ONLY_FILES.txt"
 
+# Source the shared protected-file guard (auth-critical files must never be
+# listed as local-only — see scripts/_local_only_guard.sh).
+# shellcheck source=scripts/_local_only_guard.sh
+source "$REPO_ROOT/scripts/_local_only_guard.sh"
+
 # Determine the diff range
 if [ -n "$1" ]; then
     DIFF_RANGE="$1"
@@ -53,6 +58,9 @@ if [ ! -f "$LOCAL_ONLY_FILE" ]; then
     echo "Create it with the list of local-only files."
     exit 1
 fi
+
+# Abort if a protected production file sneaks into the list (settings.py etc.)
+guard_local_only_file || exit 1
 
 # Get list of local-only files (skip comments and empty lines)
 LOCAL_ONLY_FILES=$(grep -v '^#' "$LOCAL_ONLY_FILE" | grep -v '^\s*$' | sed 's/^[[:space:]]*//')
