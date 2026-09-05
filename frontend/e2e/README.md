@@ -1,8 +1,26 @@
 # E2E smoke specs (Playwright)
 
-Minimal end-to-end coverage from plan §6.4 / §6.K: public SSR content through
-nginx and the session-cookie admin auth flow. Everything runs against the
-**local Docker stack** (`docker compose up`), not against a dev server.
+End-to-end coverage from plan §6.4 + the DEVELOPMENT.md §3.6 session smoke
+checklist: public SSR content, CSP enforcement, and the session-cookie admin
+auth flow. Everything runs against the **local Docker stack**
+(`docker compose up`), not against a dev server.
+
+Coverage map:
+- `public.spec.ts` — SSR'd home content, enforced CSP header (dev/prod eval
+  split asserted), `/cars` first-HTML cards → detail navigation.
+- `admin-auth.spec.ts` — §3.6 matrix: guard redirect, login + cookie flags,
+  logout (session cookie destroyed), logged-out public page never calls
+  `/auth/session/`, legacy `admin_token` key handling, hard-reload session
+  restore, deleted-session-cookie redirect, a full features-entity CRUD
+  through the UI asserting `X-CSRFToken` on every write, and the public
+  consultation form submitting while logged in (inquiry exemption). Side
+  effect: the consultation test appends one inquiry row (name `E2E مشاوره`)
+  to the dev DB.
+- `csp-audit.spec.ts` — zero `securitypolicyviolation` events / console
+  reports across public + admin pages (only Next-dev eval is allowed).
+
+Tests run with `workers: 1` — Next dev compiles routes on demand and is
+effectively single-threaded; parallel workers starve it.
 
 ## One-time setup
 
