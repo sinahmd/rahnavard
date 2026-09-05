@@ -201,13 +201,14 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green on 2026-09-05 (after Phase 5): backend **283 passed**
-(98.29% coverage, SQLite :memory: via `config.test_settings`), frontend
-**301 passed / 39 suites** with **zero act warnings and zero console errors**
-(grep-verified on the full `npm test` output), `tsc` clean, lint clean except
-the known Google-font `<link>` warning (`app/layout.tsx`) — do not "fix" it
-with `next/font/google` (prod image builds run where Google Fonts is blocked).
-Backend tests need no Postgres; frontend needs no API server.
+Verified green on 2026-09-05 (after Phase 5 + manual smoke fixes): backend
+**284 passed** (98.30% coverage, SQLite :memory: via `config.test_settings`),
+frontend **301 passed / 39 suites** with **zero act warnings and zero console
+errors** (grep-verified on the full `npm test` output), `tsc` clean, lint
+clean except the known Google-font `<link>` warning (`app/layout.tsx`) — do
+not "fix" it with `next/font/google` (prod image builds run where Google
+Fonts is blocked). Backend tests need no Postgres; frontend needs no API
+server.
 
 ### 3.7 Phase 3 — server/client boundary + route architecture (status)
 
@@ -327,6 +328,28 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
   Google Fonts; the Google `@import` + `display=swap` stays until a
   self-host pass) and the local next/image media optimizer ECONNREFUSED
   (dev-only — nginx same-origin production behavior is unaffected).
+- **Manual smoke (local Docker, §9-style)**: seeded 26 cars → admin
+  pagination verified through nginx (page1 = 20 rows, page2 = 6,
+  `?page=999` → 404; no-CSRF POST → 403; with-CSRF invalid → 400 with
+  Persian field errors). Car form gallery create (`gallery_0/1` → 2 URLs)
+  and edit-append (existing preserved + new file appended → 3 URLs) via
+  real multipart. Two real bugs surfaced and fixed:
+  - **Duplicate-slug create returned HTTP 500** (unhandled IntegrityError
+    from the partial unique index) — `CarAdminListView.create` now maps it
+    to a 400 `slug` field error (pinned by
+    `test_admin_create_duplicate_slug_returns_400_field_error`).
+  - **Gallery edit-append overwrote the first existing image's disk file**
+    (new files were named `{slug}_gallery_{idx}` with the counter
+    restarting at 0) — the counter now continues past the existing gallery
+    (pinned by the extended append test).
+  - **Axe spot checks** (headless Chrome + axe-core over the hydrated
+    public pages) found: unlabeled filter selects (critical) → aria-labels
+    added; footer `tel:` link empty when phone unset (serious) → rendered
+    only when a phone exists; two unlabeled nav landmarks → desktop nav
+    `aria-label="ناوبری اصلی"`; heading skips → card h4/footer h5 became
+    h3, home gained an sr-only h1. Post-fix: **0 violations** on `/`,
+    `/cars`, and a car detail page (remaining axe items are
+    jsdom-incomplete visibility/streaming artifacts).
 - **Coverage**: jest scope unchanged (lib/api + lib/data + contexts + admin
   form/list); new a11y suites live under components/{admin/ui,car,layout,
   home}/__tests__ and app/__tests__.
@@ -785,4 +808,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (Phase 5 UI/a11y polish committed: shared useModalA11y, reduced motion, 301 frontend tests with zero warnings)*
+*Last updated: 2026-09-05 (Phase 5 + manual smoke: duplicate-slug 500 and gallery-append overwrite fixed; axe findings fixed; backend 284 / frontend 301)*
