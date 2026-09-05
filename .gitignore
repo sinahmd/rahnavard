@@ -77,6 +77,9 @@ ubuntu@ubuntu---1-vcpu---1-gb-ram~$.txt
 backend/.coverage
 frontend/coverage/
 frontend/tsconfig.tsbuildinfo
+# Playwright E2E artifacts
+frontend/test-results/
+frontend/playwright-report/
 
 # Assets
 assets/webp/
@@ -85,6 +88,7 @@ assets/webp/
 # (ignore local scratch docs, but keep the ADR directory tracked)
 docs/*
 !docs/adr/
+!docs/archive/README.md
 CI_CD_IMPLEMENTATION_PLAN.md
 FINAL_PRODUCTION_REPORT.md
 IMPLEMENTATION_REPORT.md
