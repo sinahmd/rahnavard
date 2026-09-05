@@ -244,16 +244,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build and start the Docker stack
-        run: docker compose up -d --build
-
-      - name: Wait for PostgreSQL, then migrate
+      - name: Start PostgreSQL and wait for it
         run: |
+          docker compose up -d --build postgres
           for i in $(seq 1 30); do
-            docker compose exec -T postgres pg_isready -U user && break
+            docker compose exec -T postgres pg_isready -U user && exit 0
             sleep 2
           done
-          docker compose run --rm backend python manage.py migrate --noinput
+          echo "postgres never became ready"
+          docker compose logs --tail=50 postgres
+          exit 1
+
+      - name: Start the rest of the stack
+        run: docker compose up -d --build
+
+      - name: Migrate
+        run: docker compose run --rm backend python manage.py migrate --noinput
 
       - name: Seed the dedicated E2E admin
         run: |
