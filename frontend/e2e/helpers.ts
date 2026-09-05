@@ -38,7 +38,7 @@ export async function collectCspViolations(
     document.addEventListener('securitypolicyviolation', (e) => {
       w.__cspViolations.push({
         effectiveDirective: e.effectiveDirective,
-        blockedUrl: (e.blockedURL || '').slice(0, 200),
+        blockedUrl: (e.blockedURI || '').slice(0, 200),
         sourceFile: e.sourceFile || '',
         disposition: e.disposition,
         sample: (e.sample || '').slice(0, 120),

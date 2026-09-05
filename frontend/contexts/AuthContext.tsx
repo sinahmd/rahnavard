@@ -31,11 +31,11 @@ interface AuthContextType {
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// TODO(auth-cutover): the pre-Phase-2 `admin_token` localStorage key must be
-// purged exactly once, but ONLY in the post-staging, owner-approved commit
-// that removes TokenAuthentication (plan §7 Phase 2.3→2.4). During dual mode
-// the key is deliberately left untouched so legacy clients can still roll
-// back — new runtime code must never read, write, use, or send it.
+// One-time cleanup (plan §7 Phase 2.4, cutover commit): the pre-Phase-2
+// `admin_token` localStorage key is dead weight — TokenAuthentication no
+// longer exists, so the key authenticates nothing. It is REMOVED (never
+// read, never written) on the first admin bootstrap.
+const LEGACY_TOKEN_KEY = 'admin_token';
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -43,14 +43,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Bootstrap: ask the server who the session belongs to (401 when expired).
+  // Bootstrap: ask the server who the session belongs to.
+  // Session-only auth (cutover): an anonymous session check answers 403 —
+  // DRF only issues a 401 challenge through authenticators that provide a
+  // WWW-Authenticate header, and SessionAuthentication provides none. Both
+  // 401 and 403 therefore mean "no valid session".
   const fetchSession = useCallback(async () => {
     try {
       const userData = await apiGetSession();
       setUser(userData);
       return userData;
     } catch (err) {
-      if (err instanceof ApiRequestError && err.status === 401) {
+      if (
+        err instanceof ApiRequestError &&
+        (err.status === 401 || err.status === 403)
+      ) {
         // No (or expired) session — unauthenticated state.
         setUser(null);
       }
@@ -63,6 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state from the session cookie
   useEffect(() => {
     const initAuth = async () => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+      }
       await fetchSession();
       setLoading(false);
     };
@@ -72,14 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Login: the backend establishes the session cookie; we just mirror the user.
   const login = async (username: string, password: string) => {
     const data = await apiLogin(username, password);
-    // The response still carries a legacy `token` field during dual-mode; the
-    // session cookie is what authenticates subsequent requests, so the token
-    // is deliberately ignored (and never stored).
     setUser(data.user);
   };
 
-  // Logout: destroy the server-side session (and the legacy token server-side
-  // too, while dual mode still mints them).
+  // Logout: destroy the server-side session.
   const logout = async () => {
     try {
       await apiLogout();

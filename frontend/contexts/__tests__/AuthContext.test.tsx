@@ -83,7 +83,7 @@ describe('AuthContext', () => {
     localStorageMock.removeItem.mockClear()
   })
 
-  it('never touches localStorage during session bootstrap (legacy key preserved until cutover)', async () => {
+  it('purges the legacy admin_token key once on bootstrap (never reads or writes it)', async () => {
     mockFetch.mockResolvedValueOnce(okJson({ detail: 'Not authenticated.' }, 401))
 
     render(
@@ -96,12 +96,36 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('false')
     })
 
-    // Dual mode keeps the legacy admin_token key untouched for rollback: no
-    // reads, writes, or removals of credentials. Session lives in the
-    // httpOnly cookie; nothing is ever stored by the client.
+    // Cutover cleanup (plan §7 Phase 2.4): the pre-Phase-2 key authenticates
+    // nothing anymore, so it is removed exactly once. The client still never
+    // READS credentials and never WRITES any — storage stays credential-free.
+    expect(localStorageMock.removeItem).toHaveBeenCalledTimes(1)
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
     expect(localStorageMock.getItem).not.toHaveBeenCalled()
     expect(localStorageMock.setItem).not.toHaveBeenCalled()
-    expect(localStorageMock.removeItem).not.toHaveBeenCalled()
+  })
+
+  it('treats a 403 session check as unauthenticated (session-only auth has no 401 challenge)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      okJson({ detail: 'Authentication credentials were not provided.' }, 403)
+    )
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
+    expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    // The transport's 401 redirect does NOT fire for 403 — after the cutover
+    // an anonymous bootstrap answers 403, and the layout guard owns the
+    // redirect to /admin/login.
+    expect(assignMock).not.toHaveBeenCalled()
   })
 
   it('should provide unauthenticated state when the session is missing', async () => {
@@ -237,9 +261,10 @@ describe('AuthContext', () => {
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
     })
-    // Local state is cleared regardless of the API failure — but the legacy
-    // token key is never touched during dual mode.
-    expect(localStorageMock.removeItem).not.toHaveBeenCalled()
+    // Local state is cleared regardless of the API failure. The only storage
+    // touch is the one-time legacy purge from bootstrap — never a write.
+    expect(localStorageMock.removeItem).toHaveBeenCalledTimes(1)
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
     expect(localStorageMock.setItem).not.toHaveBeenCalled()
   })
 

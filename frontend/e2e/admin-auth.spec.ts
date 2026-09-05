@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test'
 import { adminLogin } from './helpers'
 
 // §3.6 session-auth smoke checklist, automated against the real stack
-// (nginx → Next → Django). Covers the DEVELOPMENT.md §3.6 items that can be
-// browser-driven; the non-admin 403 and dual-mode token internals stay
-// covered by backend tests (apps/accounts/test_session_auth.py).
+// (nginx → Next → Django), post-cutover. Covers the DEVELOPMENT.md §3.6
+// items that can be browser-driven; the non-admin 403 and remaining auth
+// internals stay covered by backend tests (apps/accounts/test_session_auth.py).
 
 const BASE = process.env.E2E_BASE_URL || 'http://localhost'
 
@@ -77,18 +77,24 @@ test('logged-out public page never calls /auth/session/ and never redirects', as
   expect(sessionCalls, 'public pages must stay auth-free').toEqual([])
 })
 
-// §3.6 (dual-mode item): the legacy `admin_token` key is left untouched
-// during dual mode. FLIP AT CUTOVER: this becomes the one-time purge
-// assertion (removeItem on first bootstrap, key gone afterwards).
-test('legacy admin_token key is preserved during dual mode', async ({ page }) => {
+// §3.6 / cutover (plan §7 Phase 2.4): the stale pre-Phase-2 localStorage key
+// is purged exactly once on the first admin bootstrap — it authenticates
+// nothing since TokenAuthentication was removed.
+test('legacy admin_token key is purged on admin bootstrap', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('admin_token', 'legacy-token-for-purge-test')
   })
   await page.goto('/admin/login')
   await expect(page.getByRole('heading', { level: 1, name: 'راهنورد' })).toBeVisible()
 
-  const stored = await page.evaluate(() => window.localStorage.getItem('admin_token'))
-  expect(stored).toBe('legacy-token-for-purge-test')
+  // The heading above is server-rendered — hydration (and the purge effect)
+  // may still be pending, so poll instead of asserting immediately.
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('admin_token')), {
+      timeout: 10_000,
+      message: 'the dead legacy key must be gone after bootstrap',
+    })
+    .toBeNull()
 })
 
 // §3.6: "Reload / hard-reload /admin/... — session restores without re-login."
@@ -99,18 +105,19 @@ test('hard reload restores the admin session without re-login', async ({ page })
   expect(page.url()).not.toContain('/admin/login')
 })
 
-// §3.6: "delete sessionid, then click any admin nav item — expect redirect
-// to /admin/login (401 policy)."
-test('deleted session cookie redirects on the next admin navigation', async ({ page }) => {
+// §3.6: "delete sessionid, then click any admin nav item" — post-cutover the
+// 401 redirect no longer fires (session-only auth answers 403 without a
+// challenge, and redirecting on 403 would loop for forbidden-but-logged-in
+// users). Observed contract: the client-side navigation surfaces the list's
+// error state; a hard navigation re-bootstraps and the guard redirects.
+test('deleted session cookie surfaces errors on soft nav, redirects on hard nav', async ({ page }) => {
   await adminLogin(page)
 
   await page.context().clearCookies()
-  // The 401 policy may fire on any background fetch (redirecting before the
-  // click lands) — the click is best-effort, the URL assertion is the gate.
-  await page
-    .getByRole('link', { name: 'ویژگی‌ها' })
-    .click({ timeout: 5_000 })
-    .catch(() => {})
+  await page.getByRole('link', { name: 'ویژگی‌ها' }).click()
+  await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 15_000 })
+
+  await page.goto('/admin/features')
   await page.waitForURL(/\/admin\/login/, { timeout: 15_000 })
 })
 

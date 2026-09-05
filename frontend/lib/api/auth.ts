@@ -1,17 +1,15 @@
 /**
- * Auth endpoints (session-cookie auth, Phase 2).
+ * Auth endpoints (session-cookie auth, session-only since the cutover).
  *
  * Authentication is the ambient httpOnly `sessionid` cookie; `http.ts` echoes
- * `X-CSRFToken` from the `csrftoken` cookie on unsafe methods. Login still
- * returns `{ token, user }` because the backend is in dual-mode and keeps
- * minting DRF tokens for legacy clients — this client ignores `token`.
+ * `X-CSRFToken` from the `csrftoken` cookie on unsafe methods. The login
+ * response carries only the user — no DRF token exists anymore.
  */
 
 import { request } from './http'
 import type { User } from '@/types/user'
 
 export interface LoginResponse {
-  token: string
   user: User
 }
 
@@ -27,10 +25,11 @@ export function logout(): Promise<{ message: string }> {
 }
 
 /**
- * Admin bootstrap: returns the current user when the session cookie (or, in
- * dual mode, a legacy token) authenticates the request; 401 otherwise. The
- * backend decorates it with @ensure_csrf_cookie so the browser holds a
- * `csrftoken` cookie before its first state-changing request.
+ * Admin bootstrap: returns the current user when the session cookie
+ * authenticates the request; 403 when it does not (session-only auth has no
+ * WWW-Authenticate challenge, so DRF answers anonymous requests with 403
+ * rather than 401). The backend decorates it with @ensure_csrf_cookie so the
+ * browser holds a `csrftoken` cookie before its first state-changing request.
  */
 export function getSession(): Promise<User> {
   return request<User>('/auth/session/')

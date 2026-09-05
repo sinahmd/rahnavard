@@ -6,11 +6,9 @@
  *
  * - Prefix endpoints with the API base URL.
  * - Authenticate via the ambient Django session cookie (httpOnly `sessionid`).
- *   No credentials are attached by JavaScript — Phase 2 of the senior refactor
- *   removed the DRF-token-in-localStorage model. A legacy `admin_token` key
- *   from before the cutover is deliberately left untouched during dual mode
- *   (it is only purged in the owner-approved TokenAuthentication-removal
- *   commit, see AuthContext TODO).
+ *   No credentials are attached by JavaScript — the Phase 2 cutover removed
+ *   the DRF-token-in-localStorage model entirely, and AuthContext purges the
+ *   stale `admin_token` localStorage key once on the first admin bootstrap.
  * - Send `X-CSRFToken` (read from the non-HttpOnly `csrftoken` cookie the
  *   backend bootstraps via @ensure_csrf_cookie on login and /auth/session/)
  *   on state-changing methods. DRF only enforces CSRF for session-authenticated
@@ -18,7 +16,12 @@
  * - Normalize non-2xx DRF bodies (`detail` / `non_field_errors` /
  *   `{field: [errors]}`) into a typed `ApiError { message, fieldErrors }`.
  * - Central 401 policy: send the browser to the admin login page (expired
- *   session). Nothing to clear — the session cookie is server-side state.
+ *   session). Note the session-only backend answers *anonymous* requests with
+ *   403 (no WWW-Authenticate challenge) — the admin bootstrap handles both
+ *   statuses as "unauthenticated" in AuthContext; the 401 redirect here only
+ *   fires for responses DRF still codes as 401 (e.g. an expired session
+ *   rejected mid-flight by SessionAuthentication's CSRF path). Nothing to
+ *   clear — the session cookie is server-side state.
  * - `AbortSignal` passthrough (listings abort in-flight fetches).
  *
  * Deliberately thin: no axios, no retry/interceptor stack, no request
