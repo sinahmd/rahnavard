@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { FUEL_TYPE_LABELS, TRANSMISSION_LABELS } from '@/lib/carConstants'
+import { useModalA11y } from '@/components/ui/useModalA11y'
 
 export interface FilterOptions {
   brands: string[]
@@ -58,16 +59,20 @@ function SelectFilter({
   onChange,
   options,
   placeholder,
+  ariaLabel,
 }: {
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string }[]
   placeholder: string
+  /** Accessible name — the selects are visually titled by FilterSection's h3. */
+  ariaLabel: string
 }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      aria-label={ariaLabel}
       className="w-full border-[1.5px] border-gray-light rounded-lg px-3 py-2.5 text-[14px] bg-white text-dark outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
     >
       <option value="">{placeholder}</option>
@@ -84,38 +89,14 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
   const [localMinPrice, setLocalMinPrice] = useState(filters.min_price)
   const [localMaxPrice, setLocalMaxPrice] = useState(filters.max_price)
   const drawerRef = useRef<HTMLDivElement>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     setLocalMinPrice(filters.min_price)
     setLocalMaxPrice(filters.max_price)
   }, [filters.min_price, filters.max_price])
 
-  // Escape key closes mobile drawer
-  useEffect(() => {
-    if (!isOpen) return
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
-
-  // Focus management: trap focus in drawer, return focus on close
-  useEffect(() => {
-    if (isOpen) {
-      previousFocusRef.current = document.activeElement as HTMLElement
-      // Focus the close button after transition
-      const timer = setTimeout(() => {
-        const closeBtn = drawerRef.current?.querySelector('button')
-        closeBtn?.focus()
-      }, 350)
-      return () => clearTimeout(timer)
-    } else {
-      // Return focus to trigger button
-      previousFocusRef.current?.focus()
-    }
-  }, [isOpen])
+  // Escape close, focus trap, and focus return are handled by useModalA11y.
+  useModalA11y({ isOpen, onClose, containerRef: drawerRef })
 
   // Debounce price range
   useEffect(() => {
@@ -175,6 +156,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
           onChange={(v) => update({ brand: v })}
           options={options.brands.map((b) => ({ value: b, label: b }))}
           placeholder="همه برندها"
+          ariaLabel="برند"
         />
       </FilterSection>
 
@@ -186,6 +168,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
             onChange={(v) => update({ body_type: v })}
             options={options.body_types.map((b) => ({ value: b, label: b }))}
             placeholder="همه انواع"
+            ariaLabel="نوع بدنه"
           />
         </FilterSection>
       )}
@@ -197,6 +180,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
           onChange={(v) => update({ fuel_type: v })}
           options={options.fuel_types.map((f) => ({ value: f, label: FUEL_TYPE_LABELS[f] || f }))}
           placeholder="همه انواع سوخت"
+          ariaLabel="نوع سوخت"
         />
       </FilterSection>
 
@@ -207,6 +191,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
           onChange={(v) => update({ transmission: v })}
           options={options.transmissions.map((t) => ({ value: t, label: TRANSMISSION_LABELS[t] || t }))}
           placeholder="همه گیربکس‌ها"
+          ariaLabel="گیربکس"
         />
       </FilterSection>
 
@@ -217,6 +202,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
             <select
               value={filters.min_year}
               onChange={(e) => update({ min_year: e.target.value })}
+              aria-label="سال حداقل"
               className="flex-1 border-[1.5px] border-gray-light rounded-lg px-3 py-2.5 text-[14px] bg-white text-dark outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
             >
               <option value="">از</option>
@@ -227,6 +213,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
             <select
               value={filters.max_year}
               onChange={(e) => update({ max_year: e.target.value })}
+              aria-label="سال حداکثر"
               className="flex-1 border-[1.5px] border-gray-light rounded-lg px-3 py-2.5 text-[14px] bg-white text-dark outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
             >
               <option value="">تا</option>
@@ -292,8 +279,9 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
         role="dialog"
         aria-modal="true"
         aria-label="فیلترهای جستجو"
-        className={`fixed top-0 bottom-0 right-0 w-[85%] max-w-[360px] bg-white z-50 transition-transform duration-300 lg:hidden overflow-y-auto ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
+        aria-hidden={!isOpen}
+        className={`fixed top-0 bottom-0 right-0 w-[85%] max-w-[360px] bg-white z-50 transition-[transform,visibility] duration-300 lg:hidden overflow-y-auto ${
+          isOpen ? 'visible translate-x-0' : 'invisible translate-x-full'
         }`}
       >
         {/* Header */}

@@ -191,9 +191,11 @@ class TestInquiryAdminAPI:
     """Tests for Inquiry admin API endpoints."""
 
     def test_admin_list_requires_auth(self, api_client):
-        """Test that admin list requires authentication."""
+        """Anonymous admin-list access must be rejected. With session-only
+        auth DRF returns 403 (no WWW-Authenticate challenge exists — the
+        401 challenge died with TokenAuthentication)."""
         response = api_client.get('/api/v1/admin/inquiries/')
-        assert response.status_code == 401
+        assert response.status_code == 403
 
     def test_admin_list_with_auth(self, admin_client, sample_inquiries):
         """Test admin list with authentication."""
@@ -242,3 +244,45 @@ class TestInquiryAdminAPI:
 
         # Inquiry should be restored
         assert Inquiry.objects.filter(pk=sample_inquiry.pk).exists()
+
+
+# ============================================================================
+# Inquiry Throttling Tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestInquiryThrottling:
+    """The public form is scope-throttled per client IP (Phase 1 hardening)."""
+
+    def test_blocks_after_scoped_rate(self, api_client, settings):
+        """Requests beyond the scoped 'inquiries' rate get 429."""
+        from django.core.cache import cache
+        from rest_framework.throttling import ScopedRateThrottle
+
+        cache.clear()
+        fw = dict(settings.REST_FRAMEWORK)
+        fw["DEFAULT_THROTTLE_RATES"] = {
+            **fw["DEFAULT_THROTTLE_RATES"],
+            "inquiries": "2/hour",
+        }
+        # The test client has no proxy chain: key directly on REMOTE_ADDR.
+        fw["NUM_PROXIES"] = 0
+        settings.REST_FRAMEWORK = fw
+
+        # DRF snapshots DEFAULT_THROTTLE_RATES onto ScopedRateThrottle when
+        # the module first imports (first URL resolution), so a settings
+        # override alone is invisible once any earlier test made a request —
+        # rebind the snapshot too, and restore it afterwards.
+        original_rates = ScopedRateThrottle.THROTTLE_RATES
+        ScopedRateThrottle.THROTTLE_RATES = {**original_rates, "inquiries": "2/hour"}
+        try:
+            data = {"name": "علی", "phone": "09121234567"}
+            # Distinct client IP: keeps this bucket isolated from other tests.
+            extra = {"REMOTE_ADDR": "10.7.0.1"}
+            assert api_client.post("/api/v1/inquiries/", data, format="json", **extra).status_code == 201
+            assert api_client.post("/api/v1/inquiries/", data, format="json", **extra).status_code == 201
+            assert api_client.post("/api/v1/inquiries/", data, format="json", **extra).status_code == 429
+        finally:
+            ScopedRateThrottle.THROTTLE_RATES = original_rates
+            cache.clear()

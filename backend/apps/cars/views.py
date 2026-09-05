@@ -1,4 +1,5 @@
 import django_filters
+from django.db import IntegrityError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, permissions, status
 from rest_framework.response import Response
@@ -90,6 +91,18 @@ class CarAdminListView(generics.ListCreateAPIView):
     def get_queryset(self):
         """Include soft-deleted items in admin."""
         return Car.objects.with_deleted()
+
+    def create(self, request, *args, **kwargs):
+        """Map the slug uniqueness violation (partial unique index on
+        is_deleted=False) to a 400 field error instead of an unhandled 500
+        — the admin form surfaces field errors from 400 responses."""
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {"slug": ["این اسلاگ قبلاً استفاده شده است."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class CarAdminDetailView(generics.RetrieveUpdateDestroyAPIView):

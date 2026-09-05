@@ -3,22 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import type { HeroSlide } from '@/types/heroSlide'
 
-interface HeroSlide {
-  id: number
-  title: string
-  image: string
-  alt_text: string
-  link?: string
-}
+/** Slides always carry an image once filtered on the server (rows without one are dropped). */
+type LoadedSlide = HeroSlide & { image: string }
 
 const SLIDE_DURATION = 6000
 const SWIPE_THRESHOLD = 50
 const SWIPE_MAX_DRAG = 120
 
-export default function HeroSlider() {
-  const [slides, setSlides] = useState<HeroSlide[]>([])
-  const [loading, setLoading] = useState(true)
+export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
   const [current, setCurrent] = useState(0)
   const [isZooming, setIsZooming] = useState(true)
 
@@ -31,22 +25,6 @@ export default function HeroSlider() {
   const isVerticalScroll = useRef(false)
   const [dragOffset, setDragOffset] = useState(0)
 
-  useEffect(() => {
-    const fetchSlides = async () => {
-      try {
-        const response = await fetch('/api/v1/hero-slides/')
-        if (response.ok) {
-          const data = await response.json()
-          setSlides(data.results || data || [])
-        }
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSlides()
-  }, [])
-
   const goTo = useCallback((index: number) => {
     if (slides.length === 0) return
     setCurrent(((index % slides.length) + slides.length) % slides.length)
@@ -58,9 +36,11 @@ export default function HeroSlider() {
   const next = useCallback(() => goTo(current + 1), [current, goTo])
   const prev = useCallback(() => goTo(current - 1), [current, goTo])
 
-  // Auto-play
+  // Auto-play — skipped entirely when the user prefers reduced motion
+  // (manual prev/next/dots still work; the CSS kill-switch handles the rest).
   useEffect(() => {
     if (slides.length === 0) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const timer = setInterval(next, SLIDE_DURATION)
     return () => clearInterval(timer)
   }, [next, slides.length])
@@ -147,10 +127,6 @@ export default function HeroSlider() {
     isSwiping.current = false
     touchDeltaX.current = 0
   }, [next, prev])
-
-  if (loading) {
-    return <div className="relative w-full max-h-[100dvh] aspect-[4/5] md:aspect-[1540/860] bg-[#111]" />
-  }
 
   if (slides.length === 0) {
     return (

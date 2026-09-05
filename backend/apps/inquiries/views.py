@@ -1,5 +1,6 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Inquiry
 from .serializers import InquiryCreateSerializer, InquirySerializer
@@ -10,16 +11,18 @@ class InquiryCreateView(generics.CreateAPIView):
 
     serializer_class = InquiryCreateSerializer
     permission_classes = [permissions.AllowAny]
+    # Explicitly anonymous: once admins hold session cookies, DRF enforces
+    # CSRF for session-authenticated unsafe requests. Declaring no
+    # authentication classes keeps this public form working (201) even when
+    # the submitter is a logged-in admin whose browser sends the session
+    # cookie (see plan §6.A request class A3).
+    authentication_classes = []
 
-    # Note: IP address and User-Agent are NOT stored for GDPR compliance.
-    # See DEVELOPMENT.md section 11 for details.
-
-
-class InquiryCreateView(generics.CreateAPIView):
-    """Public endpoint for creating inquiries."""
-
-    serializer_class = InquiryCreateSerializer
-    permission_classes = [permissions.AllowAny]
+    # Anti-spam: this public form is the spam magnet — scope a strict
+    # per-client rate ("inquiries" in settings.REST_FRAMEWORK) instead of
+    # the generous global anon bucket.
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "inquiries"
 
     # Note: IP address and User-Agent are NOT stored for GDPR compliance.
     # See DEVELOPMENT.md section 11 for details.

@@ -1,25 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import OptimizedImage from '@/components/ui/OptimizedImage'
-
-interface Car {
-  id: number
-  brand: string
-  model: string
-  persian_name: string
-  slug: string
-  year: number
-  fuel_type: string
-  fuel_type_display: string
-  transmission: string
-  transmission_display: string
-  price: string | null
-  body_type: string
-  engine: string
-  main_image: string
-  is_featured: boolean
-}
+import CarCardImage from '@/components/car/CarCardImage'
+import type { CarListItem } from '@/types/car'
 
 function formatPrice(price: string | null): string | null {
   if (!price) return null
@@ -28,7 +11,7 @@ function formatPrice(price: string | null): string | null {
   return new Intl.NumberFormat('fa-IR').format(num)
 }
 
-export default function CarCard({ car }: { car: Car }) {
+export default function CarCard({ car }: { car: CarListItem }) {
   const price = formatPrice(car.price)
 
   return (
@@ -37,22 +20,13 @@ export default function CarCard({ car }: { car: Car }) {
       className="car-card bg-white rounded-[14px] shadow-card text-center flex flex-col items-center h-full transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1 overflow-hidden group"
     >
       {/* Image */}
-      <div className="w-full aspect-[4/3] flex items-center justify-center overflow-hidden bg-white p-4">
-        {car.main_image ? (
-          <OptimizedImage
-            src={car.main_image}
-            alt={car.persian_name}
-            width={400}
-            height={300}
-            className="max-w-[88%] max-h-full object-contain transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-light flex items-center justify-center text-gray text-sm">
-            بدون تصویر
-          </div>
-        )}
-      </div>
+      <CarCardImage
+        src={car.main_image}
+        alt={car.persian_name}
+        className="bg-white p-4"
+        imageClassName="transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] group-hover:scale-105"
+        placeholderClassName="text-sm"
+      />
 
       {/* Content */}
       <div className="w-full px-5 pb-5 flex flex-col flex-1">

@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.core.mixins import SoftDeleteMixin
 from apps.core.models import Redirect
+from apps.core.sanitizer import sanitize_html
 
 
 class Car(SoftDeleteMixin, models.Model):
@@ -122,6 +123,13 @@ class Car(SoftDeleteMixin, models.Model):
         return f"{self.brand} {self.model}"
 
     def save(self, *args, **kwargs):
+        # Sanitize HTML on every write so stored content is always safe to
+        # render on the public site (rendered via dangerouslySetInnerHTML).
+        if self.technical_description:
+            cleaned = sanitize_html(self.technical_description)
+            if cleaned != self.technical_description:
+                self.technical_description = cleaned
+
         # Auto-generate slug if not provided or blank
         if not self.slug or not self.slug.strip():
             self.slug = self._generate_slug()

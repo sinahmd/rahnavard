@@ -1,5 +1,11 @@
 from rest_framework import generics, permissions
 from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.articles.models import Article
+from apps.branches.models import Branch
+from apps.cars.models import Car
+from apps.inquiries.models import Inquiry
 
 from .models import HeroSlide, SiteSettings, WhyFeature
 from .serializers import (
@@ -61,6 +67,30 @@ class HomepageDataView(generics.GenericAPIView):
 # ==========================================================================
 # Admin Endpoints
 # ==========================================================================
+
+
+class AdminStatsView(APIView):
+    """Aggregate dashboard counts for the admin panel.
+
+    One endpoint replaces the old dashboard's four page-1 client fetches
+    (which under-reported once a list exceeded the page size). Each count is
+    a direct SQL COUNT over the manager semantics the corresponding card
+    implies: active cars, published articles, active branches, and all
+    inquiries including soft-deleted ones (matching the admin inquiries
+    list total, which also includes them). Only staff may read it.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        return Response(
+            {
+                "cars": Car.objects.filter(is_active=True).count(),
+                "articles": Article.objects.filter(is_published=True).count(),
+                "branches": Branch.objects.filter(is_active=True).count(),
+                "inquiries": Inquiry.objects.with_deleted().count(),
+            }
+        )
 
 
 class SiteSettingsAdminView(generics.RetrieveUpdateAPIView):

@@ -1,40 +1,20 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
+import type { ArticleListItem } from '@/types/article'
+import type { SiteSettings } from '@/types/settings'
+import SectionHead from '@/components/site/SectionHead'
 
-interface Article {
-  id: number
-  title: string
-  slug: string
-  excerpt: string
-  cover_image: string
-  published_at: string
-}
-
-export default function LatestArticles() {
+export default function LatestArticles({
+  articles,
+  settings,
+}: {
+  articles: ArticleListItem[]
+  settings: SiteSettings
+}) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch('/api/v1/articles/')
-        if (res.ok) {
-          const data = await res.json()
-          setArticles((data.results || data || []).slice(0, 3))
-        }
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -68,15 +48,14 @@ export default function LatestArticles() {
   return (
     <section id="articles" ref={sectionRef} className="bg-white">
       <div className="wrap">
-        <div className="section-head reveal-right">
-          <span className="eyebrow">اخبار</span>
-          <h2 className="section-title">{settings.articles_section_title}</h2>
-          <p>{settings.articles_section_description}</p>
-        </div>
+        <SectionHead
+          eyebrow="اخبار"
+          title={settings.articles_section_title}
+          description={settings.articles_section_description}
+          reveal="right"
+        />
 
-        {loading ? (
-          <div className="text-center py-12 text-gray">در حال بارگذاری...</div>
-        ) : articles.length === 0 ? (
+        {articles.length === 0 ? (
           <div className="text-center py-12 text-gray">
             مقاله‌ای یافت نشد. از پنل مدیریت مقاله اضافه کنید.
           </div>
@@ -114,7 +93,7 @@ export default function LatestArticles() {
                       {formatDate(article.published_at)}
                     </span>
                   )}
-                  <h4 className="text-[17px] font-bold mb-2.5">{article.title}</h4>
+                  <h3 className="text-[17px] font-bold mb-2.5">{article.title}</h3>
                   {article.excerpt && (
                     <p className="text-[14px] text-gray mb-4">{article.excerpt}</p>
                   )}

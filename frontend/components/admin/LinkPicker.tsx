@@ -1,47 +1,50 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { authFetch } from '@/lib/authFetch'
+import { listCars } from '@/lib/api/cars'
+import { listArticles } from '@/lib/api/articles'
 
 interface LinkPickerProps {
   value: string
   onChange: (value: string) => void
 }
 
-interface Car {
+interface CarPick {
   id: number
   slug: string
   persian_name: string
   brand: string
 }
 
-interface Article {
+interface ArticlePick {
   id: number
   slug: string
   title: string
 }
 
 export default function LinkPicker({ value, onChange }: LinkPickerProps) {
-  const [cars, setCars] = useState<Car[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
+  const [cars, setCars] = useState<CarPick[]>([])
+  const [articles, setArticles] = useState<ArticlePick[]>([])
   const [loadingCars, setLoadingCars] = useState(true)
   const [loadingArticles, setLoadingArticles] = useState(true)
+  const [carsError, setCarsError] = useState(false)
+  const [articlesError, setArticlesError] = useState(false)
 
   useEffect(() => {
     const fetchCars = async () => {
       try {
-        const res = await authFetch('/api/v1/admin/cars/')
-        if (res.ok) {
-          const data = await res.json()
-          setCars((data.results || data || []).map((c: Car) => ({
+        const data = await listCars()
+        setCars(
+          data.results.map((c) => ({
             id: c.id,
             slug: c.slug,
             persian_name: c.persian_name,
             brand: c.brand,
-          })))
-        }
+          }))
+        )
       } catch {
-        // silently fail — dropdown just stays empty
+        // Non-critical quick-pick dropdown: degrade to an inline message.
+        setCarsError(true)
       } finally {
         setLoadingCars(false)
       }
@@ -52,17 +55,16 @@ export default function LinkPicker({ value, onChange }: LinkPickerProps) {
   useEffect(() => {
     const fetchArticles = async () => {
       try {
-        const res = await authFetch('/api/v1/admin/articles/')
-        if (res.ok) {
-          const data = await res.json()
-          setArticles((data.results || data || []).map((a: Article) => ({
+        const data = await listArticles()
+        setArticles(
+          data.results.map((a) => ({
             id: a.id,
             slug: a.slug,
             title: a.title,
-          })))
-        }
+          }))
+        )
       } catch {
-        // silently fail
+        setArticlesError(true)
       } finally {
         setLoadingArticles(false)
       }
@@ -97,7 +99,7 @@ export default function LinkPicker({ value, onChange }: LinkPickerProps) {
             className="w-full border border-gray-light rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">
-              {loadingCars ? 'در حال بارگذاری...' : 'انتخاب خودرو...'}
+              {loadingCars ? 'در حال بارگذاری...' : carsError ? 'خطا در بارگذاری خودروها' : 'انتخاب خودرو...'}
             </option>
             {cars.map((car) => (
               <option key={car.id} value={car.slug}>
@@ -118,7 +120,7 @@ export default function LinkPicker({ value, onChange }: LinkPickerProps) {
             className="w-full border border-gray-light rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">
-              {loadingArticles ? 'در حال بارگذاری...' : 'انتخاب مقاله...'}
+              {loadingArticles ? 'در حال بارگذاری...' : articlesError ? 'خطا در بارگذاری مقالات' : 'انتخاب مقاله...'}
             </option>
             {articles.map((article) => (
               <option key={article.id} value={article.slug}>

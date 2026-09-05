@@ -1,7 +1,9 @@
 # LOCAL-ONLY FILES — develop branch only
 # =============================================
-# These files exist ONLY on develop for local Docker development.
-# They must NEVER be merged to main. CI and deploy will fail if they are.
+# These files hold LOCAL-DEV content that must NOT overwrite the production
+# branch's copies during a develop → main merge. They differ between branches
+# only because local Docker uses an nginx proxy + dev tooling that production
+# (docker-compose.prod.yml) never references.
 #
 # WHY: Local Docker dev needs an nginx proxy (like production) to avoid
 # per-component apiUrl() changes. These files set up that proxy.
@@ -13,6 +15,11 @@
 #   2. Merge to main, push, deploy
 #   3. Switch back to develop, merge main
 #   4. Run: bash scripts/apply-local-only.sh
+#
+# ⚠️ AUTH-CRITICAL FILES MUST NEVER BE LISTED HERE.
+# backend/config/settings.py carries the Phase-2 session-auth + CSRF config and
+# must reach main unchanged — prepare-merge.sh/check-local-only.sh refuse to
+# run if a protected path (see scripts/_local_only_guard.sh) appears below.
 #
 # FILE FORMAT: one relative path per line. Lines starting with # are comments.
 # Empty lines are ignored.
@@ -27,9 +34,6 @@ docker-compose.yml
 nginx/nginx.dev.conf
 
 # --- Dockerfile ---
-# Removes Arvan npm mirror (403 outside Iran) for local dev
+# Local dev frontend image: dev server + accessible npm mirror.
+# Production builds from frontend/Dockerfile.prod instead.
 frontend/Dockerfile
-
-# --- Backend throttle ---
-# Higher throttle rates for local testing (10000/hour vs 100/hour)
-backend/config/settings.py

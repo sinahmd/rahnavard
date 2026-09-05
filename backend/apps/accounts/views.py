@@ -1,8 +1,9 @@
+from django.contrib.auth import login, logout, update_session_auth_hash
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
-from django.contrib.auth import update_session_auth_hash
 
 from .serializers import (
     LoginSerializer,
@@ -13,21 +14,30 @@ from .serializers import (
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@authentication_classes([])
+@ensure_csrf_cookie
 def login_view(request):
     """
-    Authenticate user and return token.
+    Authenticate user and establish a Django session (cutover, plan §6.A.4).
+
+    `django.contrib.auth.login()` creates the httpOnly session cookie the
+    admin client authenticates with; no DRF token is minted or returned.
+    `@ensure_csrf_cookie` bootstraps the non-HttpOnly `csrftoken` cookie the
+    browser echoes as `X-CSRFToken` on state-changing requests.
+    `authentication_classes = []` keeps this endpoint anonymous even when the
+    caller already holds an admin session — a session-authenticated unsafe POST
+    would otherwise be rejected by DRF's CSRF enforcement.
     """
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
     user = serializer.validated_data['user']
 
-    # Get or create token
-    token, created = Token.objects.get_or_create(user=user)
+    # Establish the server-side session (rotates any existing session key).
+    login(request, user)
 
     return Response({
-        'token': token.key,
-        'user': UserSerializer(user).data
+        'user': UserSerializer(user).data,
     }, status=status.HTTP_200_OK)
 
 
@@ -35,12 +45,12 @@ def login_view(request):
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
     """
-    Delete user's auth token to logout.
+    Destroy the admin session.
+
+    SessionAuthentication enforces CSRF here (the client sends X-CSRFToken);
+    the view is idempotent — logout() is safe on an already-empty session.
     """
-    try:
-        request.user.auth_token.delete()
-    except Exception:
-        pass
+    logout(request)
 
     return Response({
         'message': 'Successfully logged out.'
@@ -49,9 +59,26 @@ def logout_view(request):
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+@ensure_csrf_cookie
+def session_view(request):
+    """
+    Admin bootstrap endpoint.
+
+    Returns the current user when the request is authenticated through the
+    session cookie; 401 otherwise. It is a safe GET, so CSRF never applies
+    here; `@ensure_csrf_cookie` guarantees the client has a `csrftoken`
+    cookie before its first state-changing request.
+    """
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
 def current_user_view(request):
     """
-    Get current authenticated user's information.
+    Get current authenticated user's information (legacy endpoint; the new
+    client bootstraps through `/auth/session/` instead).
     """
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
@@ -73,13 +100,8 @@ def change_password_view(request):
     # Update session auth hash to keep user logged in
     update_session_auth_hash(request, request.user)
 
-    # Invalidate old token and create new one
-    request.user.auth_token.delete()
-    new_token = Token.objects.create(user=request.user)
-
     return Response({
         'message': 'Password changed successfully.',
-        'token': new_token.key
     }, status=status.HTTP_200_OK)
 
 

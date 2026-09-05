@@ -1,38 +1,18 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
+import type { WhyFeature } from '@/types/feature'
+import type { SiteSettings } from '@/types/settings'
 
-
-interface WhyFeature {
-  id: number
-  title: string
-  description: string
-  icon?: string
-}
-
-export default function WhyRahnavard() {
+export default function WhyRahnavard({
+  features,
+  settings,
+}: {
+  features: WhyFeature[]
+  settings: SiteSettings
+}) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
-  const [features, setFeatures] = useState<WhyFeature[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch('/api/v1/why-features/')
-        if (res.ok) {
-          const data = await res.json()
-          setFeatures(data.results || data || [])
-        }
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -71,9 +51,7 @@ export default function WhyRahnavard() {
           </p>
         )}
 
-        {loading ? (
-          <div className="mt-12 text-gray">در حال بارگذاری...</div>
-        ) : features.length === 0 ? (
+        {features.length === 0 ? (
           <div className="mt-12 text-gray">ویژگی‌ای یافت نشد. از پنل مدیریت ویژگی اضافه کنید.</div>
         ) : (
           <div className={`grid grid-cols-1 md:grid-cols-3 gap-10 ${settings.why_description ? 'mt-12' : 'mt-8'}`}>

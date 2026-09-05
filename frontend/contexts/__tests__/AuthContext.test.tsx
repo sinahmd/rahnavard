@@ -1,23 +1,54 @@
 import '@testing-library/jest-dom'
-import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
-import { AuthProvider, useAuth, withAuth } from '../AuthContext'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { AuthProvider, useAuth } from '../AuthContext'
 
-// Mock fetch
+// Mock fetch (the tests exercise the real production path: AuthContext →
+// lib/api/auth → lib/api/http → fetch).
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
-// Mock localStorage
+// Mock localStorage so we can assert the one-time purge and the absence of
+// any credential writes.
 const localStorageMock = {
   getItem: jest.fn(),
   setItem: jest.fn(),
   removeItem: jest.fn(),
   clear: jest.fn(),
 }
-Object.defineProperty(window, 'localStorage', { value: localStorageMock })
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  configurable: true,
+})
+
+// http.ts redirects on 401; stub it so no navigation happens in jsdom.
+const assignMock = jest.fn()
+Object.defineProperty(window, 'location', {
+  value: { pathname: '/admin/cars', assign: assignMock },
+  configurable: true,
+  writable: true,
+})
+
+const adminUser = {
+  id: 1,
+  username: 'admin',
+  email: 'admin@example.com',
+  first_name: '',
+  last_name: '',
+  is_staff: true,
+  is_superuser: true,
+  is_active: true,
+  date_joined: '2026-01-01T00:00:00Z',
+}
+
+const okJson = (payload: unknown, status = 200) => ({
+  ok: status < 400,
+  status,
+  json: async () => payload,
+})
 
 // Test component that uses the auth context
 function TestComponent() {
-  const { user, token, loading, login, logout, refreshUser, isAuthenticated, isAdmin, isSuperUser } = useAuth()
+  const { user, loading, login, logout, refreshUser, isAuthenticated, isAdmin, isSuperUser } = useAuth()
 
   return (
     <div>
@@ -26,26 +57,59 @@ function TestComponent() {
       <div data-testid="admin">{isAdmin.toString()}</div>
       <div data-testid="superuser">{isSuperUser.toString()}</div>
       <div data-testid="user">{user?.username || 'no-user'}</div>
-      <div data-testid="token">{token || 'no-token'}</div>
-      <button onClick={async () => { try { await login('testuser', 'password') } catch {} }}>Login</button>
+      <button
+        onClick={async () => {
+          try {
+            await login('admin', 'secret')
+          } catch {
+            // login failures are rendered by the login page, not here
+          }
+        }}
+      >
+        Login
+      </button>
       <button onClick={() => logout()}>Logout</button>
       <button onClick={() => refreshUser()}>Refresh</button>
     </div>
   )
 }
 
-// Simple wrapped component for withAuth tests
-function DummyPage() {
-  return <div data-testid="protected-content">Protected Content</div>
-}
-
 describe('AuthContext', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    assignMock.mockClear()
     localStorageMock.getItem.mockReturnValue(null)
+    localStorageMock.setItem.mockClear()
+    localStorageMock.removeItem.mockClear()
   })
 
-  it('should provide initial state', async () => {
+  it('purges the legacy admin_token key once on bootstrap (never reads or writes it)', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ detail: 'Not authenticated.' }, 401))
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+
+    // Cutover cleanup (plan §7 Phase 2.4): the pre-Phase-2 key authenticates
+    // nothing anymore, so it is removed exactly once. The client still never
+    // READS credentials and never WRITES any — storage stays credential-free.
+    expect(localStorageMock.removeItem).toHaveBeenCalledTimes(1)
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
+    expect(localStorageMock.getItem).not.toHaveBeenCalled()
+    expect(localStorageMock.setItem).not.toHaveBeenCalled()
+  })
+
+  it('treats a 403 session check as unauthenticated (session-only auth has no 401 challenge)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      okJson({ detail: 'Authentication credentials were not provided.' }, 403)
+    )
+
     render(
       <AuthProvider>
         <TestComponent />
@@ -58,14 +122,33 @@ describe('AuthContext', () => {
 
     expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
     expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    // The transport's 401 redirect does NOT fire for 403 — after the cutover
+    // an anonymous bootstrap answers 403, and the layout guard owns the
+    // redirect to /admin/login.
+    expect(assignMock).not.toHaveBeenCalled()
   })
 
-  it('should load token from localStorage on mount', async () => {
-    localStorageMock.getItem.mockReturnValue('stored-token')
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: 1, username: 'testuser', is_staff: true, is_superuser: false }),
+  it('should provide unauthenticated state when the session is missing', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ detail: 'Not authenticated.' }, 401))
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
     })
+
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
+    expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    // Expired/missing session → transport redirects to the login page.
+    expect(assignMock).toHaveBeenCalledWith('/admin/login')
+  })
+
+  it('should restore the user from the session cookie on mount', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(adminUser))
 
     render(
       <AuthProvider>
@@ -78,22 +161,20 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
-    expect(screen.getByTestId('user')).toHaveTextContent('testuser')
+    expect(screen.getByTestId('user')).toHaveTextContent('admin')
+    expect(screen.getByTestId('admin')).toHaveTextContent('true')
+    expect(screen.getByTestId('superuser')).toHaveTextContent('true')
+    // Bootstrap went to the session endpoint — no token involved.
+    const calledUrl = String(mockFetch.mock.calls[0][0])
+    expect(calledUrl).toContain('/auth/session/')
   })
 
-  it('should handle login', async () => {
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          token: 'new-token',
-          user: { id: 1, username: 'testuser', is_staff: true, is_superuser: false },
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'testuser', is_staff: true, is_superuser: false }),
-      })
+  it('should handle login and rely on the session cookie (no token stored)', async () => {
+    // Mount bootstrap: no session yet.
+    mockFetch.mockResolvedValueOnce(okJson({ detail: 'Not authenticated.' }, 401))
+    // Login: backend still returns { token, user } during dual-mode; the
+    // client must ignore the token.
+    mockFetch.mockResolvedValueOnce(okJson({ token: 'legacy-dual-mode-token', user: adminUser }))
 
     render(
       <AuthProvider>
@@ -105,29 +186,43 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('false')
     })
 
-    await act(async () => {
-      fireEvent.click(screen.getByText('Login'))
-    })
+    fireEvent.click(screen.getByText('Login'))
 
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
-      expect(screen.getByTestId('user')).toHaveTextContent('testuser')
+      expect(screen.getByTestId('user')).toHaveTextContent('admin')
     })
 
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('admin_token', 'new-token')
+    // The dual-mode token in the response is never persisted anywhere.
+    expect(localStorageMock.setItem).not.toHaveBeenCalled()
   })
 
-  it('should handle logout', async () => {
-    localStorageMock.getItem.mockReturnValue('stored-token')
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'testuser', is_staff: true, is_superuser: false }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: 'Logged out' }),
-      })
+  it('should handle login failure', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ detail: 'Not authenticated.' }, 401))
+    mockFetch.mockResolvedValueOnce(okJson({ detail: 'Invalid credentials.' }, 400))
+
+    render(
+      <AuthProvider>
+        <TestComponent />
+      </AuthProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+
+    fireEvent.click(screen.getByText('Login'))
+
+    // After a failed login the user stays logged out.
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
+    })
+    expect(localStorageMock.setItem).not.toHaveBeenCalled()
+  })
+
+  it('should handle logout (session destroyed server-side, state cleared)', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(adminUser))
+    mockFetch.mockResolvedValueOnce(okJson({ message: 'Successfully logged out.' }))
 
     render(
       <AuthProvider>
@@ -139,23 +234,17 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
     })
 
-    await act(async () => {
-      fireEvent.click(screen.getByText('Logout'))
-    })
+    fireEvent.click(screen.getByText('Logout'))
 
     await waitFor(() => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
       expect(screen.getByTestId('user')).toHaveTextContent('no-user')
     })
-
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
   })
 
-  it('should handle login failure', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ detail: 'Invalid credentials' }),
-    })
+  it('should handle logout API failure gracefully', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(adminUser))
+    mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
     render(
       <AuthProvider>
@@ -164,23 +253,24 @@ describe('AuthContext', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
     })
 
-    await act(async () => {
-      fireEvent.click(screen.getByText('Login'))
-    })
+    fireEvent.click(screen.getByText('Logout'))
 
-    // After failed login, authenticated should still be false
-    expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
+    })
+    // Local state is cleared regardless of the API failure. The only storage
+    // touch is the one-time legacy purge from bootstrap — never a write.
+    expect(localStorageMock.removeItem).toHaveBeenCalledTimes(1)
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
+    expect(localStorageMock.setItem).not.toHaveBeenCalled()
   })
 
-  it('should clear token when stored token is invalid on mount', async () => {
-    localStorageMock.getItem.mockReturnValue('invalid-token')
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ detail: 'Invalid token' }),
-    })
+  it('should handle refreshUser re-fetching the session', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(adminUser))
+    mockFetch.mockResolvedValueOnce(okJson({ ...adminUser, email: 'new@example.com' }))
 
     render(
       <AuthProvider>
@@ -189,15 +279,17 @@ describe('AuthContext', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('loading')).toHaveTextContent('false')
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
     })
 
-    expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
+    fireEvent.click(screen.getByText('Refresh'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
+    })
   })
 
-  it('should handle fetchUser network error gracefully', async () => {
-    localStorageMock.getItem.mockReturnValue('some-token')
+  it('should stay unauthenticated on a network failure during bootstrap', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
     render(
@@ -211,210 +303,8 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
-  })
-
-  it('should handle refreshUser', async () => {
-    localStorageMock.getItem.mockReturnValue('stored-token')
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'testuser', is_staff: true, is_superuser: false }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'testuser', is_staff: true, is_superuser: false, email: 'test@example.com' }),
-      })
-
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
-    })
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Refresh'))
-    })
-
-    // Should still be authenticated after refresh
-    expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
-  })
-
-  it('should not refreshUser when no token', async () => {
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('loading')).toHaveTextContent('false')
-    })
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Refresh'))
-    })
-
-    // No additional fetch should have been made
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-
-  it('should handle logout API failure gracefully', async () => {
-    localStorageMock.getItem.mockReturnValue('stored-token')
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'testuser', is_staff: true, is_superuser: false }),
-      })
-      .mockRejectedValueOnce(new Error('Network error'))
-
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('authenticated')).toHaveTextContent('true')
-    })
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Logout'))
-    })
-
-    await waitFor(() => {
-      expect(screen.getByTestId('authenticated')).toHaveTextContent('false')
-    })
-
-    expect(localStorageMock.removeItem).toHaveBeenCalledWith('admin_token')
-  })
-
-  it('should detect admin and superuser roles', async () => {
-    localStorageMock.getItem.mockReturnValue('stored-token')
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: 1, username: 'admin', is_staff: true, is_superuser: true }),
-    })
-
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('loading')).toHaveTextContent('false')
-    })
-
-    expect(screen.getByTestId('admin')).toHaveTextContent('true')
-    expect(screen.getByTestId('superuser')).toHaveTextContent('true')
-  })
-
-  describe('withAuth HOC', () => {
-    it('should render wrapped component when authenticated with admin role', async () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'admin', is_staff: true, is_superuser: true }),
-      })
-
-      const ProtectedPage = withAuth(DummyPage, 'admin')
-
-      render(
-        <AuthProvider>
-          <ProtectedPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('protected-content')).toBeInTheDocument()
-      })
-    })
-
-    it('should redirect to login when not authenticated', async () => {
-      const ProtectedPage = withAuth(DummyPage)
-
-      render(
-        <AuthProvider>
-          <ProtectedPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        const { useRouter } = require('next/navigation')
-        const mockUseRouter = useRouter as jest.Mock
-        const lastCall = mockUseRouter.mock.results[mockUseRouter.mock.results.length - 1]
-        expect(lastCall.value.push).toHaveBeenCalledWith('/admin/login')
-      })
-    })
-
-    it('should redirect non-admin to login when admin role required', async () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'user', is_staff: false, is_superuser: false }),
-      })
-
-      const AdminPage = withAuth(DummyPage, 'admin')
-
-      render(
-        <AuthProvider>
-          <AdminPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        const { useRouter } = require('next/navigation')
-        const mockUseRouter = useRouter as jest.Mock
-        const lastCall = mockUseRouter.mock.results[mockUseRouter.mock.results.length - 1]
-        expect(lastCall.value.push).toHaveBeenCalledWith('/admin/login')
-      })
-    })
-
-    it('should redirect non-superuser to /admin when superuser role required', async () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'admin', is_staff: true, is_superuser: false }),
-      })
-
-      const SuperPage = withAuth(DummyPage, 'superuser')
-
-      render(
-        <AuthProvider>
-          <SuperPage />
-        </AuthProvider>
-      )
-
-      await waitFor(() => {
-        const { useRouter } = require('next/navigation')
-        const mockUseRouter = useRouter as jest.Mock
-        const lastCall = mockUseRouter.mock.results[mockUseRouter.mock.results.length - 1]
-        expect(lastCall.value.push).toHaveBeenCalledWith('/admin')
-      })
-    })
-
-    it('should show loading spinner while loading', () => {
-      localStorageMock.getItem.mockReturnValue('stored-token')
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: 1, username: 'admin', is_staff: true, is_superuser: true }),
-      })
-
-      const ProtectedPage = withAuth(DummyPage)
-
-      const { container } = render(
-        <AuthProvider>
-          <ProtectedPage />
-        </AuthProvider>
-      )
-
-      // Should show spinner (animate-spin) while loading
-      expect(container.querySelector('.animate-spin')).toBeInTheDocument()
-    })
+    // Network failure is not a 401 → no redirect to login.
+    expect(assignMock).not.toHaveBeenCalled()
   })
 
   describe('useAuth hook', () => {

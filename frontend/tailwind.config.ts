@@ -21,9 +21,11 @@ const config: Config = {
           dark: '#e0b400',
         },
       },
+      // next/font/local hashes the family names, so the utilities resolve
+      // through the CSS variables declared on <html> (lib/fonts.ts).
       fontFamily: {
-        vazir: ['Vazirmatn', 'sans-serif'],
-        poppins: ['Poppins', 'Vazirmatn', 'sans-serif'],
+        vazir: ['var(--font-vazirmatn)', 'sans-serif'],
+        poppins: ['var(--font-poppins)', 'var(--font-vazirmatn)', 'sans-serif'],
       },
       borderRadius: {
         DEFAULT: '14px',

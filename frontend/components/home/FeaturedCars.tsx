@@ -1,51 +1,23 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
-import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
+import CarCardImage from '@/components/car/CarCardImage'
+import SectionHead from '@/components/site/SectionHead'
+import type { CarListItem } from '@/types/car'
+import type { SiteSettings } from '@/types/settings'
 
-interface Car {
-  id: number
-  brand: string
-  model: string
-  persian_name: string
-  slug: string
-  main_image: string
-}
-
-export default function FeaturedCars() {
+export default function FeaturedCars({
+  cars,
+  settings,
+}: {
+  cars: CarListItem[]
+  settings: SiteSettings
+}) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
-  const [cars, setCars] = useState<Car[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Try featured cars first, fall back to all active cars
-        let res = await fetch('/api/v1/cars/?is_featured=true')
-        if (!res.ok) throw new Error(String(res.status))
-        let data = await res.json()
-        let carsList = data.results || data || []
-
-        if (carsList.length === 0) {
-          res = await fetch('/api/v1/cars/')
-          if (res.ok) {
-            data = await res.json()
-            carsList = data.results || data || []
-          }
-        }
-
-        setCars(carsList)
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
-
+  // Scroll-reveal is progressive enhancement only — the car cards are
+  // already in the server-rendered HTML.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -68,15 +40,14 @@ export default function FeaturedCars() {
   return (
     <section id="cars" ref={sectionRef} className="bg-bg">
       <div className="wrap">
-        <div className="section-head reveal-left">
-          <span className="eyebrow">محصولات</span>
-          <h2 className="section-title">{settings.cars_section_title}</h2>
-          <p>{settings.cars_section_description}</p>
-        </div>
+        <SectionHead
+          eyebrow="محصولات"
+          title={settings.cars_section_title}
+          description={settings.cars_section_description}
+          reveal="left"
+        />
 
-        {loading ? (
-          <div className="text-center py-12 text-gray">در حال بارگذاری...</div>
-        ) : cars.length === 0 ? (
+        {cars.length === 0 ? (
           <div className="text-center py-12 text-gray">
             خودرویی یافت نشد. از پنل مدیریت خودرو اضافه کنید.
           </div>
@@ -88,22 +59,12 @@ export default function FeaturedCars() {
                 key={car.id}
                 className="car-card reveal-scale bg-white rounded-[14px] p-7 pb-6 shadow-card text-center flex flex-col items-center h-full transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1"
               >
-                <div className="w-full aspect-[4/3] flex items-center justify-center mb-[18px] overflow-hidden">
-                  {car.main_image ? (
-                    <OptimizedImage
-                      src={car.main_image}
-                      alt={car.persian_name}
-                      width={400}
-                      height={300}
-                      className="max-w-[88%] max-h-full object-contain transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-translate-y-1.5"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-light flex items-center justify-center text-gray">
-                      بدون تصویر
-                    </div>
-                  )}
-                </div>
+                <CarCardImage
+                  src={car.main_image}
+                  alt={car.persian_name}
+                  className="mb-[18px]"
+                  imageClassName="transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-translate-y-1.5"
+                />
                 <div className="flex-1 flex flex-col items-center justify-start w-full">
                   <span className="font-poppins text-[12.5px] tracking-[2px] text-gray font-semibold uppercase">
                     {car.brand}

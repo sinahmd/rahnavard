@@ -12,7 +12,43 @@
 
 ## 1. Testing Rules
 
-### Backend Tests (pytest)
+### ⚠️ Run everything on local Docker (owner convention)
+
+The owner develops and verifies the whole stack on **local Docker** — `docker compose up`
+(runs nginx/frontend/backend/postgres, app entry point is http://localhost).
+**Agents should run tests/checks with `docker compose exec`** rather than a host
+venv/node_modules, unless the owner says otherwise.
+
+```bash
+# Backend — the dev image now installs requirements-dev.txt (pytest included)
+# at build time, so a rebuilt backend image runs tests directly:
+docker compose exec -T backend python -m pytest -q          # 282 passed, 98.32% cov (2026-09-05)
+docker compose exec -T backend python manage.py check
+docker compose exec -T backend python manage.py makemigrations --check --dry-run
+# pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
+
+# Frontend — all tooling (jest/tsc/eslint/next) is installed in the image.
+# The LOCAL dev frontend/Dockerfile uses the China npm mirror
+# (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
+# Iran — so `docker compose up --build` works locally.
+docker compose exec -T frontend npm test -- --runInBand      # 302 passed, 40 suites, zero act/console warnings (2026-09-05)
+docker compose exec -T frontend npx tsc --noEmit
+docker compose exec -T frontend npm run lint
+# Production build in a throwaway container so the running dev server's .next
+# volume is never touched:
+docker compose run --rm --no-deps frontend npm run build
+```
+
+Verified green inside Docker on 2026-09-05 (backend **282 passed** / 98.32%
+cov, frontend **302 passed**, tsc clean, **lint fully clean** — fonts are
+self-hosted via `next/font/local` (frontend/lib/fonts.ts), so the old Google
+Fonts `<link>` warning is gone. Never switch to `next/font/google`: prod
+images are built on a server where Google Fonts is blocked, see plan §J —
+local files only).
+
+---
+
+### Backend Tests (pytest) — host alternative
 ```bash
 cd backend
 pip install -r requirements-dev.txt
@@ -46,10 +82,10 @@ class TestFeatureName:
 - Serializer validation
 - Edge cases (empty data, invalid data, not found)
 
-### Frontend Tests (Jest + React Testing Library)
+### Frontend Tests (Jest + React Testing Library) — host alternative
 ```bash
 cd frontend
-npm test                      # Run all tests
+npm test                      # Run all tests (prefer the docker exec form above)
 npm run test:watch           # Watch mode
 npm run test:coverage        # With coverage report
 ```
@@ -151,7 +187,7 @@ python manage.py lint                     # If flake8 is installed
 
 ---
 
-## 2. URL Conventions
+## 3. URL Conventions
 
 ### API URLs (Django)
 ```
@@ -206,44 +242,42 @@ fetch('/api/v1/cars/admin/')
 
 ---
 
-## 3. Authentication & Token Handling
+## 4. Authentication & Session Handling
 
-### Token Storage
-```typescript
-// Frontend stores token in localStorage
-localStorage.setItem('admin_token', token)
-localStorage.getItem('admin_token')
-localStorage.removeItem('admin_token')
-```
+Session-only admin auth ([docs/adr/0001](docs/adr/0001-session-cookie-auth-for-admin.md)).
+`TokenAuthentication` and `rest_framework.authtoken` were removed at the
+2026-09-05 cutover — the guidance below is the ONLY auth model.
 
-### API Requests with Auth
-```typescript
-// Always include Token prefix
-headers: {
-  'Authorization': `Token ${token}`,
-  'Content-Type': 'application/json',
-}
-```
+### How it works
+1. `POST /api/v1/auth/login/` with credentials → Django sets an httpOnly
+   `sessionid` cookie (SameSite=Lax) plus a deliberately readable
+   `csrftoken` cookie. The response body is exactly `{user}` — no token
+   is minted anywhere.
+2. Admin API calls authenticate via the session cookie. Unsafe methods
+   (POST/PUT/PATCH/DELETE) must echo `csrftoken` as the `X-CSRFToken`
+   header — DRF `SessionAuthentication` enforces CSRF.
+3. `AuthProvider` is mounted only under `app/admin`; public pages never
+   call `/auth/session/`.
+4. A stale `localStorage['admin_token']` key from the token era is purged
+   exactly once on the first admin bootstrap.
 
-### Protected Endpoints
+### Frontend rules
+- Never store auth material in localStorage; never send an
+  `Authorization` header; never read `sessionid` (it is httpOnly).
+- Send `X-CSRFToken` on unsafe requests — handled centrally in
+  `lib/api`, not per-call.
+- Unauthenticated requests to protected endpoints answer **403** (no 401
+  challenge exists since TokenAuthentication died). On 403 at the admin
+  guard, redirect to `/admin/login`.
+
+### Protected endpoints
 ```python
-# Django views that require authentication
-from rest_framework import permissions
-
 class AdminView(generics.ListAPIView):
     permission_classes = [permissions.IsAdminUser]
 ```
 
-### Auth Flow
-1. User logs in via `/api/v1/auth/login/`
-2. Backend returns `{ token: "...", user: {...} }`
-3. Frontend stores token in localStorage
-4. All subsequent API calls include `Authorization: Token xxx`
-5. On 401 response, redirect to `/admin/login`
 
----
-
-## 4. Environment Variables
+## 5. Environment Variables
 
 ### Frontend (.env.local)
 ```bash
@@ -276,7 +310,7 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 ---
 
-## 5. Branching Strategy
+## 6. Branching Strategy
 
 ```
 main ─────────────────── Production (rahnavard.co) — auto-deploys
@@ -293,7 +327,7 @@ feature/* ─────────────── Individual features
 
 ---
 
-## 6. Docker & Deployment
+## 7. Docker & Deployment
 
 ### Development
 ```bash
@@ -350,7 +384,7 @@ cd /var/www/rahnavard
 
 ---
 
-## 7. Database & Migrations
+## 8. Database & Migrations
 
 ### After Model Changes
 ```bash
@@ -369,7 +403,7 @@ Always commit migration files to git. They must be in the repo for CI/CD to work
 
 ---
 
-## 8. Component Architecture
+## 9. Component Architecture
 
 ### Server Components (Default)
 ```tsx
@@ -404,7 +438,7 @@ export default function InteractiveComponent() {
 
 ---
 
-## 9. API Response Format
+## 10. API Response Format
 
 ### List Endpoints
 ```json
@@ -435,7 +469,7 @@ export default function InteractiveComponent() {
 
 ---
 
-## 10. Image Handling
+## 11. Image Handling
 
 ### Upload Path
 ```python
@@ -467,7 +501,7 @@ images: {
 
 ---
 
-## 11. Common Pitfalls to Avoid
+## 12. Common Pitfalls to Avoid
 
 ### ❌ DON'T
 1. Use `process.env.NEXT_PUBLIC_API_URL` in client components (use `/api/v1` directly)
@@ -490,7 +524,7 @@ images: {
 
 ---
 
-## 12. File Structure
+## 13. File Structure
 
 ```
 rahnavard/
@@ -504,8 +538,9 @@ rahnavard/
 │   │   ├── layout/             # Header, Footer
 │   │   ├── home/               # Home page sections
 │   │   └── admin/              # Admin components
-│   ├── contexts/               # React contexts (Client)
-│   └── lib/                    # Utilities (api.ts)
+│   ├── contexts/               # AuthProvider (scoped to /admin)
+│   ├── lib/api/                # Typed browser API client (admin)
+│   └── lib/data/               # RSC-only data layer (public)
 ├── backend/
 │   ├── apps/
 │   │   ├── core/               # Settings, hero, features
@@ -523,7 +558,7 @@ rahnavard/
 
 ---
 
-## 13. Testing Checklist
+## 14. Testing Checklist
 
 Before every commit:
 - [ ] `npm run lint` passes (frontend)
@@ -537,7 +572,7 @@ Before every commit:
 
 ---
 
-## 14. Deployment Checklist
+## 15. Deployment Checklist
 
 Before deploying:
 - [ ] All changes committed and pushed
@@ -555,7 +590,7 @@ After deploying:
 
 ---
 
-## 15. Emergency Commands
+## 16. Emergency Commands
 
 ### Reset Database (DANGER - loses all data)
 ```bash
@@ -580,7 +615,7 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
-## 16. Contact & Support
+## 17. Contact & Support
 
 - **Repository**: github.com/sinahmd/rahnavard
 - **Domain**: rahnavard.co
@@ -588,51 +623,7 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
-## 17. Session History (Cross-Session Memory)
+## 18. Session History
 
-> **Update this section at the end of every session.** Summarize what was done, what's in progress, and what the next steps are. This is the only persistent memory across sessions — the AI has no other recall.
-
-### Format Template
-```
-### Session — [DATE]
-- **Goal**: What the user wanted
-- **Done**: What was completedn- **Files touched**: Key files modified
-- **In progress / Next steps**: What remains
-- **Decisions made**: Any architectural or design choices
-```
-
----
-
-### Session — 2026-09-02
-- **Goal**: Add cross-session memory mechanism to project
-- **Done**: Added Session History section (Section 17) to CLAUDE.md so future AI sessions can recall past work
-- **Files touched**: CLAUDE.md
-- **In progress / Next steps**: Populate this log with prior session summaries (see below)
-- **Decisions made**: Use reverse-chronological format in CLAUDE.md as the single source of session memory
-
----
-
-### Prior Session Summaries (Reconstructed from Git Log)
-
-These are inferred from commit history since no prior session logs existed.
-
-#### Phase 1 — Initial Setup (2026-08-17 to 2026-08-20)
-- **Goal**: Scaffold full-stack Next.js + Django application
-- **Done**: Project init, Docker setup, Nginx config, Arvan Cloud deployment, CI/CD pipeline, Django models & migrations, admin panel with auth, home page with all sections
-- **Key features built**: Hero slider, Why Rahnavard, Featured Cars, Consultation Form, Branches, Latest Articles, Footer, Header
-- **Backend apps**: core, cars, articles, branches, inquiries, accounts
-
-#### Phase 2 — Bug Fixes & Deployment Hardening (2026-08-20 to 2026-08-27)
-- **Goal**: Fix production issues and stabilize deployment
-- **Done**: SSL redirect fixes, CSRF fix, health check improvements, deploy script hardening, image 400 fixes, slug migrations, local-only files system, admin CRUD for all entities
-- **Key issue**: Local-only Docker dev files kept leaking into production — solved with stash-based merge workflow
-
-#### Phase 3 — Car Listing & UI Polish (2026-08-28 to 2026-09-01)
-- **Goal**: Build /cars listing page and fix UI issues
-- **Done**: Car listing page with URL state management, filtering/search/ordering/pagination, car listing components + tests, header solid bg fix, hero slider link hover, PDF viewer fix, image loading fixes
-- **Files touched**: app/cars/page.tsx, components/car/*, components/admin/*, frontend/lib/*
-- **In progress**: Pending features — articles page, more admin CRUD, additional tests
-
----
-
-*Last updated: 2026-09-03 (ci test)*
+Cross-session agent memory lives in `CLAUDE.local.md` — gitignored,
+local-only. This file intentionally carries no session log.

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,10 +18,17 @@ env = environ.Env(
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env("SECRET_KEY", default="django-insecure-change-this-in-production")
+_INSECURE_SECRET_KEY_DEFAULT = "django-insecure-change-this-in-production"
+SECRET_KEY = env("SECRET_KEY", default=_INSECURE_SECRET_KEY_DEFAULT)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG", default=True)
+# Fail closed: DEBUG must be explicitly enabled (dev compose and CI set
+# DEBUG=1), so an unset variable means production-safe defaults instead of
+# accidentally serving debug pages.
+DEBUG = env("DEBUG")
+if not DEBUG and SECRET_KEY == _INSECURE_SECRET_KEY_DEFAULT:
+    raise ImproperlyConfigured(
+        "SECRET_KEY must be set to a real value when DEBUG is False."
+    )
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
@@ -38,7 +46,6 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
-    "rest_framework.authtoken",
     "corsheaders",
     "django_filters",
 ]
@@ -59,7 +66,10 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    # CSRF middleware is kept but API views are exempted via decorator
+    # CsrfViewMiddleware protects Django admin / non-DRF views. DRF API views
+    # are csrf_exempt at the middleware layer; DRF itself enforces CSRF for
+    # session-authenticated unsafe requests inside SessionAuthentication (see
+    # REST_FRAMEWORK below).
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -151,14 +161,29 @@ CSRF_TRUSTED_ORIGINS = env.list(
     ],
 )
 
-# Exempt API endpoints from CSRF (they use CORS + origin checking instead)
-CSRF_TRUSTED_ORIGINS_API = ["/api/"]
+# Session policy for the admin API (Phase 2 dual-mode — see
+# docs/SENIOR_REFACTOR_PLAN.md §6.A). Flags are explicit here (Phase 6):
+# `sessionid` is HttpOnly (JS never reads it) with SameSite=Lax;
+# `csrftoken` is deliberately NOT HttpOnly — the browser must read it to
+# echo it as the X-CSRFToken header on unsafe requests — and SameSite=Lax.
+# SESSION_COOKIE_SECURE / CSRF_COOKIE_SECURE are applied only when not DEBUG
+# (below) so local Docker over plain http keeps working.
+SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 hours
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = False  # readable on purpose: echoed as X-CSRFToken
+CSRF_COOKIE_SAMESITE = "Lax"
 
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
+    # SESSION-ONLY (Phase 2 cutover, plan §6.A.4): admin requests authenticate
+    # through the httpOnly Django session cookie; SessionAuthentication
+    # enforces CSRF for unsafe methods. The legacy DRF TokenAuthentication was
+    # removed after the §3.6 staging smoke passed — an `Authorization: Token`
+    # header is now simply ignored (the request stays anonymous).
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -177,7 +202,15 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "1000/hour",
         "user": "5000/hour",
+        # The public inquiry form is the spam magnet — a strict scoped rate
+        # instead of the generous global anon bucket (inquiries/views.py).
+        "inquiries": "20/hour",
     },
+    # Throttle keying behind the proxy chain (Arvan edge → nginx → Django):
+    # nginx fills X-Forwarded-For via $proxy_add_x_forwarded_for, and DRF's
+    # get_ident() walks NUM_PROXIES addresses back from the end of that
+    # header. Two trusted hops leave the client address Arvan inserted.
+    "NUM_PROXIES": 2,
 }
 
 

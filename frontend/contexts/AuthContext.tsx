@@ -9,23 +9,16 @@ import {
   ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-
-// Types
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  is_staff: boolean;
-  is_superuser: boolean;
-  is_active: boolean;
-  date_joined: string;
-}
+import { ApiRequestError } from '@/lib/api/http';
+import {
+  login as apiLogin,
+  logout as apiLogout,
+  getSession as apiGetSession,
+} from '@/lib/api/auth';
+import type { User } from '@/types/user';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -38,105 +31,70 @@ interface AuthContextType {
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+// One-time cleanup (plan §7 Phase 2.4, cutover commit): the pre-Phase-2
+// `admin_token` localStorage key is dead weight — TokenAuthentication no
+// longer exists, so the key authenticates nothing. It is REMOVED (never
+// read, never written) on the first admin bootstrap.
+const LEGACY_TOKEN_KEY = 'admin_token';
 
 // Provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Fetch user data
-  const fetchUser = useCallback(async (authToken: string) => {
+  // Bootstrap: ask the server who the session belongs to.
+  // Session-only auth (cutover): an anonymous session check answers 403 —
+  // DRF only issues a 401 challenge through authenticators that provide a
+  // WWW-Authenticate header, and SessionAuthentication provides none. Both
+  // 401 and 403 therefore mean "no valid session".
+  const fetchSession = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/user/`, {
-        headers: {
-          Authorization: `Token ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-        return userData;
-      } else {
-        // Token is invalid
-        localStorage.removeItem('admin_token');
-        setToken(null);
+      const userData = await apiGetSession();
+      setUser(userData);
+      return userData;
+    } catch (err) {
+      if (
+        err instanceof ApiRequestError &&
+        (err.status === 401 || err.status === 403)
+      ) {
+        // No (or expired) session — unauthenticated state.
         setUser(null);
-        return null;
       }
-    } catch {
+      // Network failures also leave the user null but do not redirect; the
+      // layout guard only reacts once loading completes below.
       return null;
     }
   }, []);
 
-  // Initialize auth state from localStorage
+  // Initialize auth state from the session cookie
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem('admin_token');
-
-      if (storedToken) {
-        setToken(storedToken);
-        await fetchUser(storedToken);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(LEGACY_TOKEN_KEY);
       }
-
+      await fetchSession();
       setLoading(false);
     };
-
     initAuth();
-  }, [fetchUser]);
+  }, [fetchSession]);
 
-  // Login function
+  // Login: the backend establishes the session cookie; we just mirror the user.
   const login = async (username: string, password: string) => {
-    const response = await fetch(`${API_BASE_URL}/auth/login/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(
-        error.non_field_errors?.[0] ||
-          error.detail ||
-          'Login failed. Please check your credentials.'
-      );
-    }
-
-    const data = await response.json();
-    const authToken = data.token;
-
-    // Store token
-    localStorage.setItem('admin_token', authToken);
-    setToken(authToken);
-
-    // Fetch user info
-    await fetchUser(authToken);
+    const data = await apiLogin(username, password);
+    setUser(data.user);
   };
 
-  // Logout function
+  // Logout: destroy the server-side session.
   const logout = async () => {
     try {
-      if (token) {
-        await fetch(`${API_BASE_URL}/auth/logout/`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Token ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-      }
+      await apiLogout();
     } catch {
+      // Deliberately ignored: logout must succeed locally even when the
+      // server call fails (network drop, expired session, already logged
+      // out elsewhere). The finally block clears state and navigates
+      // regardless.
     } finally {
-      // Clear local state regardless of API response
-      localStorage.removeItem('admin_token');
-      setToken(null);
       setUser(null);
       router.push('/admin/login');
     }
@@ -144,19 +102,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Refresh user data
   const refreshUser = async () => {
-    if (token) {
-      await fetchUser(token);
-    }
+    await fetchSession();
   };
 
   // Computed properties
-  const isAuthenticated = !!user && !!token;
+  const isAuthenticated = !!user;
   const isAdmin = isAuthenticated && user.is_staff;
   const isSuperUser = isAuthenticated && user.is_superuser;
 
   const value: AuthContextType = {
     user,
-    token,
     loading,
     login,
     logout,
@@ -178,61 +133,4 @@ export function useAuth() {
   }
 
   return context;
-}
-
-// HOC for protected pages
-export function withAuth<P extends object>(
-  WrappedComponent: React.ComponentType<P>,
-  requiredRole?: 'admin' | 'superuser'
-) {
-  return function ProtectedComponent(props: P) {
-    const { isAuthenticated, isAdmin, isSuperUser, loading } = useAuth();
-    const router = useRouter();
-
-    useEffect(() => {
-      if (!loading) {
-        if (!isAuthenticated) {
-          router.push('/admin/login');
-          return;
-        }
-
-        if (requiredRole === 'admin' && !isAdmin) {
-          router.push('/admin/login');
-          return;
-        }
-
-        if (requiredRole === 'superuser' && !isSuperUser) {
-          router.push('/admin');
-          return;
-        }
-      }
-    }, [isAuthenticated, isAdmin, isSuperUser, loading, router]);
-
-    if (loading) {
-      return <LoadingSpinner />;
-    }
-
-    if (!isAuthenticated) {
-      return null;
-    }
-
-    if (requiredRole === 'admin' && !isAdmin) {
-      return null;
-    }
-
-    if (requiredRole === 'superuser' && !isSuperUser) {
-      return null;
-    }
-
-    return <WrappedComponent {...props} />;
-  };
-}
-
-// Loading spinner component
-function LoadingSpinner() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-    </div>
-  );
 }

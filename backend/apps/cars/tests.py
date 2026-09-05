@@ -1,6 +1,8 @@
+import os
 import struct
 import zlib
 import pytest
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
@@ -310,9 +312,11 @@ class TestCarAdminAPI:
     """Tests for Car admin API endpoints."""
 
     def test_admin_list_requires_auth(self, api_client):
-        """Test that admin list requires authentication."""
+        """Anonymous admin-list access must be rejected. With session-only
+        auth DRF returns 403 (no WWW-Authenticate challenge exists — the
+        401 challenge died with TokenAuthentication)."""
         response = api_client.get('/api/v1/admin/cars/')
-        assert response.status_code == 401
+        assert response.status_code == 403
 
     def test_admin_list_with_auth(self, admin_client, sample_cars):
         """Test admin list with authentication."""
@@ -346,6 +350,48 @@ class TestCarAdminAPI:
         )
         assert response.status_code == 200
         assert response.data['brand'] == 'Updated Brand'
+
+    def test_admin_create_sanitizes_technical_description(self, admin_client):
+        """Dirty HTML posted via the admin API never reaches the database."""
+        data = {
+            'brand': 'Honda',
+            'model': 'Civic',
+            'persian_name': 'هوندا سیویک',
+            'slug': 'honda-civic-xss',
+            'year': 2025,
+            'fuel_type': 'gasoline',
+            'transmission': 'automatic',
+            'is_active': True,
+            'technical_description': (
+                '<p>متن</p><script>alert(1)</script>'
+                '<img src="x" onerror="alert(1)">'
+                '<a href="JaVaScRiPt:alert(1)">bad</a>'
+            ),
+            'main_image': SimpleUploadedFile('test.png', _make_tiny_png(), 'image/png')
+        }
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+
+        stored = Car.objects.get(slug='honda-civic-xss')
+        assert '<script' not in stored.technical_description
+        assert 'onerror' not in stored.technical_description
+        assert 'javascript:' not in stored.technical_description
+        assert 'متن' in stored.technical_description
+
+    def test_admin_update_sanitizes_technical_description(
+        self, admin_client, sample_car
+    ):
+        """Dirty HTML posted via PATCH is sanitized before storage."""
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {'technical_description': '<p>x</p><a href="javascript:alert(1)">bad</a>'},
+            format='json'
+        )
+        assert response.status_code == 200
+
+        sample_car.refresh_from_db()
+        assert 'javascript:' not in sample_car.technical_description
+        assert 'x' in sample_car.technical_description
 
     def test_admin_soft_delete_car(self, admin_client, sample_car):
         """Test soft deleting a car via admin API (DELETE now does soft delete)."""
@@ -782,3 +828,180 @@ class TestCarEdgeCases:
         response = api_client.get('/api/v1/cars/?search=آزمایشی')
         assert response.status_code == 200
         assert response.data['count'] == 1
+
+
+@pytest.mark.django_db
+class TestCarAdminGalleryAndPagination:
+    """Tests for the admin gallery_0..N upload convention and list pagination.
+
+    These pin the wire contract the frontend form split relies on: multipart
+    gallery files arrive as gallery_0..N (see frontend/lib/api/formData.ts),
+    edits preserve existing gallery URLs, catalog uploads work through the
+    admin API, and the paginated admin list exposes the page_size envelope
+    key while 404-ing out-of-range pages (the frontend AdminListPage falls
+    back to the previous page on that 404).
+    """
+
+    def _car_data(self, slug):
+        return {
+            'brand': 'Toyota',
+            'model': 'RAV4',
+            'persian_name': 'تویوتا راو۴',
+            'slug': slug,
+            'year': 2025,
+            'fuel_type': 'gasoline',
+            'transmission': 'automatic',
+            'is_active': True,
+            'main_image': SimpleUploadedFile('main.png', _make_tiny_png(), 'image/png'),
+        }
+
+    def _gallery_files(self, count):
+        return {
+            f'gallery_{i}': SimpleUploadedFile(f'g{i}.png', _make_tiny_png(), 'image/png')
+            for i in range(count)
+        }
+
+    @staticmethod
+    def _cleanup_media(paths):
+        for path in paths:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_admin_create_with_gallery_files(self, admin_client):
+        """gallery_0..N multipart keys are stored as a gallery URL list on disk."""
+        data = self._car_data('gallery-create')
+        data.update(self._gallery_files(2))
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+
+        car = Car.objects.get(slug='gallery-create')
+        assert len(car.gallery) == 2
+        created = []
+        for url in car.gallery:
+            relative = url.replace(settings.MEDIA_URL, '')
+            path = os.path.join(settings.MEDIA_ROOT, relative)
+            assert os.path.exists(path)
+            created.append(path)
+        self._cleanup_media(created)
+
+    def test_admin_update_preserves_existing_gallery_and_appends(self, admin_client, sample_car):
+        """A PATCH with new gallery files keeps existing URLs and appends."""
+        sample_car.gallery = [f'{settings.MEDIA_URL}cars/gallery/existing.jpg']
+        sample_car.save()
+
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {**self._gallery_files(1)},
+            format='multipart',
+        )
+        assert response.status_code == 200
+
+        sample_car.refresh_from_db()
+        assert sample_car.gallery[0].endswith('existing.jpg')
+        assert len(sample_car.gallery) == 2
+        # The new file must NOT reuse the first image's filename: the counter
+        # continues past the existing gallery (`_gallery_1.png`), so an
+        # edit-append never overwrites the disk file of an existing image.
+        assert sample_car.gallery[1] != sample_car.gallery[0]
+        assert sample_car.gallery[1].endswith(f'{sample_car.slug}_gallery_1.png')
+
+        created = []
+        for url in sample_car.gallery:
+            relative = url.replace(settings.MEDIA_URL, '')
+            path = os.path.join(settings.MEDIA_ROOT, relative)
+            if url != f'{settings.MEDIA_URL}cars/gallery/existing.jpg':
+                created.append(path)
+        self._cleanup_media(created)
+
+    def test_admin_create_with_catalog_file(self, admin_client):
+        """catalog_file uploads through the admin multipart API."""
+        data = self._car_data('catalog-create')
+        data['catalog_file'] = SimpleUploadedFile(
+            'catalog.pdf', b'%PDF-1.4\n%', 'application/pdf'
+        )
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+        assert response.data['catalog_file'].endswith('.pdf')
+
+        car = Car.objects.get(slug='catalog-create')
+        path = os.path.join(settings.MEDIA_ROOT, car.catalog_file.name)
+        assert os.path.exists(path)
+        self._cleanup_media([path])
+
+    @staticmethod
+    def _make_cars(count):
+        for i in range(count):
+            Car.objects.create(
+                brand='Toyota',
+                model='RAV4',
+                persian_name=f'خودرو {i}',
+                slug=f'page-car-{i}',
+                year=2025,
+                fuel_type='gasoline',
+                transmission='automatic',
+                is_active=True,
+                main_image='cars/page.jpg',
+            )
+
+    def test_admin_list_pagination_second_page(self, admin_client):
+        """25 cars paginate: page 2 holds the remainder and the envelope
+        carries page_size so the frontend can derive total pages."""
+        self._make_cars(25)
+        response = admin_client.get('/api/v1/admin/cars/', {'page': 2})
+        assert response.status_code == 200
+        assert response.data['count'] == 25
+        assert response.data['page_size'] == 20
+        assert len(response.data['results']) == 5
+
+    def test_admin_list_out_of_range_page_returns_404(self, admin_client):
+        """An out-of-range page 404s (the frontend falls back a page on this)."""
+        self._make_cars(25)
+        response = admin_client.get('/api/v1/admin/cars/', {'page': 999})
+        assert response.status_code == 404
+
+    def test_admin_create_duplicate_slug_returns_400_field_error(self, admin_client, sample_car):
+        """Creating a car with an already-active slug maps to a 400 slug field
+        error (not an unhandled IntegrityError 500) — the admin form shows
+        field errors only from 400 responses."""
+        data = self._car_data(sample_car.slug)
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 400
+        assert 'slug' in response.data
+
+        # The failed insert may have written main.png before the DB raised.
+        self._cleanup_media([os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png')])
+
+    def test_distinct_active_cars_do_not_collide_gallery_files(self, admin_client):
+        """Two different active cars uploading gallery_0..N never produce the
+        same on-disk filename.
+
+        Gallery files are named `{slug}_gallery_{idx}` (slug-based, accepted
+        technical debt — see DEVELOPMENT.md §3.9). Collisions are prevented
+        by the `car_slug_unique_when_not_deleted` partial unique index: two
+        active cars always have distinct slugs, hence distinct filenames even
+        at the same image index. This test pins that guarantee through the
+        real admin API (and would fail loudly if the scheme changed to one
+        that could collide)."""
+        urls = []
+        paths = []
+        for slug in ('gallery-a', 'gallery-b'):
+            data = self._car_data(slug)
+            data.update(self._gallery_files(2))
+            response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+            assert response.status_code == 201
+
+            car = Car.objects.get(slug=slug)
+            assert len(car.gallery) == 2
+            for url in car.gallery:
+                relative = url.replace(settings.MEDIA_URL, '')
+                path = os.path.join(settings.MEDIA_ROOT, relative)
+                assert os.path.exists(path)
+                urls.append(url)
+                paths.append(path)
+
+        # Four distinct URLs and four distinct files across the two cars.
+        assert len(set(urls)) == 4
+        assert len(set(paths)) == 4
+
+        paths.append(os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png'))
+        self._cleanup_media(paths)

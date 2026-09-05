@@ -17,6 +17,8 @@ const baseCar = {
   engine: '2.5L Hybrid',
   main_image: '/media/cars/test.jpg',
   is_featured: false,
+  display_order: 0,
+  created_at: '2025-01-01T00:00:00Z',
 }
 
 describe('CarCard', () => {

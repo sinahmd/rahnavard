@@ -28,6 +28,11 @@ BACKUP_DIR="$REPO_ROOT/.local-only-backup"
 
 cd "$REPO_ROOT"
 
+# Source the shared protected-file guard (auth-critical files must never be
+# listed as local-only — see scripts/_local_only_guard.sh).
+# shellcheck source=scripts/_local_only_guard.sh
+source "$REPO_ROOT/scripts/_local_only_guard.sh"
+
 # Verify we're on develop
 BRANCH=$(git branch --show-current)
 if [ "$BRANCH" != "develop" ]; then
@@ -40,6 +45,9 @@ if [ ! -f "$LOCAL_ONLY_FILE" ]; then
     echo -e "${RED}ERROR: LOCAL_ONLY_FILES.txt not found!${NC}"
     exit 1
 fi
+
+# Abort if a protected production file sneaks into the list (settings.py etc.)
+guard_local_only_file || exit 1
 
 # Get list of local-only files
 LOCAL_ONLY_FILES=$(grep -v '^#' "$LOCAL_ONLY_FILE" | grep -v '^\s*$' | sed 's/^[[:space:]]*//')
@@ -115,7 +123,12 @@ echo ""
 # Step 3: Revert local-only files to main versions
 echo -e "${CYAN}Step 2: Reverting local-only files to main versions...${NC}"
 for f in "${CHANGED_FILES[@]}"; do
-    git checkout main -- "$f" 2>/dev/null && echo "   ✅ $f" || echo "   ⚠️  $f (not on main, skipping)"
+    if git checkout main -- "$f" 2>/dev/null; then
+        echo "   ✅ $f"
+    else
+        # File is tracked on develop but not on main — delete it
+        git rm -f "$f" 2>/dev/null && echo "   ✅ $f (removed, not on main)" || rm -f "$f" && echo "   ✅ $f (deleted, not on main)"
+    fi
 done
 
 # Handle untracked files — delete them so they don't leak into the merge

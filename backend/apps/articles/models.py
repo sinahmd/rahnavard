@@ -3,6 +3,7 @@ from django.utils.text import slugify
 
 from apps.core.mixins import SoftDeleteMixin
 from apps.core.models import Redirect
+from apps.core.sanitizer import sanitize_html
 
 
 class Article(SoftDeleteMixin, models.Model):
@@ -54,6 +55,13 @@ class Article(SoftDeleteMixin, models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
+        # Sanitize HTML on every write so stored content is always safe to
+        # render on the public site (rendered via dangerouslySetInnerHTML).
+        if self.content:
+            cleaned = sanitize_html(self.content)
+            if cleaned != self.content:
+                self.content = cleaned
+
         # Auto-generate slug if not provided or blank
         if not self.slug or not self.slug.strip():
             self.slug = self._generate_slug()

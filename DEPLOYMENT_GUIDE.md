@@ -92,7 +92,7 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 docker compose -f docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
 ```
 
-## Step 5: Verify Deployment
+## Step 4: Verify Deployment
 
 ```bash
 # Check if services are running
@@ -215,13 +215,11 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py migrate
 ```
 
 ### SSL issues
-```bash
-# Renew certificate
-sudo certbot renew
 
-# Test renewal
-sudo certbot renew --dry-run
-```
+SSL terminates at the Arvan Cloud edge — there is no certbot/Let's
+Encrypt on the server. If HTTPS is broken, check the Arvan console
+(certificate status, origin settings) and that the origin still serves
+plain HTTP on port 80.
 
 ## Admin Dashboard
 

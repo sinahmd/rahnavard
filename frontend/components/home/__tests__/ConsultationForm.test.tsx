@@ -1,13 +1,12 @@
 import '@testing-library/jest-dom'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import ConsultationForm from '../ConsultationForm'
+import type { SiteSettings } from '@/types/settings'
 
-jest.mock('@/contexts/SettingsContext', () => ({
-  useSettings: jest.fn(() => ({
-    form_title: 'عنوان سفارشی',
-    form_description: 'توضیحات سفارشی',
-  })),
-}))
+const settings = {
+  form_title: 'عنوان سفارشی',
+  form_description: 'توضیحات سفارشی',
+} as SiteSettings
 
 const mockFetch = jest.fn()
 global.fetch = mockFetch
@@ -21,16 +20,13 @@ describe('ConsultationForm', () => {
     })
   })
 
-  it('should render the form with default title', async () => {
-    render(<ConsultationForm />)
-
-    await waitFor(() => {
-      expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
-    })
+  it('should render the form with the settings title prop', () => {
+    render(<ConsultationForm settings={settings} />)
+    expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
   })
 
   it('should render form fields', () => {
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
     expect(screen.getByLabelText('نام')).toBeInTheDocument()
     expect(screen.getByLabelText('شماره تلفن')).toBeInTheDocument()
     expect(screen.getByLabelText('موضوع')).toBeInTheDocument()
@@ -38,12 +34,12 @@ describe('ConsultationForm', () => {
   })
 
   it('should render submit button', () => {
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
     expect(screen.getByRole('button', { name: 'ارسال درخواست' })).toBeInTheDocument()
   })
 
   it('should update form fields on input', () => {
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
 
     const nameInput = screen.getByLabelText('نام')
     fireEvent.change(nameInput, { target: { value: 'علی' } })
@@ -55,7 +51,7 @@ describe('ConsultationForm', () => {
   })
 
   it('should submit form and show success message', async () => {
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
 
     await waitFor(() => {
       expect(screen.getByText('عنوان سفارشی')).toBeInTheDocument()
@@ -65,10 +61,9 @@ describe('ConsultationForm', () => {
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    // Submit
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    // Submit; the submit handler is async (fetch resolves on a microtask), so
+    // assert via waitFor — it polls inside act() and absorbs those updates.
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('درخواست شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.')).toBeInTheDocument()
@@ -87,35 +82,40 @@ describe('ConsultationForm', () => {
       })
     )
 
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    // The fetch stays pending, so the loading state is set synchronously by
+    // the click and visible immediately.
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
-    expect(screen.getByText('در حال ارسال...')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('در حال ارسال...')).toBeInTheDocument()
+    })
     expect(screen.getByRole('button')).toBeDisabled()
 
-    // Resolve to clean up
-    act(() => {
+    // Resolve; awaiting the act() lets the post-resolution microtasks
+    // (setIsSubmitting(false), success message) settle inside act().
+    await act(async () => {
       resolveFetch!({ ok: true, json: async () => ({}) })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('درخواست شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.')).toBeInTheDocument()
     })
   })
 
   it('should show error message on submission failure', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, json: async () => ({ detail: 'Error' }) })
 
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('خطا در ارسال درخواست. لطفاً دوباره تلاش کنید.')).toBeInTheDocument()
@@ -125,14 +125,12 @@ describe('ConsultationForm', () => {
   it('should show error message on network failure', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('خطا در ارسال درخواست. لطفاً دوباره تلاش کنید.')).toBeInTheDocument()
@@ -142,14 +140,12 @@ describe('ConsultationForm', () => {
   it('should hide success message after timeout', async () => {
     jest.useFakeTimers()
 
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }))
 
     await waitFor(() => {
       expect(screen.getByText('درخواست شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.')).toBeInTheDocument()
@@ -168,7 +164,7 @@ describe('ConsultationForm', () => {
   })
 
   it('should send POST request with correct data', async () => {
-    render(<ConsultationForm />)
+    render(<ConsultationForm settings={settings} />)
 
     fireEvent.change(screen.getByLabelText('نام'), { target: { value: 'علی' } })
     fireEvent.change(screen.getByLabelText('شماره تلفن'), { target: { value: '09121234567' } })

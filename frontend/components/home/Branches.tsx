@@ -1,40 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
-import { useSettings } from '@/contexts/SettingsContext'
+import type { Branch } from '@/types/branch'
+import type { SiteSettings } from '@/types/settings'
+import SectionHead from '@/components/site/SectionHead'
 
-
-interface Branch {
-  id: number
-  name: string
-  address: string
-  phone: string
-  map_url: string
-  map_image: string
-}
-
-export default function Branches() {
+export default function Branches({
+  branches,
+  settings,
+}: {
+  branches: Branch[]
+  settings: SiteSettings
+}) {
   const sectionRef = useRef<HTMLElement>(null)
-  const settings = useSettings()
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch('/api/v1/branches/')
-        if (res.ok) {
-          const data = await res.json()
-          setBranches(data.results || data || [])
-        }
-      } catch {
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -58,14 +37,13 @@ export default function Branches() {
   return (
     <section id="branches" ref={sectionRef} className="bg-bg">
       <div className="wrap">
-        <div className="section-head reveal-left">
-          <span className="eyebrow">دفاتر ما</span>
-          <h2 className="section-title">{settings.branches_section_title}</h2>
-        </div>
+        <SectionHead
+          eyebrow="دفاتر ما"
+          title={settings.branches_section_title}
+          reveal="left"
+        />
 
-        {loading ? (
-          <div className="text-center py-12 text-gray">در حال بارگذاری...</div>
-        ) : branches.length === 0 ? (
+        {branches.length === 0 ? (
           <div className="text-center py-12 text-gray">
             شعبه‌ای یافت نشد. از پنل مدیریت شعبه اضافه کنید.
           </div>
@@ -84,7 +62,7 @@ export default function Branches() {
                 </div>
 
                 <div className="flex-1">
-                  <h4 className="text-[19px] font-extrabold mb-2.5">{branch.name}</h4>
+                  <h3 className="text-[19px] font-extrabold mb-2.5">{branch.name}</h3>
                   <p className="text-gray text-[14.5px] mb-1.5">{branch.address}</p>
                   {branch.phone && (
                     <a href={`tel:${branch.phone}`} className="text-dark font-bold mt-2.5 inline-block ltr text-right" style={{ unicodeBidi: 'embed' }}>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import MobileNav from './MobileNav'
-import { useSettings } from '@/contexts/SettingsContext'
+import type { SiteSettings } from '@/types/settings'
 
 function getNavLinks(pathname: string) {
   const isHome = pathname === '/'
@@ -19,10 +19,9 @@ function getNavLinks(pathname: string) {
   ]
 }
 
-export default function Header() {
+export default function Header({ settings }: { settings: SiteSettings }) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const settings = useSettings()
   const pathname = usePathname()
   const navLinks = getNavLinks(pathname)
   const isHome = pathname === '/'
@@ -72,8 +71,9 @@ export default function Header() {
           )}
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:block">
+        {/* Desktop Navigation — distinct label from the mobile panel so the
+            two nav landmarks never collide (axe landmark-unique). */}
+        <nav className="hidden md:block" aria-label="ناوبری اصلی">
           <ul className="flex items-center gap-[34px] h-[44px]">
             {navLinks.map((link) => (
               <li key={link.href}>
