@@ -202,7 +202,15 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "1000/hour",
         "user": "5000/hour",
+        # The public inquiry form is the spam magnet — a strict scoped rate
+        # instead of the generous global anon bucket (inquiries/views.py).
+        "inquiries": "20/hour",
     },
+    # Throttle keying behind the proxy chain (Arvan edge → nginx → Django):
+    # nginx fills X-Forwarded-For via $proxy_add_x_forwarded_for, and DRF's
+    # get_ident() walks NUM_PROXIES addresses back from the end of that
+    # header. Two trusted hops leave the client address Arvan inserted.
+    "NUM_PROXIES": 2,
 }
 
 
