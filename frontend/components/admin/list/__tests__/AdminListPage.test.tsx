@@ -66,6 +66,26 @@ describe('AdminListPage', () => {
     expect(await screen.findByText('چیزی وجود ندارد')).toBeInTheDocument()
   })
 
+  it('announces the loading state to assistive tech', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(pageOf([1], 1))
+    renderList(fetchPage)
+    // Shown on first paint, before the fetch resolves.
+    expect(screen.getByRole('status')).toHaveTextContent('در حال بارگذاری...')
+    // Settle the fetch chain inside act so no state update leaks past the test.
+    await waitFor(() => expect(screen.getByText('ردیف 1')).toBeInTheDocument())
+  })
+
+  it('gives the table a caption and column-header scope', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(pageOf([1], 1))
+    const { container } = renderList(fetchPage)
+    await screen.findByText('ردیف 1')
+
+    expect(container.querySelector('caption')).toHaveTextContent('مدیریت آزمون')
+    screen.getAllByRole('columnheader').forEach((th) =>
+      expect(th).toHaveAttribute('scope', 'col')
+    )
+  })
+
   it('shows the error banner with retry and refetches on retry', async () => {
     const fetchPage = jest
       .fn()

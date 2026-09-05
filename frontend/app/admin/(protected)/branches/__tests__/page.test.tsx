@@ -79,6 +79,8 @@ it('toggles branch activity through the typed endpoint', async () => {
   render(<AdminBranchesPage />)
 
   const toggle = await screen.findByRole('button', { name: 'فعال' })
+  // Status is conveyed to assistive tech (aria-pressed), not only by color.
+  expect(toggle).toHaveAttribute('aria-pressed', 'true')
   fireEvent.click(toggle)
 
   expect(mockSetBranchActive).toHaveBeenCalledWith(1, false)

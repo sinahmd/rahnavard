@@ -83,4 +83,56 @@ describe('MobileNav', () => {
     expect(nav).toBeInTheDocument()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
+
+  // ── Keyboard / focus behavior (plan §6.I) ────────────────────────────
+
+  it('should move focus to the first link when opened', () => {
+    render(<MobileNav isOpen={true} onClose={jest.fn()} links={mockLinks} />)
+    expect(screen.getByRole('link', { name: 'خانه' })).toHaveFocus()
+  })
+
+  it('should close on Escape', () => {
+    const onClose = jest.fn()
+    render(<MobileNav isOpen={true} onClose={onClose} links={mockLinks} />)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('should trap Tab focus inside the panel', () => {
+    render(<MobileNav isOpen={true} onClose={jest.fn()} links={mockLinks} />)
+    const first = screen.getByRole('link', { name: 'خانه' })
+    const last = screen.getByRole('link', { name: 'مقالات' })
+
+    // Tab from the last link wraps to the first.
+    last.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(first).toHaveFocus()
+
+    // Shift+Tab from the first wraps to the last.
+    first.focus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(last).toHaveFocus()
+  })
+
+  it('should return focus to the trigger when closed', () => {
+    const trigger = document.createElement('button')
+    document.body.appendChild(trigger)
+    trigger.focus()
+
+    const { rerender } = render(
+      <MobileNav isOpen={true} onClose={jest.fn()} links={mockLinks} />
+    )
+    rerender(<MobileNav isOpen={false} onClose={jest.fn()} links={mockLinks} />)
+
+    expect(trigger).toHaveFocus()
+    trigger.remove()
+  })
+
+  it('should hide the panel from the accessibility tree when closed', () => {
+    const { container } = render(
+      <MobileNav isOpen={false} onClose={jest.fn()} links={mockLinks} />
+    )
+    const nav = container.querySelector('nav')
+    expect(nav).toHaveAttribute('aria-hidden', 'true')
+  })
 })
