@@ -1,3 +1,7 @@
+> **SUPERSEDED (2026-09-06):** this was an implementation report, not
+> guidance. Its phases are landed in the codebase; current state lives in
+> DEVELOPMENT.md §10 and docs/adr/. Kept for history only.
+
 # Database Hardening — Implementation Report
 
 > **Purpose:** Fix critical database issues before production launch
