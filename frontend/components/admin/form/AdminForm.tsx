@@ -6,6 +6,7 @@ import Link from 'next/link'
 import type { FormField, FormValues } from '@/types/admin-form'
 import { useAdminForm } from './useAdminForm'
 import FieldControl, { fieldToControlProps } from './fields'
+import ErrorState from '@/components/admin/ui/ErrorState'
 
 interface AdminFormProps<TEntity extends object> {
   entityNamePersian: string
@@ -89,11 +90,7 @@ export default function AdminForm<TEntity extends object = Record<string, unknow
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} />}
 
       <form onSubmit={handleSubmit}>
         {Object.entries(sections).map(([sectionName, sectionFields]) => (

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import type { Branch } from '@/types/branch'
 import type { SiteSettings } from '@/types/settings'
+import SectionHead from '@/components/site/SectionHead'
 
 export default function Branches({
   branches,
@@ -36,10 +37,11 @@ export default function Branches({
   return (
     <section id="branches" ref={sectionRef} className="bg-bg">
       <div className="wrap">
-        <div className="section-head reveal-left">
-          <span className="eyebrow">دفاتر ما</span>
-          <h2 className="section-title">{settings.branches_section_title}</h2>
-        </div>
+        <SectionHead
+          eyebrow="دفاتر ما"
+          title={settings.branches_section_title}
+          reveal="left"
+        />
 
         {branches.length === 0 ? (
           <div className="text-center py-12 text-gray">

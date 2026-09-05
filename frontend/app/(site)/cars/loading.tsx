@@ -1,12 +1,15 @@
+import SectionHead from '@/components/site/SectionHead'
+
 export default function CarsLoading() {
   return (
     <main className="pt-32 pb-20">
       <div className="wrap">
-        <div className="section-head">
-          <span className="eyebrow">محصولات</span>
-          <h1 className="section-title">خودروهای ما</h1>
-          <p>مجموعه‌ای از خودروهای وارداتی راهنورد خودرو، آماده تحویل با گارانتی رسمی.</p>
-        </div>
+        <SectionHead
+          eyebrow="محصولات"
+          title="خودروهای ما"
+          description="مجموعه‌ای از خودروهای وارداتی راهنورد خودرو، آماده تحویل با گارانتی رسمی."
+          headingLevel="h1"
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (

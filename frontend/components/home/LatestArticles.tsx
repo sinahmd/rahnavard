@@ -5,6 +5,7 @@ import Link from 'next/link'
 import OptimizedImage from '@/components/ui/OptimizedImage'
 import type { ArticleListItem } from '@/types/article'
 import type { SiteSettings } from '@/types/settings'
+import SectionHead from '@/components/site/SectionHead'
 
 export default function LatestArticles({
   articles,
@@ -47,11 +48,12 @@ export default function LatestArticles({
   return (
     <section id="articles" ref={sectionRef} className="bg-white">
       <div className="wrap">
-        <div className="section-head reveal-right">
-          <span className="eyebrow">اخبار</span>
-          <h2 className="section-title">{settings.articles_section_title}</h2>
-          <p>{settings.articles_section_description}</p>
-        </div>
+        <SectionHead
+          eyebrow="اخبار"
+          title={settings.articles_section_title}
+          description={settings.articles_section_description}
+          reveal="right"
+        />
 
         {articles.length === 0 ? (
           <div className="text-center py-12 text-gray">

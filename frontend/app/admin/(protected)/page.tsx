@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { getAdminStats } from '@/lib/api/stats'
+import PageHeader from '@/components/admin/ui/PageHeader'
+import ErrorState from '@/components/admin/ui/ErrorState'
 import { listInquiries } from '@/lib/api/inquiries'
 import type { AdminStats } from '@/types/api'
 import type { Inquiry } from '@/types/inquiry'
@@ -55,13 +57,9 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">داشبورد</h1>
+      <PageHeader title="داشبورد" />
 
-      {error && (
-        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {statsDisplay.map((stat, index) => (

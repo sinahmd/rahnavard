@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
-import OptimizedImage from '@/components/ui/OptimizedImage'
+import CarCardImage from '@/components/car/CarCardImage'
+import SectionHead from '@/components/site/SectionHead'
 import type { CarListItem } from '@/types/car'
 import type { SiteSettings } from '@/types/settings'
 
@@ -39,11 +40,12 @@ export default function FeaturedCars({
   return (
     <section id="cars" ref={sectionRef} className="bg-bg">
       <div className="wrap">
-        <div className="section-head reveal-left">
-          <span className="eyebrow">محصولات</span>
-          <h2 className="section-title">{settings.cars_section_title}</h2>
-          <p>{settings.cars_section_description}</p>
-        </div>
+        <SectionHead
+          eyebrow="محصولات"
+          title={settings.cars_section_title}
+          description={settings.cars_section_description}
+          reveal="left"
+        />
 
         {cars.length === 0 ? (
           <div className="text-center py-12 text-gray">
@@ -57,22 +59,12 @@ export default function FeaturedCars({
                 key={car.id}
                 className="car-card reveal-scale bg-white rounded-[14px] p-7 pb-6 shadow-card text-center flex flex-col items-center h-full transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1"
               >
-                <div className="w-full aspect-[4/3] flex items-center justify-center mb-[18px] overflow-hidden">
-                  {car.main_image ? (
-                    <OptimizedImage
-                      src={car.main_image}
-                      alt={car.persian_name}
-                      width={400}
-                      height={300}
-                      className="max-w-[88%] max-h-full object-contain transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-translate-y-1.5"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-light flex items-center justify-center text-gray">
-                      بدون تصویر
-                    </div>
-                  )}
-                </div>
+                <CarCardImage
+                  src={car.main_image}
+                  alt={car.persian_name}
+                  className="mb-[18px]"
+                  imageClassName="transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-translate-y-1.5"
+                />
                 <div className="flex-1 flex flex-col items-center justify-start w-full">
                   <span className="font-poppins text-[12.5px] tracking-[2px] text-gray font-semibold uppercase">
                     {car.brand}

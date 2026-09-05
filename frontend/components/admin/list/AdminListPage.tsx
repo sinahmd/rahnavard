@@ -5,6 +5,9 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type { ApiRequestError } from '@/lib/api/http'
 import type { Paginated } from '@/types/api'
+import PageHeader from '@/components/admin/ui/PageHeader'
+import ErrorState from '@/components/admin/ui/ErrorState'
+import EmptyState from '@/components/admin/ui/EmptyState'
 
 /** Helpers passed to column cells so row actions can refresh / surface errors. */
 export interface AdminListHelpers {
@@ -106,39 +109,32 @@ export default function AdminListPage<T>({
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{title}</h1>
-        {createHref && (
-          <Link
-            href={createHref}
-            className="bg-accent text-dark px-4 py-2 rounded-lg font-bold hover:bg-accent-dark transition-colors"
-          >
-            {createLabel || '+ جدید'}
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        title={title}
+        action={
+          createHref ? (
+            <Link
+              href={createHref}
+              className="bg-accent text-dark px-4 py-2 rounded-lg font-bold hover:bg-accent-dark transition-colors"
+            >
+              {createLabel || '+ جدید'}
+            </Link>
+          ) : undefined
+        }
+      />
 
-      {error && (
-        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
-          <button
-            onClick={() => setReloadKey((k) => k + 1)}
-            className="mr-3 underline font-bold hover:text-red-900"
-          >
-            تلاش مجدد
-          </button>
-        </div>
-      )}
+      {error && <ErrorState message={error} onRetry={() => setReloadKey((k) => k + 1)} />}
 
       {loading && rows.length === 0 ? (
         <div className="text-center py-8">در حال بارگذاری...</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="w-full">
+            <caption className="sr-only">{title}</caption>
             <thead className="bg-gray-50">
               <tr className="text-right">
                 {columns.map((col) => (
-                  <th key={col.header} className={`p-4 font-bold ${col.className || ''}`}>
+                  <th key={col.header} scope="col" className={`p-4 font-bold ${col.className || ''}`}>
                     {col.header}
                   </th>
                 ))}
@@ -147,8 +143,8 @@ export default function AdminListPage<T>({
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="p-4 text-center text-gray-500">
-                    {emptyMessage}
+                  <td colSpan={columns.length} className="p-4">
+                    <EmptyState message={emptyMessage} />
                   </td>
                 </tr>
               ) : (
