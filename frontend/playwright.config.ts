@@ -7,7 +7,9 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   fullyParallel: true,
-  retries: 0,
+  // The dev server compiles routes on demand — parallel first hits can
+  // abort/timeout; one retry (routes then warm) keeps the suite stable.
+  retries: process.env.CI ? 2 : 1,
   reporter: [['list']],
   outputDir: './test-results',
   use: {
