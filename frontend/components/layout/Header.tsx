@@ -71,8 +71,9 @@ export default function Header({ settings }: { settings: SiteSettings }) {
           )}
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:block">
+        {/* Desktop Navigation — distinct label from the mobile panel so the
+            two nav landmarks never collide (axe landmark-unique). */}
+        <nav className="hidden md:block" aria-label="ناوبری اصلی">
           <ul className="flex items-center gap-[34px] h-[44px]">
             {navLinks.map((link) => (
               <li key={link.href}>

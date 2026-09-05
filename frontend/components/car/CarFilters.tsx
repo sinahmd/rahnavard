@@ -59,16 +59,20 @@ function SelectFilter({
   onChange,
   options,
   placeholder,
+  ariaLabel,
 }: {
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string }[]
   placeholder: string
+  /** Accessible name — the selects are visually titled by FilterSection's h3. */
+  ariaLabel: string
 }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      aria-label={ariaLabel}
       className="w-full border-[1.5px] border-gray-light rounded-lg px-3 py-2.5 text-[14px] bg-white text-dark outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
     >
       <option value="">{placeholder}</option>
@@ -152,6 +156,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
           onChange={(v) => update({ brand: v })}
           options={options.brands.map((b) => ({ value: b, label: b }))}
           placeholder="همه برندها"
+          ariaLabel="برند"
         />
       </FilterSection>
 
@@ -163,6 +168,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
             onChange={(v) => update({ body_type: v })}
             options={options.body_types.map((b) => ({ value: b, label: b }))}
             placeholder="همه انواع"
+            ariaLabel="نوع بدنه"
           />
         </FilterSection>
       )}
@@ -174,6 +180,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
           onChange={(v) => update({ fuel_type: v })}
           options={options.fuel_types.map((f) => ({ value: f, label: FUEL_TYPE_LABELS[f] || f }))}
           placeholder="همه انواع سوخت"
+          ariaLabel="نوع سوخت"
         />
       </FilterSection>
 
@@ -184,6 +191,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
           onChange={(v) => update({ transmission: v })}
           options={options.transmissions.map((t) => ({ value: t, label: TRANSMISSION_LABELS[t] || t }))}
           placeholder="همه گیربکس‌ها"
+          ariaLabel="گیربکس"
         />
       </FilterSection>
 
@@ -194,6 +202,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
             <select
               value={filters.min_year}
               onChange={(e) => update({ min_year: e.target.value })}
+              aria-label="سال حداقل"
               className="flex-1 border-[1.5px] border-gray-light rounded-lg px-3 py-2.5 text-[14px] bg-white text-dark outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
             >
               <option value="">از</option>
@@ -204,6 +213,7 @@ export default function CarFilters({ options, filters, onChange, resultCount, is
             <select
               value={filters.max_year}
               onChange={(e) => update({ max_year: e.target.value })}
+              aria-label="سال حداکثر"
               className="flex-1 border-[1.5px] border-gray-light rounded-lg px-3 py-2.5 text-[14px] bg-white text-dark outline-none focus:border-accent transition-colors appearance-none cursor-pointer"
             >
               <option value="">تا</option>

@@ -125,7 +125,7 @@ export default function ConsultationModal({ isOpen, onClose, carName }: Consulta
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h4 className="text-xl font-bold text-dark mb-2">درخواست شما ثبت شد</h4>
+              <h3 className="text-xl font-bold text-dark mb-2">درخواست شما ثبت شد</h3>
               <p className="text-gray mb-6">
                 همکاران ما در کوتاه‌ترین زمان ممکن با شما تماس خواهند گرفت.
               </p>

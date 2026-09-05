@@ -45,7 +45,7 @@ export default function Footer({ settings }: { settings: SiteSettings }) {
 
           {/* Quick Links */}
           <div>
-            <h5 className="text-[15px] font-bold mb-[18px]">دسترسی سریع</h5>
+            <h3 className="text-[15px] font-bold mb-[18px]">دسترسی سریع</h3>
             <ul>
               {quickLinks.map((link) => (
                 <li key={link.href} className="mb-3">
@@ -62,19 +62,23 @@ export default function Footer({ settings }: { settings: SiteSettings }) {
 
           {/* Contact Info */}
           <div>
-            <h5 className="text-[15px] font-bold mb-[18px]">اطلاعات تماس</h5>
+            <h3 className="text-[15px] font-bold mb-[18px]">اطلاعات تماس</h3>
             <ul>
               <li className="text-white/60 text-[14px] mb-3">
                 {settings.address}
               </li>
-              <li className="ltr text-right">
-                <a
-                  href={`tel:${settings.phone?.replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1728))}`}
-                  className="text-white/60 text-[14px] hover:text-accent transition-colors"
-                >
-                  {settings.phone}
-                </a>
-              </li>
+              {/* Only render the tel link when a phone number exists — an
+                  empty href+text would be an unlabeled link (axe link-name). */}
+              {settings.phone && (
+                <li className="ltr text-right">
+                  <a
+                    href={`tel:${settings.phone.replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1728))}`}
+                    className="text-white/60 text-[14px] hover:text-accent transition-colors"
+                  >
+                    {settings.phone}
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </div>

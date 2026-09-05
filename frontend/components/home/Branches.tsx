@@ -62,7 +62,7 @@ export default function Branches({
                 </div>
 
                 <div className="flex-1">
-                  <h4 className="text-[19px] font-extrabold mb-2.5">{branch.name}</h4>
+                  <h3 className="text-[19px] font-extrabold mb-2.5">{branch.name}</h3>
                   <p className="text-gray text-[14.5px] mb-1.5">{branch.address}</p>
                   {branch.phone && (
                     <a href={`tel:${branch.phone}`} className="text-dark font-bold mt-2.5 inline-block ltr text-right" style={{ unicodeBidi: 'embed' }}>

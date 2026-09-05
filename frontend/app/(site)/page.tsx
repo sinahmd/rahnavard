@@ -53,6 +53,9 @@ export default async function HomePage() {
         }}
       />
       <main id="main-content">
+        {/* Page-level heading: the hero is an image slider, so the h1 is
+            visually hidden (axe page-has-heading-one). */}
+        <h1 className="sr-only">راهنورد خودرو</h1>
         <HeroSlider slides={slides} />
         <WhyRahnavard features={features} settings={settings} />
         <FeaturedCars cars={cars} settings={settings} />

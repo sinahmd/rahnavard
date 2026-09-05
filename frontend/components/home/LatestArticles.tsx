@@ -93,7 +93,7 @@ export default function LatestArticles({
                       {formatDate(article.published_at)}
                     </span>
                   )}
-                  <h4 className="text-[17px] font-bold mb-2.5">{article.title}</h4>
+                  <h3 className="text-[17px] font-bold mb-2.5">{article.title}</h3>
                   {article.excerpt && (
                     <p className="text-[14px] text-gray mb-4">{article.excerpt}</p>
                   )}
