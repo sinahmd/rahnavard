@@ -231,41 +231,45 @@ jobs:
           python manage.py makemigrations --check --dry-run
 
   e2e:
-    name: E2E (Playwright, Docker stack)
+    name: E2E (Playwright, production compose)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    # Full-stack e2e needs the DEV compose files (docker-compose.yml,
-    # nginx.dev.conf, dev Dockerfile) — which prepare-merge.sh detaches on
-    # PR branches before the production merge. So it gates every develop
-    # push (the PR's app code is identical; its only delta is the detached
-    # infra files) and stays dispatchable on demand.
+    timeout-minutes: 30
+    # The suite runs against docker-compose.prod.yml — the exact stack shape
+    # that ships — so it behaves identically on PRs, develop and main,
+    # regardless of the local-only detach dance, and doubles as a
+    # production-shape smoke test. E2E_BASE_URL=127.0.0.1 tells the CSP spec
+    # to expect the production (no-unsafe-eval) policy.
     if: >-
+      github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+      github.event_name == 'push'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Start PostgreSQL and wait for it
+      - name: Write a throwaway production env
         run: |
-          docker compose up -d --build postgres
-          for i in $(seq 1 30); do
-            docker compose exec -T postgres pg_isready -U user && exit 0
-            sleep 2
-          done
-          echo "postgres never became ready"
-          docker compose logs --tail=50 postgres
-          exit 1
+          cat > .env <<'EOF'
+          POSTGRES_DB=rahnavard
+          POSTGRES_USER=rahnavard_user
+          POSTGRES_PASSWORD=e2e-only-not-a-real-secret
+          SECRET_KEY=e2e-ci-secret-key-0123456789abcdefghijklmnopqrstuvwxyz
+          DEBUG=0
+          ALLOWED_HOSTS=localhost,127.0.0.1,backend
+          CORS_ALLOWED_ORIGINS=http://localhost,http://127.0.0.1
+          CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1
+          NEXT_PUBLIC_API_URL=/api/v1
+          NEXT_PUBLIC_SITE_URL=http://localhost
+          EOF
+          echo ".env written (compose interpolation only — never committed)"
 
-      - name: Start the backend service
-        run: docker compose up -d --build backend
+      - name: Build and start the production stack
+        run: docker compose -f docker-compose.prod.yml up -d --build
 
-      - name: Migrate
-        run: docker compose run --rm backend python manage.py migrate --noinput
-
-      - name: Seed the dedicated E2E admin and a sample car
+      - name: Migrate and seed
         run: |
-          docker compose run --rm backend python manage.py shell -c "
+          docker compose -f docker-compose.prod.yml run --rm backend python manage.py migrate --noinput
+          docker compose -f docker-compose.prod.yml run --rm backend python manage.py shell -c "
           from django.contrib.auth.models import User
           u, _ = User.objects.get_or_create(username='e2e_admin', defaults={'is_staff': True, 'is_superuser': True, 'email': 'e2e@example.com'})
           u.is_staff = u.is_superuser = True
@@ -287,27 +291,26 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      # The frontend container bind-mounts frontend/ as root — it must not
-      # exist while npm rewrites node_modules for the host-side Playwright.
       - name: Install frontend dependencies
         working-directory: frontend
         run: |
           sudo rm -rf node_modules
           npm ci
 
-      - name: Start the frontend and nginx
-        run: docker compose up -d --build frontend nginx
-
       - name: Wait for the stack to answer through nginx
         run: |
           for i in $(seq 1 30); do
-            curl -sf http://localhost/api/v1/settings/ && exit 0
+            curl -sf http://127.0.0.1/api/v1/settings/ && exit 0
             sleep 2
           done
           echo "stack never became healthy"
-          docker compose logs --tail=50
+          docker compose -f docker-compose.prod.yml logs --tail=50
           exit 1
 
       - name: Run Playwright e2e
         working-directory: frontend
+        env:
+          E2E_BASE_URL: http://127.0.0.1
+          E2E_ADMIN_USER: e2e_admin
+          E2E_ADMIN_PASSWORD: e2epass123
         run: npx playwright test
