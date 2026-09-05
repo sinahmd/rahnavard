@@ -897,6 +897,11 @@ class TestCarAdminGalleryAndPagination:
         sample_car.refresh_from_db()
         assert sample_car.gallery[0].endswith('existing.jpg')
         assert len(sample_car.gallery) == 2
+        # The new file must NOT reuse the first image's filename: the counter
+        # continues past the existing gallery (`_gallery_1.png`), so an
+        # edit-append never overwrites the disk file of an existing image.
+        assert sample_car.gallery[1] != sample_car.gallery[0]
+        assert sample_car.gallery[1].endswith(f'{sample_car.slug}_gallery_1.png')
 
         created = []
         for url in sample_car.gallery:
@@ -951,3 +956,15 @@ class TestCarAdminGalleryAndPagination:
         self._make_cars(25)
         response = admin_client.get('/api/v1/admin/cars/', {'page': 999})
         assert response.status_code == 404
+
+    def test_admin_create_duplicate_slug_returns_400_field_error(self, admin_client, sample_car):
+        """Creating a car with an already-active slug maps to a 400 slug field
+        error (not an unhandled IntegrityError 500) — the admin form shows
+        field errors only from 400 responses."""
+        data = self._car_data(sample_car.slug)
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 400
+        assert 'slug' in response.data
+
+        # The failed insert may have written main.png before the DB raised.
+        self._cleanup_media([os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png')])

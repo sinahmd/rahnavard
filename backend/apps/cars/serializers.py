@@ -31,6 +31,11 @@ class GalleryField(serializers.Field):
         os.makedirs(gallery_dir, exist_ok=True)
 
         # Find all gallery file uploads (gallery_0, gallery_1, ...)
+        # New files are named with a counter that CONTINUES past the existing
+        # gallery, so an edit-append never reuses (and overwrites) the disk
+        # file of an already-listed image: 2 existing → new files are
+        # `{slug}_gallery_2.png`, `{slug}_gallery_3.png`, ...
+        file_index = len(gallery_urls)
         idx = 0
         while True:
             file_key = f'gallery_{idx}'
@@ -40,12 +45,13 @@ class GalleryField(serializers.Field):
             if hasattr(uploaded_file, 'read'):
                 # It's a file — save it
                 ext = os.path.splitext(uploaded_file.name)[1]
-                filename = f'{instance.slug}_gallery_{idx}{ext}'
+                filename = f'{instance.slug}_gallery_{file_index}{ext}'
                 filepath = os.path.join(gallery_dir, filename)
                 with open(filepath, 'wb+') as dest:
                     for chunk in uploaded_file.chunks():
                         dest.write(chunk)
                 gallery_urls.append(f'{settings.MEDIA_URL}cars/gallery/{filename}')
+                file_index += 1
             idx += 1
 
         return gallery_urls
