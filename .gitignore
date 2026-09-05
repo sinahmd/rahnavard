@@ -26,6 +26,7 @@ media/
 *.swo
 
 # AI agent config (local only)
+.kilo/
 .opencode/
 agents/
 
