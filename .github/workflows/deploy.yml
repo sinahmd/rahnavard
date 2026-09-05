@@ -77,24 +77,60 @@ jobs:
               docker compose -f ${{ env.COMPOSE_FILE }} build --pull
             fi
 
-            # Step 3: Restart services
-            # entrypoint.sh handles: wait for DB → migrate → collectstatic → start Gunicorn
-            echo "🔄 Restarting services..."
-            docker compose -f ${{ env.COMPOSE_FILE }} down
-            docker compose -f ${{ env.COMPOSE_FILE }} up -d
+            # Step 3: Run migrations explicitly (idempotent) BEFORE the new code
+            # serves traffic. The one-shot container exits with the migrate
+            # status; entrypoint.sh still re-runs migrate on backend start as a
+            # safety net (migrations are recorded, so a re-run is a no-op).
+            echo "🗄️  Running migrations..."
+            docker compose -f ${{ env.COMPOSE_FILE }} run --rm --no-deps backend python manage.py migrate --noinput
 
-            # Step 4: Health check (max 30s)
-            echo "🏥 Health check..."
-            for i in {1..6}; do
-              if curl -sf http://localhost/api/v1/settings/ > /dev/null 2>&1; then
+            # Step 4: Rolling start (NO blind down) — recreate changed containers
+            # only, then bounce nginx LAST so it re-resolves the new backend/
+            # frontend container IPs (nginx caches upstreams at startup).
+            echo "🔄 Starting services..."
+            docker compose -f ${{ env.COMPOSE_FILE }} up -d --remove-orphans backend
+
+            echo "🏥 Waiting for backend health..."
+            BACKEND_OK=false
+            for i in {1..12}; do
+              if docker compose -f ${{ env.COMPOSE_FILE }} exec -T backend python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/settings/', timeout=3) else 1)" > /dev/null 2>&1; then
+                BACKEND_OK=true
                 echo "✅ Backend healthy"
                 break
               fi
-              [ $i -eq 6 ] && echo "❌ Backend health check failed" && docker compose -f ${{ env.COMPOSE_FILE }} logs backend | tail -20
+              echo "   ...waiting (${i}/12)"
               sleep 5
             done
+            if [ "$BACKEND_OK" != "true" ]; then
+              echo "❌ Backend health check failed"
+              docker compose -f ${{ env.COMPOSE_FILE }} logs --tail=40 backend
+              exit 1
+            fi
 
-            # Step 5: Status
+            docker compose -f ${{ env.COMPOSE_FILE }} up -d --remove-orphans frontend
+            echo "✅ Frontend started"
+            # Bounce nginx last so its upstreams point at the recreated containers.
+            docker compose -f ${{ env.COMPOSE_FILE }} up -d --force-recreate --no-deps nginx
+
+            # Step 5: End-to-end health through nginx (max 60s)
+            echo "🏥 End-to-end health check..."
+            SITE_OK=false
+            for i in {1..12}; do
+              if curl -sf http://localhost/api/v1/settings/ > /dev/null 2>&1; then
+                SITE_OK=true
+                echo "✅ Site healthy"
+                break
+              fi
+              echo "   ...waiting (${i}/12)"
+              sleep 5
+            done
+            if [ "$SITE_OK" != "true" ]; then
+              echo "❌ Site health check failed"
+              docker compose -f ${{ env.COMPOSE_FILE }} logs --tail=40 nginx backend
+              exit 1
+            fi
+
+            # Step 6: Status
             echo "📊 Status:"
             docker compose -f ${{ env.COMPOSE_FILE }} ps
             echo "✅ Done — https://rahnavard.co"

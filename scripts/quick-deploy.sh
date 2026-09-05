@@ -66,23 +66,63 @@ else
   echo "⏭️  Skipping build (--no-build flag)"
 fi
 
-# Step 3: Run migrations
+# Step 3: Run migrations (idempotent, explicit) BEFORE the new code serves
 echo ""
 echo "🗄️  Running migrations..."
 docker compose -f $COMPOSE_FILE run --rm --no-deps backend python manage.py migrate --noinput
 echo "✅ Migrations complete"
 
-# Step 4: Restart services
+# Step 4: Rolling start (NO blind down) — recreate changed containers, bounce
+# nginx last so it re-resolves upstream IPs, then health-gate.
 echo ""
-echo "🔄 Restarting services..."
-docker compose -f $COMPOSE_FILE down
-docker compose -f $COMPOSE_FILE up -d
-echo "✅ Services restarted"
+echo "🔄 Starting services..."
+docker compose -f $COMPOSE_FILE up -d --remove-orphans backend
+echo "🏥 Waiting for backend health..."
+BACKEND_OK=false
+for i in $(seq 1 12); do
+  if docker compose -f $COMPOSE_FILE exec -T backend python -c "
+import urllib.request
+try:
+    urllib.request.urlopen('http://localhost:8000/api/v1/settings/', timeout=3)
+    print('ok')
+except Exception:
+    exit(1)
+" > /dev/null 2>&1; then
+    BACKEND_OK=true
+    echo "✅ Backend healthy"
+    break
+  fi
+  echo "   ...waiting ($i/12)"
+  sleep 5
+done
+if [ "$BACKEND_OK" != "true" ]; then
+  echo "❌ Backend health check failed"
+  docker compose -f $COMPOSE_FILE logs --tail=40 backend
+  exit 1
+fi
 
-# Step 5: Wait and check
+docker compose -f $COMPOSE_FILE up -d --remove-orphans frontend
+docker compose -f $COMPOSE_FILE up -d --force-recreate --no-deps nginx
+echo "✅ Services started"
+
+# Step 5: End-to-end health through nginx
 echo ""
-echo "⏳ Waiting for services..."
-sleep 20
+echo "🏥 End-to-end health check..."
+SITE_OK=false
+for i in $(seq 1 12); do
+  if curl -sf http://localhost/api/v1/settings/ > /dev/null 2>&1; then
+    SITE_OK=true
+    echo "✅ Site healthy"
+    break
+  fi
+  echo "   ...waiting ($i/12)"
+  sleep 5
+done
+if [ "$SITE_OK" != "true" ]; then
+  echo "❌ Site health check failed"
+  docker compose -f $COMPOSE_FILE logs --tail=40 nginx backend
+  exit 1
+fi
 
 echo ""
 echo "📊 Container status:"
