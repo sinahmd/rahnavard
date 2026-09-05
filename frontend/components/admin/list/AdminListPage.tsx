@@ -149,7 +149,9 @@ export default function AdminListPage<T>({
       {error && <ErrorState message={error} onRetry={() => setReloadKey((k) => k + 1)} />}
 
       {loading && rows.length === 0 ? (
-        <div className="text-center py-8">در حال بارگذاری...</div>
+        <div role="status" className="text-center py-8">
+          در حال بارگذاری...
+        </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="w-full">

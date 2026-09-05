@@ -34,6 +34,7 @@ export default function AdminBranchesPage() {
                   helpers.error('خطا در ذخیره تغییرات')
                 }
               }}
+              aria-pressed={branch.is_active}
               className={`px-3 py-1 rounded-full text-sm font-bold ${
                 branch.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}

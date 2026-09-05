@@ -45,6 +45,20 @@ global.fetch = jest.fn()
 // changes (Pagination) and menu interactions (Header/MobileNav).
 window.scrollTo = jest.fn()
 
+// jsdom does not implement window.matchMedia; HeroSlider queries it to skip
+// autoplay when the user prefers reduced motion. Tests override `matches`
+// per-case (mockReturnValue with a full MediaQueryList-ish object).
+window.matchMedia = jest.fn().mockImplementation((query) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: jest.fn(),
+  removeListener: jest.fn(),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+  dispatchEvent: jest.fn(),
+}))
+
 // Mock IntersectionObserver (used by FeaturedCars, LatestArticles, WhyRahnavard for scroll animations)
 global.IntersectionObserver = class IntersectionObserver {
   constructor(callback, options) {

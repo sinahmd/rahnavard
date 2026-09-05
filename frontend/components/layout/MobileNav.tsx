@@ -1,6 +1,8 @@
 'use client'
 
+import { useRef } from 'react'
 import Link from 'next/link'
+import { useModalA11y } from '@/components/ui/useModalA11y'
 
 interface MobileNavProps {
   isOpen: boolean
@@ -9,6 +11,12 @@ interface MobileNavProps {
 }
 
 export default function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
+  const panelRef = useRef<HTMLElement>(null)
+  // Focus first link on open, trap Tab, close on Escape, return focus to the
+  // hamburger on close (workstream I). The panel also leaves the tab order
+  // while closed so off-screen links are never focusable.
+  useModalA11y({ isOpen, onClose, containerRef: panelRef })
+
   return (
     <>
       {/* Overlay */}
@@ -22,8 +30,11 @@ export default function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
 
       {/* Navigation Panel */}
       <nav
-        className={`fixed top-0 bottom-0 left-0 w-[78%] max-w-[300px] bg-dark z-50 transition-transform duration-300 md:hidden ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+        ref={panelRef}
+        aria-label="منوی ناوبری"
+        aria-hidden={!isOpen}
+        className={`fixed top-0 bottom-0 left-0 w-[78%] max-w-[300px] bg-dark z-50 transition-[transform,visibility] duration-300 md:hidden ${
+          isOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
         }`}
       >
         <div className="pt-24 px-7 pb-7">

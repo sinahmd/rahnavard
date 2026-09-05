@@ -32,6 +32,7 @@ export default function AdminCarsPage() {
                   helpers.error('خطا در ذخیره تغییرات')
                 }
               }}
+              aria-pressed={car.is_active}
               className={`px-3 py-1 rounded-full text-sm font-bold ${
                 car.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}
@@ -52,6 +53,7 @@ export default function AdminCarsPage() {
                   helpers.error('خطا در ذخیره تغییرات')
                 }
               }}
+              aria-pressed={car.is_featured}
               className={`px-3 py-1 rounded-full text-sm font-bold ${
                 car.is_featured ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'
               }`}

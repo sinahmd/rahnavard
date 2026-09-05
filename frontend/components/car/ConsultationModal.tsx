@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, FormEvent, useEffect } from 'react'
+import { useState, FormEvent, useEffect, useRef } from 'react'
+import { useModalA11y } from '@/components/ui/useModalA11y'
 
 interface ConsultationModalProps {
   isOpen: boolean
@@ -36,17 +37,6 @@ export default function ConsultationModal({ isOpen, onClose, carName }: Consulta
     }
   }, [isOpen])
 
-  // Close on Escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-      return () => document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isOpen, onClose])
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -78,6 +68,18 @@ export default function ConsultationModal({ isOpen, onClose, carName }: Consulta
     onClose()
   }
 
+  // Escape close, initial focus, Tab trap, and focus return via useModalA11y.
+  // (Declared after handleClose — the hook reads it during the same render.)
+  const modalRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const titleId = 'consultation-modal-title'
+  useModalA11y({
+    isOpen,
+    onClose: handleClose,
+    containerRef: modalRef,
+    initialFocusRef: closeRef,
+  })
+
   if (!isOpen) return null
 
   return (
@@ -89,14 +91,21 @@ export default function ConsultationModal({ isOpen, onClose, carName }: Consulta
       />
 
       {/* Modal */}
-      <div className="relative bg-white w-full md:max-w-[520px] md:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative bg-white w-full md:max-w-[520px] md:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up"
+      >
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-light px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <h3 className="text-lg font-bold text-dark">درخواست مشاوره</h3>
+            <h3 id={titleId} className="text-lg font-bold text-dark">درخواست مشاوره</h3>
             <p className="text-sm text-gray mt-0.5">{carName}</p>
           </div>
           <button
+            ref={closeRef}
             onClick={handleClose}
             className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
             aria-label="بستن"
@@ -110,7 +119,7 @@ export default function ConsultationModal({ isOpen, onClose, carName }: Consulta
         {/* Body */}
         <div className="p-6">
           {showSuccess ? (
-            <div className="text-center py-8">
+            <div className="text-center py-8" role="status">
               <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
                 <svg className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -205,7 +214,7 @@ export default function ConsultationModal({ isOpen, onClose, carName }: Consulta
 
               {/* Error */}
               {error && (
-                <p className="text-red-500 text-sm font-bold">{error}</p>
+                <p role="alert" className="text-red-500 text-sm font-bold">{error}</p>
               )}
 
               {/* Submit */}

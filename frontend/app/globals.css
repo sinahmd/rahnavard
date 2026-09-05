@@ -272,6 +272,23 @@ section {
     transform: none !important;
     animation: none !important;
   }
+
+  /* Modals, hero zoom, and any other keyframe animation: no entrance motion. */
+  .animate-slide-up,
+  .animate-hero-zoom {
+    animation: none !important;
+  }
+
+  /* Blanket kill: collapse every remaining transition/animation to a single
+     frame so no motion is left (drawers still flip visibility instantly). */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Responsive adjustments */

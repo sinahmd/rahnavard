@@ -46,6 +46,7 @@ export default function AdminInquiriesPage() {
                   helpers.error('خطا در ذخیره تغییرات')
                 }
               }}
+              aria-pressed={inquiry.is_read}
               className={statusButton(inquiry.is_read)}
             >
               {inquiry.is_read ? 'خوانده شده' : 'جدید'}
@@ -64,6 +65,7 @@ export default function AdminInquiriesPage() {
                   helpers.error('خطا در ذخیره تغییرات')
                 }
               }}
+              aria-pressed={inquiry.is_contacted}
               className={statusButton(inquiry.is_contacted)}
             >
               {inquiry.is_contacted ? 'تماس گرفته شده' : 'در انتظار'}

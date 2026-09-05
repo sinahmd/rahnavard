@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { useModalA11y } from '@/components/ui/useModalA11y'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -15,11 +16,10 @@ interface ConfirmDialogProps {
 /**
  * Accessible confirmation dialog replacing window.confirm (plan §6.H/§6.I).
  *
- - role="dialog" + aria-modal + labelled/described by the title and text;
- - initial focus on the CANCEL button (destructive-safe default);
- - Escape and overlay click cancel;
- - Tab is trapped inside the dialog;
- - focus returns to the triggering element on close.
+ * role="dialog" + aria-modal, labelled/described by the title and text,
+ * initial focus on the CANCEL button (destructive-safe default), Escape and
+ * overlay click cancel, Tab trapped inside the dialog, focus returned to the
+ * triggering element on close (via useModalA11y).
  */
 export default function ConfirmDialog({
   open,
@@ -35,38 +35,22 @@ export default function ConfirmDialog({
   const titleId = useRef(`confirm-title-${Math.random().toString(36).slice(2, 8)}`).current
   const descriptionId = useRef(`confirm-description-${Math.random().toString(36).slice(2, 8)}`).current
 
+  useModalA11y({
+    isOpen: open,
+    onClose: onCancel,
+    containerRef: dialogRef,
+    initialFocusRef: cancelRef,
+  })
+
+  // ConfirmDialog has no trigger of its own; open transitions must still be
+  // announced. Escape/focus-trap/focus-return live in useModalA11y.
   useEffect(() => {
     if (!open) return
-    const previousFocus = document.activeElement as HTMLElement | null
-    cancelRef.current?.focus()
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onCancel()
-        return
-      }
-      if (e.key !== 'Tab') return
-      const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )
-      if (!focusables || focusables.length === 0) return
-      const first = focusables[0]
-      const last = focusables[focusables.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
+    document.body.style.overflow = 'hidden'
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      previousFocus?.focus()
+      document.body.style.overflow = ''
     }
-  }, [open, onCancel])
+  }, [open])
 
   if (!open) return null
 

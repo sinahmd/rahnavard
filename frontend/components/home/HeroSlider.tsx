@@ -36,9 +36,11 @@ export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
   const next = useCallback(() => goTo(current + 1), [current, goTo])
   const prev = useCallback(() => goTo(current - 1), [current, goTo])
 
-  // Auto-play
+  // Auto-play — skipped entirely when the user prefers reduced motion
+  // (manual prev/next/dots still work; the CSS kill-switch handles the rest).
   useEffect(() => {
     if (slides.length === 0) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const timer = setInterval(next, SLIDE_DURATION)
     return () => clearInterval(timer)
   }, [next, slides.length])

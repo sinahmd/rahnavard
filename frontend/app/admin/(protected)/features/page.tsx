@@ -49,6 +49,7 @@ export default function AdminFeaturesPage() {
                   helpers.error('خطا در ذخیره تغییرات')
                 }
               }}
+              aria-pressed={feature.is_active}
               className={`px-3 py-1 rounded-full text-sm font-bold ${
                 feature.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}
