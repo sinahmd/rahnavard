@@ -155,10 +155,17 @@ CSRF_TRUSTED_ORIGINS = env.list(
 )
 
 # Session policy for the admin API (Phase 2 dual-mode — see
-# docs/SENIOR_REFACTOR_PLAN.md §6.A). SESSION_COOKIE_SECURE / CSRF_COOKIE_SECURE
-# are applied only when not DEBUG (below); HttpOnly is Django's default and
-# SameSite stays at the default (Lax) — same-origin fetch is unaffected.
+# docs/SENIOR_REFACTOR_PLAN.md §6.A). Flags are explicit here (Phase 6):
+# `sessionid` is HttpOnly (JS never reads it) with SameSite=Lax;
+# `csrftoken` is deliberately NOT HttpOnly — the browser must read it to
+# echo it as the X-CSRFToken header on unsafe requests — and SameSite=Lax.
+# SESSION_COOKIE_SECURE / CSRF_COOKIE_SECURE are applied only when not DEBUG
+# (below) so local Docker over plain http keeps working.
 SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 hours
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = False  # readable on purpose: echoed as X-CSRFToken
+CSRF_COOKIE_SAMESITE = "Lax"
 
 
 # REST Framework Configuration

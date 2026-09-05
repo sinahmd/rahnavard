@@ -115,6 +115,19 @@ class TestLoginSessionBootstrap:
         assert session.status_code == 200
         assert session.data['username'] == 'admin'
 
+    def test_cookie_flags_session_httponly_csrf_readable(self, api_client, admin_user):
+        """Phase 6 hardening: `sessionid` is HttpOnly; `csrftoken` must stay
+        readable by JS (the client echoes it as X-CSRFToken)."""
+        resp = do_login(api_client)
+        assert resp.status_code == 200
+        session = resp.cookies['sessionid']
+        csrf = resp.cookies['csrftoken']
+        # Morsel exposes httpOnly as True when set, '' when not
+        assert session['httponly']  # JS must never read sessionid
+        assert not csrf['httponly']  # readable on purpose: echoed as X-CSRFToken
+        assert session['samesite'] == 'Lax'
+        assert csrf['samesite'] == 'Lax'
+
     def test_login_allowed_again_for_session_holder_without_csrf(self, api_client, admin_user):
         """Login stays anonymous so a session-holder can re-login (no CSRF 403)."""
         assert do_login(api_client).status_code == 200
