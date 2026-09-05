@@ -968,3 +968,38 @@ class TestCarAdminGalleryAndPagination:
 
         # The failed insert may have written main.png before the DB raised.
         self._cleanup_media([os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png')])
+
+    def test_distinct_active_cars_do_not_collide_gallery_files(self, admin_client):
+        """Two different active cars uploading gallery_0..N never produce the
+        same on-disk filename.
+
+        Gallery files are named `{slug}_gallery_{idx}` (slug-based, accepted
+        technical debt — see DEVELOPMENT.md §3.9). Collisions are prevented
+        by the `car_slug_unique_when_not_deleted` partial unique index: two
+        active cars always have distinct slugs, hence distinct filenames even
+        at the same image index. This test pins that guarantee through the
+        real admin API (and would fail loudly if the scheme changed to one
+        that could collide)."""
+        urls = []
+        paths = []
+        for slug in ('gallery-a', 'gallery-b'):
+            data = self._car_data(slug)
+            data.update(self._gallery_files(2))
+            response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+            assert response.status_code == 201
+
+            car = Car.objects.get(slug=slug)
+            assert len(car.gallery) == 2
+            for url in car.gallery:
+                relative = url.replace(settings.MEDIA_URL, '')
+                path = os.path.join(settings.MEDIA_ROOT, relative)
+                assert os.path.exists(path)
+                urls.append(url)
+                paths.append(path)
+
+        # Four distinct URLs and four distinct files across the two cars.
+        assert len(set(urls)) == 4
+        assert len(set(paths)) == 4
+
+        paths.append(os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png'))
+        self._cleanup_media(paths)

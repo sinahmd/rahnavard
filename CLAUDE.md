@@ -39,7 +39,7 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-05 (backend **284 passed** / 98.30%
+Verified green inside Docker on 2026-09-05 (backend **285 passed** / 98.31%
 cov, frontend **301 passed**, tsc clean, **lint fully clean** — fonts are
 self-hosted via `next/font/local` (frontend/lib/fonts.ts), so the old Google
 Fonts `<link>` warning is gone. Never switch to `next/font/google`: prod
@@ -639,9 +639,17 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
+### Session — 2026-09-05 — Gallery filename scheme accepted as debt + collision test
+- **Goal**: Close the smoke observation about slug-based gallery filenames without changing the scheme — document it as deferred technical debt and pin the no-collision guarantee with a test.
+- **Done**: added `test_distinct_active_cars_do_not_collide_gallery_files` in `TestCarAdminGalleryAndPagination` — two active cars uploading `gallery_0..N` through the admin multipart API produce four distinct URLs and four distinct on-disk files (the partial unique slug index guarantees distinct slugs). Full backend suite **285 passed / 98.31% cov**. DEVELOPMENT.md §3.9 records the accepted/deferred verdict verbatim (slug+index is safe for public media — readable, stable, no unpredictable-URL requirement; UUID immutable paths `cars/{car_id}/gallery/{uuid}.webp` deferred until slug reuse/renaming or storage isolation becomes necessary; no scheme change this phase).
+- **Files touched**: backend/apps/cars/tests.py, DEVELOPMENT.md, CLAUDE.md
+- **Decisions made**: keep `{slug}_gallery_{idx}` naming; do not start a storage migration or orphan-file cleanup now. The DB-level uniqueness of active slugs is the load-bearing guarantee, so the test asserts distinct filenames across distinct active cars rather than testing the index itself (that already exists as `test_slug_rejected_when_active_exists`).
+
+---
+
 ### Session — 2026-09-05 — Font self-hosting (plan §6.J / §7 perf)
 - **Goal**: Remove the last runtime dependency on fonts.googleapis.com by self-hosting Vazirmatn + Poppins via `next/font/local`, with Docker validation.
-- **Done** (`9f6d1a0`):
+- **Done** (`07e72c8`):
   - Downloaded 10 woff2 files into `frontend/fonts/` — Vazirmatn weights 400–900 from the upstream repo (rastikerdar/vazirmatn `fonts/webfonts/`, via jsDelivr `gh/` mirror, ~51 KB each) and Poppins latin 500–800 from `@fontsource/poppins` files (~8 KB each, the same files Google Fonts serves). All verified wOFF2 magic + per-file HTTP 200.
   - New `frontend/lib/fonts.ts` declares both families with per-weight `src` arrays and CSS variables (`--font-vazirmatn`, `--font-poppins`), `display: swap`.
   - `app/layout.tsx`: the three Google `<link>` tags (preconnect ×2 + stylesheet) are DELETED; the font variables go on `<html lang="fa" dir="rtl">`. `globals.css`: the render-blocking Google `@import` (which sat AFTER the @tailwind directives — invalid CSS order, latent bug) is removed and `body` uses `var(--font-vazirmatn)`. `tailwind.config.ts`: `font-vazir`/`font-poppins` resolve through the CSS variables (next/font hashes the family names).
@@ -785,4 +793,4 @@ These are inferred from commit history since no prior session logs existed.
 
 ---
 
-*Last updated: 2026-09-05 (Fonts self-hosted via next/font/local — no Google Fonts anywhere; lint fully clean; backend 284, frontend 301)*
+*Last updated: 2026-09-05 (Gallery filename scheme accepted as deferred debt + collision test; backend 285, frontend 301)*

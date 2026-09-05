@@ -202,7 +202,7 @@ docker compose run --rm --no-deps frontend npm run build
 ```
 
 Verified green on 2026-09-05 (after Phase 5 + manual smoke fixes): backend
-**284 passed** (98.30% coverage, SQLite :memory: via `config.test_settings`),
+**285 passed** (98.31% coverage, SQLite :memory: via `config.test_settings`),
 frontend **301 passed / 39 suites** with **zero act warnings and zero console
 errors** (grep-verified on the full `npm test` output), `tsc` clean, and
 **lint fully clean** — fonts are self-hosted via `next/font/local`
@@ -347,6 +347,18 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
     (new files were named `{slug}_gallery_{idx}` with the counter
     restarting at 0) — the counter now continues past the existing gallery
     (pinned by the extended append test).
+  - **Accepted/deferred technical debt — slug-based gallery filenames**: gallery
+    files are named `{slug}_gallery_{idx}`. This is safe for current public
+    media requirements: each active car has a unique slug (partial unique
+    index), filenames are readable/stable, and public images do not require
+    unpredictable URLs. Changing to UUID-based immutable paths
+    (`cars/{car_id}/gallery/{uuid}.webp`) would need a storage migration,
+    a URL/backward-compatibility plan, and orphan-file cleanup — deferred.
+    One future edge case: slug reuse after soft deletion or slug changes;
+    if that becomes common, move to the immutable identifier above. The
+    no-collision guarantee is pinned by
+    `test_distinct_active_cars_do_not_collide_gallery_files` (two active
+    cars uploading `gallery_0..N` produce four distinct files).
   - **Axe spot checks** (headless Chrome + axe-core over the hydrated
     public pages) found: unlabeled filter selects (critical) → aria-labels
     added; footer `tel:` link empty when phone unset (serious) → rendered
@@ -813,4 +825,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (Fonts self-hosted via next/font/local — Google Fonts dependency removed; lint fully clean; backend 284 / frontend 301)*
+*Last updated: 2026-09-05 (Gallery filename scheme documented as accepted debt + collision test pinned; backend 285 / frontend 301)*
