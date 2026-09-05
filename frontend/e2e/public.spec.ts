@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 // (plan §6.C — this is the curl-visible property, asserted through a real
 // browser over nginx) and must carry the tightened Report-Only CSP.
 
-test('home renders server-side content and the report-only CSP header', async ({ page }) => {
+test('home renders server-side content and the enforced CSP header', async ({ page }) => {
   const response = await page.goto('/')
   expect(response?.status()).toBe(200)
 
@@ -12,11 +12,20 @@ test('home renders server-side content and the report-only CSP header', async ({
   await expect(page.getByRole('heading', { level: 1, name: 'راهنورد خودرو' })).toBeAttached()
   await expect(page.getByRole('navigation', { name: 'ناوبری اصلی' })).toBeVisible()
 
-  const csp = response?.headers()['content-security-policy-report-only']
+  const csp = response?.headers()['content-security-policy']
+  expect(csp, 'CSP must be enforced (not report-only) since 2026-09-05').toBeTruthy()
   expect(csp).toContain("default-src 'self'")
   expect(csp).toContain("object-src 'none'")
   // Fonts are self-hosted — no Google Fonts hosts in the policy.
   expect(csp).not.toContain('fonts.googleapis')
+  // Dev conf allows eval for Next dev/HMR; the PROD conf must never carry it.
+  // (This suite runs against the dev stack — see e2e/README.md.)
+  const isDevStack = (process.env.E2E_BASE_URL || 'http://localhost').includes('://localhost')
+  if (isDevStack) {
+    expect(csp).toContain('unsafe-eval')
+  } else {
+    expect(csp).not.toContain('unsafe-eval')
+  }
 })
 
 test('cars listing first HTML contains car cards; detail page opens', async ({ page }) => {
