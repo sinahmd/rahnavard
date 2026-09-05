@@ -261,13 +261,22 @@ jobs:
       - name: Migrate
         run: docker compose run --rm backend python manage.py migrate --noinput
 
-      - name: Seed the dedicated E2E admin
+      - name: Seed the dedicated E2E admin and a sample car
         run: |
           docker compose run --rm backend python manage.py shell -c "
           from django.contrib.auth.models import User
           u, _ = User.objects.get_or_create(username='e2e_admin', defaults={'is_staff': True, 'is_superuser': True, 'email': 'e2e@example.com'})
           u.is_staff = u.is_superuser = True
-          u.set_password('e2epass123'); u.save()"
+          u.set_password('e2epass123'); u.save()
+          import base64
+          from django.core.files.base import ContentFile
+          from apps.cars.models import Car
+          if not Car.objects.count():
+              img = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==')
+              car = Car(brand='Toyota', model='Corolla', persian_name='تویوتا کورولا', year=2024, fuel_type='gasoline', transmission='automatic', is_featured=True)
+              car.main_image.save('e2e-corolla.png', ContentFile(img), save=False)
+              car.save()
+              print('seeded car:', car.slug)"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
