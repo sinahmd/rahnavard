@@ -60,8 +60,8 @@ flowchart LR
   support for autoplay/animations.
 - **Self-hosted fonts:** Vazirmatn + Poppins committed as woff2 via
   `next/font/local` — zero third-party font requests.
-- **Baseline:** `/` ships ~107 kB first-load JS; 300+ frontend tests run
-  with zero `act()`/console warnings.
+- **Baseline:** `/` ships ~107 kB first-load JS; the 302-test frontend
+  suite runs clean (no `act()` or console warnings).
 
 ## Quickstart
 
@@ -91,7 +91,7 @@ relative API URLs in both environments.
 
 | Suite | Command | What it covers |
 |-------|---------|----------------|
-| Frontend (Jest) | `cd frontend && npm test` | 300+ unit/integration tests, zero console warnings |
+| Frontend (Jest) | `cd frontend && npm test` | 302 unit/integration tests, clean console |
 | Backend (pytest) | `docker compose exec backend pytest` | 283 tests, ~98% coverage, Postgres-backed |
 | E2E (Playwright) | `cd frontend && npx playwright test` | Public SSR, CSP violation audit, admin login/session/CSRF matrix — runs against the local Docker stack ([guide](frontend/e2e/README.md)) |
 
