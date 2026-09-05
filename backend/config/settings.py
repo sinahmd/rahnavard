@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,10 +18,17 @@ env = environ.Env(
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env("SECRET_KEY", default="django-insecure-change-this-in-production")
+_INSECURE_SECRET_KEY_DEFAULT = "django-insecure-change-this-in-production"
+SECRET_KEY = env("SECRET_KEY", default=_INSECURE_SECRET_KEY_DEFAULT)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG", default=True)
+# Fail closed: DEBUG must be explicitly enabled (dev compose and CI set
+# DEBUG=1), so an unset variable means production-safe defaults instead of
+# accidentally serving debug pages.
+DEBUG = env("DEBUG")
+if not DEBUG and SECRET_KEY == _INSECURE_SECRET_KEY_DEFAULT:
+    raise ImproperlyConfigured(
+        "SECRET_KEY must be set to a real value when DEBUG is False."
+    )
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
