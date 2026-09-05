@@ -1,232 +1,182 @@
 # Rahnavard Automotive (راهنورد خودرو)
 
-A full-stack web application for Rahnavard Automotive, a car import company.
+Production full-stack web application for **Rahnavard Automotive**, a car
+import company: a Persian/RTL dealership site with an admin-managed catalog,
+articles, and branches — public pages rendered by Next.js 14 server
+components on top of a Django REST API, deployed by a health-gated
+GitHub Actions pipeline.
 
-## Tech Stack
+**Live site:** https://rahnavard.co
 
-### Frontend
-- **Next.js 14** with App Router
-- **React 18** with TypeScript
-- **Tailwind CSS** for styling
+[![CI](https://github.com/sinahmd/rahnavard-landing/actions/workflows/ci.yml/badge.svg)](https://github.com/sinahmd/rahnavard-landing/actions/workflows/ci.yml)
+[![Deploy](https://github.com/sinahmd/rahnavard-landing/actions/workflows/deploy.yml/badge.svg)](https://github.com/sinahmd/rahnavard-landing/actions/workflows/deploy.yml)
+![License](https://img.shields.io/badge/license-All_rights_reserved-red)
+![Next.js 14](https://img.shields.io/badge/Next.js-14-black)
+![Django 4.2](https://img.shields.io/badge/Django-4.2-44B78B)
+![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1)
 
-### Backend
-- **Django 4.2** with Django REST Framework
-- **PostgreSQL 16** database
-- **Gunicorn** WSGI server
+## Architecture
 
-### Infrastructure
-- **Docker** & **Docker Compose**
-- **Nginx** reverse proxy (production)
-
-## Branching Strategy
-
-| Branch | Purpose | Deploys? |
-|--------|---------|----------|
-| `main` | Production code | ✅ Auto-deploys to rahnavard.co |
-| `develop` | Local dev & integration | ❌ CI only |
-| `feature/*` | Individual features | ❌ CI only |
-
-**Quick start:**
-```bash
-git checkout develop      # Switch to dev branch
-git pull origin develop   # Get latest changes
-# ... make changes ...
-git push origin develop   # Push to develop
-# When ready for production:
-git checkout main && git merge develop && git push origin main
+```mermaid
+flowchart LR
+    B["Browser (fa / RTL)"] --> A["Arvan Cloud edge (SSL, CDN)"]
+    A --> N["nginx — CSP, rate limits, static/media"]
+    N -->|"pages + admin UI"| F["Next.js 14 — RSC public pages, admin SPA"]
+    N -->|"/api/ · /django-admin/"| D["Django 4.2 / DRF — session-cookie admin API"]
+    F -->|"server-side fetches (RSC)"| D
+    D --> P[("PostgreSQL 16")]
 ```
 
-👉 See [DEVELOPMENT.md](./DEVELOPMENT.md) for the full workflow guide.
+- **Public pages are React Server Components.** HTML is rendered on the
+  server from the database; listing filters and pagination live entirely in
+  the URL — no mirrored client state ([ADR-0004](docs/adr/0004-server-rendered-public-pages-url-single-source.md)).
+- **Admin auth is httpOnly session cookies + CSRF.** No tokens in the
+  browser; the legacy token flow was removed after an automated smoke
+  matrix passed ([ADR-0001](docs/adr/0001-session-cookie-auth-for-admin.md)).
+- **CSP is enforced** in production and dev nginx, rolled out
+  report-only first and flipped only after a zero-violation Playwright
+  audit ([ADR-0006](docs/adr/0006-infra-hardening-local-only-guard-csp-deploy.md)).
 
----
+## Engineering notes
 
-## Refactor Status
+- **Two data boundaries** ([ADR-0003](docs/adr/0003-two-data-boundaries.md)):
+  a typed browser API client (`lib/api`) for the admin SPA, and an RSC-only
+  data layer (`lib/data`) for server components — a dead legacy client and
+  the shared SettingsContext were deleted in the cutover.
+- **No unnecessary dependencies** ([ADR-0005](docs/adr/0005-no-new-client-dependencies.md)):
+  runtime dependencies are `next`, `react`, `react-dom`, `sharp`. State
+  lives in the URL, RSC fetches, and small local state — no Redux/Zustand,
+  TanStack Query, React Hook Form, or Zod.
+- **Health-gated rolling deploys:** explicit migrate → backend rolling
+  restart → backend health gate → frontend → nginx bounced last →
+  end-to-end health check through nginx. Any gate fails the deploy loudly.
+- **Data safety:** soft deletes with restore endpoints across all models,
+  conditional slug-uniqueness constraints, database indexes for listing
+  queries, and GDPR-driven removal of stored IP/user-agent from inquiries.
+- **Accessibility:** keyboard-visible skip link on every public page, a
+  focus-trapped `ConfirmDialog` replacing `window.confirm`, real focus
+  management for modals/drawers via one shared hook, `aria-pressed` status
+  toggles, table captions with `scope="col"`, and `prefers-reduced-motion`
+  support for autoplay/animations.
+- **Self-hosted fonts:** Vazirmatn + Poppins committed as woff2 via
+  `next/font/local` — zero third-party font requests.
+- **Baseline:** `/` ships ~107 kB first-load JS; 300+ frontend tests run
+  with zero `act()`/console warnings.
 
-This repository is mid-refactor under **[docs/SENIOR_REFACTOR_PLAN.md](./docs/SENIOR_REFACTOR_PLAN.md)** — the source of truth for the current architecture direction.
+## Quickstart
 
-**Done (Phases 0–6):** backend HTML sanitizer + backfill migrations; shared wire types in `frontend/types/`; a single typed browser API boundary (`frontend/lib/api/*`) that all admin pages use; an RSC-only data layer (`frontend/lib/data/*`); the dead legacy clients (`lib/api.ts`, `lib/authFetch.ts`, `withAuth`) deleted; admin authentication moved to **Django session cookies + CSRF** (`sessionid` is httpOnly; the client never attaches an `Authorization` header and never stores a token). Public pages are now **server-rendered**: route groups split public (`(site)`) from admin (`admin/(protected)`), site settings are fetched on the server in `(site)/layout.tsx` (SettingsContext deleted), the home page and car/article listings render their initial content in the server HTML, and listing interactions are client islands whose state derives from the URL `searchParams` (no mirrored React state; back/forward, deep links and shareable URLs preserved). Detail pages fetch through `lib/data/*` and use `notFound()`; `(site)/loading.tsx` and `(site)/error.tsx` provide public boundaries. **Phase 4** rebuilt the admin core: all six list pages share one typed `AdminListPage` with real pagination from the `count`/`page_size` envelope (lists beyond 20 rows were previously unreachable), the dashboard reads one `/api/v1/admin/stats/` endpoint instead of counting page-1 rows, and the 575-line `AdminForm` god-file is split into a transport-free `useAdminForm` hook, per-type field renderers, and `lib/api/formData.ts` as the single home of the multipart `gallery_0..N` conventions — pinned by tests on both the frontend and backend. **Phase 5** polished UI/a11y: repeated section-head/card-image markup extracted into `SectionHead`/`CarCardImage`; admin primitives `PageHeader`/`ErrorState`/`EmptyState`/`ConfirmDialog`; a keyboard-visible skip link on every public page; the five admin `window.confirm()` delete flows replaced by an accessible `ConfirmDialog` (Escape, Tab trap, focus return); one shared `useModalA11y` hook gives the mobile nav, car-filter drawer and consultation modal real focus management; `prefers-reduced-motion` disables autoplay/animations/transitions; status toggles announce with `aria-pressed` and tables carry captions + `scope="col"`. Frontend suite is 301 green with zero act/console warnings; build baselines recorded (`/` 107 kB first load). Fonts are **self-hosted** (`next/font/local`, Vazirmatn + Poppins woff2 committed under `frontend/fonts/`) — no request to fonts.googleapis.com anywhere, which also makes lint fully clean. **Phase 6** hardened delivery: explicit session/CSRF cookie flags (tested); a tightened CSP now **ENFORCED** in prod + dev nginx (gated on a zero-violation Playwright audit); a CI **secret-scan** job (`scripts/scan-secrets.sh`, tracked files only); a guard (`scripts/_local_only_guard.sh`) that structurally prevents auth-critical files (settings.py) from being reverted by the local-only merge dance; **health-gated deploys** (explicit migrate → rolling restart → nginx bounced last → end-to-end health check) in `deploy.yml` and `scripts/quick-deploy.sh`; and the architecture decisions recorded as **ADRs in [docs/adr/](./docs/adr/)**.
+Prerequisites: Docker & Docker Compose.
 
-**Deliberately not used** (each argued in [docs/adr/0005](./docs/adr/0005-no-new-client-dependencies.md)): Redux/Zustand/Jotai, TanStack Query, React Hook Form, Zod, and OpenAPI codegen. The frontend's runtime dependencies remain `next`, `react`, `react-dom`, `sharp` — state lives in the URL, RSC fetches, contexts (auth only), and small local component state.
-
-**Auth is session-only (Phase 2 cutover complete, 2026-09-05):** `TokenAuthentication` and `rest_framework.authtoken` are removed — the login response is exactly `{user}`, no DRF token is minted anywhere, and the stale `localStorage['admin_token']` key is purged once on the first admin bootstrap. The §3.6 staging smoke checklist was automated as Playwright specs and executed before the removal ([DEVELOPMENT.md §3.6](./DEVELOPMENT.md#36-phase-2--auth-staging-smoke-checklist-session-cookies--csrf) records the execution; §3.11 the cutover). One behavioral delta worth knowing: unauthenticated requests to permission-protected endpoints now answer **403** (DRF only sends a 401 challenge through authenticators carrying a `WWW-Authenticate` header, which TokenAuthentication provided).
-
-`AuthProvider` is **scoped to the `/admin` routes** — public pages never call `/auth/session/` and anonymous visitors are never redirected to `/admin/login`.
-
-The refactor plan is fully implemented. Playwright E2E smoke specs (public SSR + CSP enforcement + the §3.6 session matrix + a CSP violation audit) live in [`frontend/e2e/`](./frontend/e2e/README.md) and run against the local Docker stack.
-
-> ⚠️ Superseded pre-refactor documents (old architecture, token-auth-era checklists, the Phase 1 report) live in **[docs/archive/](./docs/archive/)** — historical only, do not run commands from them.
-
----
-
-## Getting Started
-
-### Prerequisites
-- Docker & Docker Compose
-- Node.js 20+ (for local development)
-- Python 3.11+ (for local development)
-
-### Quick Start with Docker
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd rahnavard
-```
-
-2. Copy environment variables:
-```bash
+git clone https://github.com/sinahmd/rahnavard-landing.git
+cd rahnavard-landing
 cp .env.example .env
-```
-
-3. Start the application:
-```bash
-docker compose up --build
-```
-
-4. Access the application:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000/api/v1/
-- Django Admin: http://localhost:8000/admin/
-
-5. Create a superuser for Django Admin:
-```bash
+docker compose up --build -d
+docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 ```
 
-6. Run migrations:
-```bash
-docker compose exec backend python manage.py migrate
+| URL | What |
+|-----|------|
+| http://localhost | Public site (via the dev nginx proxy) |
+| http://localhost/admin | Admin UI (Next.js) |
+| http://localhost:8000/api/v1/ | Django REST API |
+| http://localhost:8000/django-admin/ | Django admin |
+
+First build takes a few minutes; the frontend runs with HMR against the
+same nginx routing as production, so the frontend code uses identical
+relative API URLs in both environments.
+
+## Testing
+
+| Suite | Command | What it covers |
+|-------|---------|----------------|
+| Frontend (Jest) | `cd frontend && npm test` | 300+ unit/integration tests, zero console warnings |
+| Backend (pytest) | `docker compose exec backend pytest` | 283 tests, ~98% coverage, Postgres-backed |
+| E2E (Playwright) | `cd frontend && npx playwright test` | Public SSR, CSP violation audit, admin login/session/CSRF matrix — runs against the local Docker stack ([guide](frontend/e2e/README.md)) |
+
+CI runs lint + typecheck + frontend tests + backend tests (with a Postgres
+service) + a production build check, plus a secret scan on every push and
+a local-only files guard on PRs to `main`.
+
+## Project structure
+
+```
+├── frontend/                 # Next.js 14 (App Router, TypeScript, Tailwind)
+│   ├── app/(site)/           #   public routes — server-rendered
+│   ├── app/admin/            #   admin UI (protected route group)
+│   ├── lib/api/              #   typed browser API client (admin)
+│   ├── lib/data/             #   RSC-only data layer (public)
+│   ├── e2e/                  #   Playwright smoke suite
+│   └── fonts/                #   self-hosted Vazirmatn + Poppins
+├── backend/                  # Django 4.2 / DRF
+│   ├── apps/{cars,articles,branches,inquiries,core,accounts}/
+│   └── config/               # settings (session+CSRF auth, throttling, CSP-era hardening)
+├── nginx/                    # prod + dev reverse proxy configs (CSP, rate limits)
+├── scripts/                  # deploy helpers, secret scan, local-only guards
+├── docs/adr/                 # architecture decision records
+└── docker-compose{,.prod}.yml
 ```
 
-### Local Development (without Docker)
+## Deployment
 
-#### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+| Branch | Purpose | Deploys? |
+|--------|---------|----------|
+| `main` | Production code | ✅ auto-deploys to rahnavard.co |
+| `develop` | Integration | CI only |
+| `feature/*` | Work branches | CI only |
+
+```mermaid
+flowchart LR
+    M["push to main"] --> C["CI: lint · tests · build"]
+    C --> S["SSH deploy"]
+    S --> MG["explicit migrate"]
+    MG --> RS["rolling restart backend"]
+    RS --> H1{"backend health gate"}
+    H1 --> FE["start frontend"]
+    FE --> NB["bounce nginx last"]
+    NB --> H2{"end-to-end health check"}
 ```
 
-#### Backend
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
-```
+Deploy secrets live in GitHub Actions secrets; the server pulls with a
+shallow fetch and fails loudly if any health gate trips. Full server
+provisioning and ops detail: [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
 
-## Project Structure
+## Environment variables
 
-```
-rahnavard/
-├── frontend/                 # Next.js application
-│   ├── app/                  # App Router pages
-│   ├── components/           # React components
-│   ├── public/               # Static assets
-│   └── ...
-├── backend/                  # Django application
-│   ├── apps/                 # Django apps
-│   │   ├── core/             # Core functionality
-│   │   ├── cars/             # Cars management
-│   │   ├── articles/         # Articles management
-│   │   ├── branches/         # Branches management
-│   │   └── inquiries/        # Inquiry form
-│   ├── config/               # Django settings
-│   └── ...
-├── nginx/                    # Nginx configuration
-├── docker-compose.yml        # Development Docker Compose
-├── docker-compose.prod.yml   # Production Docker Compose
-└── ...
-```
+Copy `.env.example` → `.env` and adjust. Key variables:
 
-## API Endpoints
+| Variable | Used by | Example |
+|----------|---------|---------|
+| `DEBUG` | backend | `1` dev / `0` prod (defaults to off — fail closed) |
+| `SECRET_KEY` | backend | a real random value in prod (placeholder refuses to boot) |
+| `ALLOWED_HOSTS` | backend | `rahnavard.co,www.rahnavard.co` |
+| `DATABASE_URL` | backend | `postgres://user:password@postgres:5432/rahnavard` |
+| `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` | backend | `https://rahnavard.co` |
+| `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_API_URL` | frontend | `https://rahnavard.co` / `/api/v1` |
 
-### Public API
-- `GET /api/v1/cars/` - List active cars
-- `GET /api/v1/cars/{slug}/` - Car detail
-- `GET /api/v1/articles/` - List published articles
-- `GET /api/v1/articles/{slug}/` - Article detail
-- `GET /api/v1/branches/` - List active branches
-- `POST /api/v1/inquiries/` - Submit inquiry form
-- `GET /api/v1/settings/` - Public site settings
+## Architecture decisions
 
-### Admin API
-- `GET/POST /api/v1/admin/cars/` - Cars management
-- `GET/PUT/DELETE /api/v1/admin/cars/{id}/` - Car detail management
-- `GET/POST /api/v1/admin/articles/` - Articles management
-- `GET/PUT/DELETE /api/v1/admin/articles/{id}/` - Article detail management
-- `GET/POST /api/v1/admin/branches/` - Branches management
-- `GET /api/v1/admin/inquiries/` - Inquiries list
-- `PATCH /api/v1/admin/inquiries/{id}/` - Update inquiry status
+| ADR | Decision |
+|-----|----------|
+| [0001](docs/adr/0001-session-cookie-auth-for-admin.md) | Session-cookie auth for the admin API (token auth removed) |
+| [0002](docs/adr/0002-route-structure-and-guard-placement.md) | Route structure: `(site)` group vs `admin/(protected)` guard placement |
+| [0003](docs/adr/0003-two-data-boundaries.md) | Two data boundaries: browser client vs RSC data layer |
+| [0004](docs/adr/0004-server-rendered-public-pages-url-single-source.md) | Server-rendered public pages; URL as the single source of truth |
+| [0005](docs/adr/0005-no-new-client-dependencies.md) | No new client dependencies (state, forms, validation, codegen) |
+| [0006](docs/adr/0006-infra-hardening-local-only-guard-csp-deploy.md) | Infra hardening: local-only guard, CSP rollout, health-gated deploys |
 
-## Frontend Routes
+## Roadmap
 
-- `/` - Home page
-- `/cars` - Cars listing
-- `/cars/[slug]` - Car detail
-- `/articles` - Articles listing
-- `/articles/[slug]` - Article detail
-- `/admin` - Custom admin dashboard (coming soon)
-
-## SEO Features
-
-- Dynamic metadata with `generateMetadata()`
-- Automatic sitemap.xml generation
-- robots.txt configuration
-- Schema.org structured data
-- Open Graph metadata
-- Canonical URLs
-- Persian/Farsi language support
-- RTL layout
-
-## Production Deployment
-
-> **Note:** Production deploys automatically when you push/merge to `main`. See [DEVELOPMENT.md](./DEVELOPMENT.md) for the full workflow.
-
-
-1. Update environment variables in `.env`:
-```bash
-DEBUG=0
-SECRET_KEY=<strong-secret-key>
-ALLOWED_HOSTS=rahnavard.co,www.rahnavard.co
-DATABASE_URL=postgres://user:password@postgres:5432/rahnavard
-```
-
-2. Build and start production containers:
-```bash
-docker compose -f docker-compose.prod.yml up --build -d
-```
-
-3. Run migrations:
-```bash
-docker compose -f docker-compose.prod.yml exec backend python manage.py migrate
-```
-
-4. Create superuser:
-```bash
-docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
-```
-
-5. Place SSL certificates in `nginx/ssl/`:
-- `fullchain.pem`
-- `privkey.pem`
-
-## Environment Variables
-
-### Frontend
-- `NEXT_PUBLIC_SITE_URL` - Site URL (e.g., https://rahnavard.co)
-- `NEXT_PUBLIC_API_URL` - API URL (e.g., http://backend:8000/api/v1)
-
-### Backend
-- `DEBUG` - Debug mode (0 or 1)
-- `SECRET_KEY` - Django secret key
-- `ALLOWED_HOSTS` - Comma-separated list of allowed hosts
-- `DATABASE_URL` - PostgreSQL connection URL
-- `CORS_ALLOWED_ORIGINS` - Comma-separated list of CORS origins
-- `CSRF_TRUSTED_ORIGINS` - Comma-separated list of CSRF trusted origins
+- Upgrade Django 4.2 → 5.2 LTS (4.2 is past extended security support)
+- Run the Playwright e2e suite in CI against a compose stack; publish a
+  coverage badge
+- `manage.py seed_demo` so a fresh clone boots with believable demo data
+- Evaluate Next.js 16 and `sharp` 0.35 dependency bumps
 
 ## License
 
-Proprietary - Rahnavard Automotive
+Proprietary — © Rahnavard Automotive. All rights reserved; see
+[LICENSE](LICENSE). This repository is public for portfolio and review
+purposes; no reuse is granted. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[SECURITY.md](SECURITY.md) before opening issues.
