@@ -229,3 +229,61 @@ jobs:
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
+
+  e2e:
+    name: E2E (Playwright, Docker stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Full-stack e2e is too slow for every develop push: it gates the
+    # production path — PRs to main, pushes to main, and manual dispatch.
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and start the Docker stack
+        run: docker compose up -d --build
+
+      - name: Wait for PostgreSQL, then migrate
+        run: |
+          for i in $(seq 1 30); do
+            docker compose exec -T postgres pg_isready -U user && break
+            sleep 2
+          done
+          docker compose run --rm backend python manage.py migrate --noinput
+
+      - name: Seed the dedicated E2E admin
+        run: |
+          docker compose run --rm backend python manage.py shell -c "
+          from django.contrib.auth.models import User
+          u, _ = User.objects.get_or_create(username='e2e_admin', defaults={'is_staff': True, 'is_superuser': True, 'email': 'e2e@example.com'})
+          u.is_staff = u.is_superuser = True
+          u.set_password('e2epass123'); u.save()"
+
+      - name: Wait for the stack to answer through nginx
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost/api/v1/settings/ && exit 0
+            sleep 2
+          done
+          echo "stack never became healthy"
+          docker compose logs --tail=50
+          exit 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Playwright e2e
+        working-directory: frontend
+        run: npx playwright test
