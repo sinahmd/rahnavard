@@ -234,12 +234,14 @@ jobs:
     name: E2E (Playwright, Docker stack)
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # Full-stack e2e is too slow for every develop push: it gates the
-    # production path — PRs to main, pushes to main, and manual dispatch.
+    # Full-stack e2e needs the DEV compose files (docker-compose.yml,
+    # nginx.dev.conf, dev Dockerfile) — which prepare-merge.sh detaches on
+    # PR branches before the production merge. So it gates every develop
+    # push (the PR's app code is identical; its only delta is the detached
+    # infra files) and stays dispatchable on demand.
     if: >-
-      github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
