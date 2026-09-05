@@ -82,7 +82,9 @@ frontend/tsconfig.tsbuildinfo
 assets/webp/
 
 # Docs & reports
-docs/
+# (ignore local scratch docs, but keep the ADR directory tracked)
+docs/*
+!docs/adr/
 CI_CD_IMPLEMENTATION_PLAN.md
 FINAL_PRODUCTION_REPORT.md
 IMPLEMENTATION_REPORT.md
