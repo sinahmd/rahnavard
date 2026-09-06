@@ -42,29 +42,35 @@ export async function getWhyFeatures(): Promise<WhyFeature[]> {
 }
 
 /**
- * Featured cars with the old fallback semantics: try `is_featured=true`,
- * fall back to the full listing when nothing is featured.
+ * The 3 newest cars for the home showcase: newest-first among featured
+ * cars, falling back to the full listing when nothing is featured. The
+ * count is capped server-side via page_size so the section stays compact
+ * no matter how many cars are flagged or in the catalog.
  */
 export async function getFeaturedCars(): Promise<CarListItem[]> {
   const featured = await fetchDataJson<Paginated<CarListItem>>(
-    '/api/v1/cars/?is_featured=true',
+    '/api/v1/cars/?is_featured=true&page_size=3&ordering=-created_at',
     { revalidate: REVALIDATE_SECONDS }
   )
   let cars = resultsOf(featured)
   if (cars.length === 0) {
-    const all = await fetchDataJson<Paginated<CarListItem>>('/api/v1/cars/', {
-      revalidate: REVALIDATE_SECONDS,
-    })
+    const all = await fetchDataJson<Paginated<CarListItem>>(
+      '/api/v1/cars/?page_size=3&ordering=-created_at',
+      { revalidate: REVALIDATE_SECONDS }
+    )
     cars = resultsOf(all)
   }
-  return cars.map((car) => normalizeMediaUrls(car, ['main_image']))
+  return cars
+    .slice(0, 3)
+    .map((car) => normalizeMediaUrls(car, ['main_image']))
 }
 
-/** The three most recent articles (mirrors the old client slice). */
+/** The three newest articles, capped server-side via page_size. */
 export async function getLatestArticles(): Promise<ArticleListItem[]> {
-  const data = await fetchDataJson<Paginated<ArticleListItem>>('/api/v1/articles/', {
-    revalidate: REVALIDATE_SECONDS,
-  })
+  const data = await fetchDataJson<Paginated<ArticleListItem>>(
+    '/api/v1/articles/?page_size=3&ordering=-published_at',
+    { revalidate: REVALIDATE_SECONDS }
+  )
   return resultsOf(data)
     .slice(0, 3)
     .map((article) => normalizeMediaUrls(article, ['cover_image']))
