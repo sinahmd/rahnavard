@@ -42,7 +42,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          command_timeout: 15m
+          command_timeout: 30m  # 1 vCPU / 1 GB box: cold builds (npm ci re-runs when --pull refreshes the base image) need more than the old 15m
           script: |
             set -e
             cd /var/www/rahnavard
