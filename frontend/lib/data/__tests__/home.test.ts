@@ -61,10 +61,24 @@ describe('home section fetchers', () => {
 
     const cars = await getFeaturedCars()
 
+    // Newest-first, capped at 3 server-side (home section contract).
     expect(mockFetch.mock.calls[0][0]).toContain('is_featured=true')
+    expect(mockFetch.mock.calls[0][0]).toContain('page_size=3')
+    expect(mockFetch.mock.calls[0][0]).toContain('ordering=-created_at')
     expect(mockFetch.mock.calls[1][0]).toContain('/cars/')
+    expect(mockFetch.mock.calls[1][0]).toContain('page_size=3')
     expect(cars).toHaveLength(1)
     expect(cars[0].main_image).toBe('/media/cars/7.jpg')
+  })
+
+  it('getFeaturedCars never returns more than 3 even if the API leaks rows', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ results: Array.from({ length: 9 }, (_, i) => ({ id: i + 1 })) })
+    )
+
+    const cars = await getFeaturedCars()
+
+    expect(cars).toHaveLength(3)
   })
 
   it('getFeaturedCars returns featured rows without a second call', async () => {
@@ -88,6 +102,9 @@ describe('home section fetchers', () => {
 
     const articles = await getLatestArticles()
 
+    // Newest-first, capped at 3 server-side (home section contract).
+    expect(mockFetch.mock.calls[0][0]).toContain('page_size=3')
+    expect(mockFetch.mock.calls[0][0]).toContain('ordering=-published_at')
     expect(articles).toHaveLength(3)
     expect(articles[0].cover_image).toBe('/media/articles/0.jpg')
   })

@@ -108,7 +108,7 @@ export default function LatestArticles({
             ))}
           </div>
           <div className="text-center mt-10">
-            <Link href="/articles" className="btn btn-outline">
+            <Link href="/articles" className="btn btn-dark">
               مشاهده همه مقالات
             </Link>
           </div>

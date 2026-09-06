@@ -75,4 +75,20 @@ describe('LatestArticles (client island)', () => {
     render(<LatestArticles articles={mockArticles} settings={settings} />)
     expect(screen.getAllByText(/۱۴۰۳/)).toHaveLength(2)
   })
+
+  it('renders the articles CTA linking to /articles', () => {
+    render(<LatestArticles articles={mockArticles} settings={settings} />)
+
+    const cta = screen.getByRole('link', { name: 'مشاهده همه مقالات' })
+    expect(cta).toHaveAttribute('href', '/articles')
+    // btn-dark (not btn-outline): the section is white, and the outline
+    // variant renders white text — invisible on this background.
+    expect(cta).toHaveClass('btn', 'btn-dark')
+  })
+
+  it('hides the articles CTA in the empty state', () => {
+    render(<LatestArticles articles={[]} settings={settings} />)
+
+    expect(screen.queryByRole('link', { name: 'مشاهده همه مقالات' })).not.toBeInTheDocument()
+  })
 })
