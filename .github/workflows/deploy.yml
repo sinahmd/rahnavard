@@ -142,7 +142,7 @@ jobs:
             echo "🏥 End-to-end health check..."
             SITE_OK=false
             for i in {1..12}; do
-              if curl -sf http://localhost/api/v1/settings/ > /dev/null 2>&1; then
+              if curl -sf --max-time 5 http://localhost/api/v1/settings/ > /dev/null 2>&1; then
                 SITE_OK=true
                 echo "✅ Site healthy"
                 break
