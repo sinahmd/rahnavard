@@ -49,17 +49,33 @@ jobs:
 
             echo "🚀 Deployment started — $(date)"
 
-            # Step 0: Ensure GitHub SSH host key is up to date
+            # Step 0: GitHub SSH pre-flight — ADVISORY ONLY: a failed or hung
+            # probe must not abort the deploy, but every command is bounded so
+            # it can never hang it either. ConnectTimeout only covers the TCP
+            # connect; a stalled SSH handshake on github.com:22 (seen
+            # 2026-09-06) needs an outer timeout. BatchMode forbids any
+            # interactive prompt (host-key/passphrase) that could block forever.
             echo "🔑 Checking GitHub SSH access..."
-            ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null || true
-            if ! ssh -T git@github.com -o ConnectTimeout=10 2>&1 | grep -q "successfully authenticated"; then
-              echo "⚠️  GitHub SSH key may be invalid — attempting pull anyway..."
+            echo "  → ssh-keyscan..."
+            if timeout 10 ssh-keyscan -T 5 -H github.com >> ~/.ssh/known_hosts 2>/dev/null; then
+              echo "  ✓ ssh-keyscan succeeded"
+            else
+              echo "  ⚠ ssh-keyscan failed or timed out (advisory)"
+            fi
+            echo "  → ssh auth probe..."
+            if timeout 15 ssh -T -o ConnectTimeout=10 -o BatchMode=yes git@github.com 2>&1 | grep -q "successfully authenticated"; then
+              echo "  ✓ GitHub SSH authentication OK"
+            else
+              echo "  ⚠ GitHub SSH auth probe failed or timed out (advisory) — attempting pull anyway..."
             fi
 
-            # Step 1: Pull latest code (shallow fetch avoids SSH hang on diverged history)
+            # Step 1: Pull latest code (shallow fetch avoids SSH hang on diverged
+            # history). The fetch is the first REQUIRED step — bounded at 120s
+            # so an SSH stall here fails fast into the existing error handling
+            # instead of hanging until the job's 20m limit.
             echo "📥 Pulling code..."
-            if ! git fetch --depth 1 origin main 2>&1; then
-              echo "❌ git fetch failed — check that the server's SSH key has repo access"
+            if ! timeout 120 git fetch --depth 1 origin main 2>&1; then
+              echo "❌ git fetch failed (or timed out after 120s) — check that the server's SSH key has repo access"
               echo "   Run: ssh -T git@github.com  (from the server)"
               echo "   If invalid, update the deploy key in GitHub → Settings → Deploy Keys"
               exit 1
@@ -67,15 +83,25 @@ jobs:
             git reset --hard origin/main
             echo "✅ Code at $(git rev-parse --short HEAD)"
 
-            # Step 2: Build Docker images
+            # Step 2: Build Docker images. --progress=plain streams build
+            # output (the 2026-09-05 failure showed zero build output for 15
+            # minutes) so a hung step is visible in the Actions log instead of
+            # silent. Resource snapshot first: the box is 1 vCPU / 1 GB —
+            # disk-full or OOM during build are the silent-hang suspects.
+            echo "🖥️  Server resources before build:"
+            df -h / || true
+            free -m || true
             REBUILD="${{ github.event.inputs.rebuild_images || 'false' }}"
             if [ "$REBUILD" = "true" ]; then
               echo "📦 Building images (no cache)..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build --pull --no-cache
+              docker compose -f ${{ env.COMPOSE_FILE }} build --progress=plain --pull --no-cache
             else
               echo "📦 Building images (with cache)..."
-              docker compose -f ${{ env.COMPOSE_FILE }} build --pull
+              docker compose -f ${{ env.COMPOSE_FILE }} build --progress=plain --pull
             fi
+            echo "🖥️  Server resources after build:"
+            df -h / || true
+            free -m || true
 
             # Step 3: Run migrations explicitly (idempotent) BEFORE the new code
             # serves traffic. The one-shot container exits with the migrate
@@ -116,7 +142,7 @@ jobs:
             echo "🏥 End-to-end health check..."
             SITE_OK=false
             for i in {1..12}; do
-              if curl -sf http://localhost/api/v1/settings/ > /dev/null 2>&1; then
+              if curl -sf --max-time 5 http://localhost/api/v1/settings/ > /dev/null 2>&1; then
                 SITE_OK=true
                 echo "✅ Site healthy"
                 break
