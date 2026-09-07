@@ -8,8 +8,8 @@ GitHub Actions pipeline.
 
 **Live site:** https://rahnavard.co
 
-[![CI](https://github.com/sinahmd/rahnavard-landing/actions/workflows/ci.yml/badge.svg)](https://github.com/sinahmd/rahnavard-landing/actions/workflows/ci.yml)
-[![Deploy](https://github.com/sinahmd/rahnavard-landing/actions/workflows/deploy.yml/badge.svg)](https://github.com/sinahmd/rahnavard-landing/actions/workflows/deploy.yml)
+[![CI](https://github.com/sinahmd/rahnavard/actions/workflows/ci.yml/badge.svg)](https://github.com/sinahmd/rahnavard/actions/workflows/ci.yml)
+[![Deploy](https://github.com/sinahmd/rahnavard/actions/workflows/deploy.yml/badge.svg)](https://github.com/sinahmd/rahnavard/actions/workflows/deploy.yml)
 ![License](https://img.shields.io/badge/license-All_rights_reserved-red)
 ![Next.js 14](https://img.shields.io/badge/Next.js-14-black)
 ![Django 4.2](https://img.shields.io/badge/Django-4.2-44B78B)
@@ -68,8 +68,8 @@ flowchart LR
 Prerequisites: Docker & Docker Compose.
 
 ```bash
-git clone https://github.com/sinahmd/rahnavard-landing.git
-cd rahnavard-landing
+git clone https://github.com/sinahmd/rahnavard.git
+cd rahnavard
 cp .env.example .env
 docker compose up --build -d
 docker compose exec backend python manage.py migrate
