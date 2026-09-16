@@ -3,7 +3,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 
-from apps.core.validators import ImageValidator
+from apps.core.validators import ImageValidator, PDFValidator
 from .models import Car
 
 
@@ -176,6 +176,7 @@ class CarAdminSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "main_image": {"validators": [ImageValidator()]},
             "og_image": {"validators": [ImageValidator()]},
+            "catalog_file": {"validators": [PDFValidator()]},
         }
 
     def create(self, validated_data):

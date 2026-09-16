@@ -4,9 +4,31 @@ import zlib
 import pytest
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from io import BytesIO
+from PIL import Image
 from rest_framework.test import APIClient
 
 from .models import Car
+
+
+def _make_valid_png(width=800, height=600):
+    """Return a valid PNG image with the given dimensions."""
+    img = Image.new('RGB', (width, height), 'white')
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    buf.name = 'test.png'
+    return buf.getvalue()
+
+
+def _make_valid_jpeg(width=800, height=600):
+    """Return a valid JPEG image with the given dimensions."""
+    img = Image.new('RGB', (width, height), 'white')
+    buf = BytesIO()
+    img.save(buf, format='JPEG')
+    buf.seek(0)
+    buf.name = 'test.jpg'
+    return buf.getvalue()
 
 
 def _make_tiny_png():
@@ -40,7 +62,7 @@ def sample_car(db):
         display_order=1,
         main_image=SimpleUploadedFile(
             name='test.jpg',
-            content=b'',
+            content=_make_valid_jpeg(),
             content_type='image/jpeg'
         )
     )
@@ -100,7 +122,7 @@ class TestCarModel:
             year=2025,
             fuel_type='gasoline',
             transmission='automatic',
-            main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+            main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
         )
         assert car.slug is not None
         assert len(car.slug) > 0
@@ -114,7 +136,7 @@ class TestCarModel:
             year=2026,
             fuel_type='gasoline',
             transmission='automatic',
-            main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+            main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
         )
         # Auto-generated slug should differ from sample_car's slug
         assert car.slug != sample_car.slug
@@ -219,7 +241,7 @@ class TestCarSoftDelete:
             year=2025,
             fuel_type='gasoline',
             transmission='automatic',
-            main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+            main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
         )
         assert new_car.slug == original_slug
 
@@ -237,7 +259,7 @@ class TestCarSoftDelete:
                 year=2025,
                 fuel_type='gasoline',
                 transmission='automatic',
-                main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+                main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
             )
 
     def test_multiple_cars_soft_delete(self, sample_cars):
@@ -335,7 +357,7 @@ class TestCarAdminAPI:
             'fuel_type': 'gasoline',
             'transmission': 'automatic',
             'is_active': True,
-            'main_image': SimpleUploadedFile('test.png', _make_tiny_png(), 'image/png')
+            'main_image': SimpleUploadedFile('test.png', _make_valid_png(), 'image/png')
         }
         response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
         assert response.status_code == 201
@@ -367,7 +389,7 @@ class TestCarAdminAPI:
                 '<img src="x" onerror="alert(1)">'
                 '<a href="JaVaScRiPt:alert(1)">bad</a>'
             ),
-            'main_image': SimpleUploadedFile('test.png', _make_tiny_png(), 'image/png')
+            'main_image': SimpleUploadedFile('test.png', _make_valid_png(), 'image/png')
         }
         response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
         assert response.status_code == 201
@@ -539,7 +561,7 @@ def filter_cars(db):
     for i, spec in enumerate(specs):
         car = Car.objects.create(
             display_order=i,
-            main_image=SimpleUploadedFile(f'car{i}.jpg', b'', 'image/jpeg'),
+            main_image=SimpleUploadedFile(f'car{i}.jpg', _make_valid_jpeg(), 'image/jpeg'),
             **spec,
         )
         cars.append(car)
@@ -785,7 +807,7 @@ class TestCarEdgeCases:
             is_active=True,
             is_featured=True,
             display_order=10,
-            main_image=SimpleUploadedFile('featured.jpg', b'', 'image/jpeg'),
+            main_image=SimpleUploadedFile('featured.jpg', _make_valid_jpeg(), 'image/jpeg'),
         )
         response = api_client.get('/api/v1/cars/?is_featured=true')
         assert response.status_code == 200
@@ -823,7 +845,7 @@ class TestCarEdgeCases:
             transmission='automatic',
             is_active=True,
             display_order=0,
-            main_image=SimpleUploadedFile('t.jpg', b'', 'image/jpeg'),
+            main_image=SimpleUploadedFile('t.jpg', _make_valid_jpeg(), 'image/jpeg'),
         )
         response = api_client.get('/api/v1/cars/?search=آزمایشی')
         assert response.status_code == 200
@@ -852,12 +874,12 @@ class TestCarAdminGalleryAndPagination:
             'fuel_type': 'gasoline',
             'transmission': 'automatic',
             'is_active': True,
-            'main_image': SimpleUploadedFile('main.png', _make_tiny_png(), 'image/png'),
+            'main_image': SimpleUploadedFile('main.png', _make_valid_png(), 'image/png'),
         }
 
     def _gallery_files(self, count):
         return {
-            f'gallery_{i}': SimpleUploadedFile(f'g{i}.png', _make_tiny_png(), 'image/png')
+            f'gallery_{i}': SimpleUploadedFile(f'g{i}.png', _make_valid_png(), 'image/png')
             for i in range(count)
         }
 
@@ -1005,3 +1027,31 @@ class TestCarAdminGalleryAndPagination:
 
         paths.append(os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png'))
         self._cleanup_media(paths)
+
+
+@pytest.mark.django_db
+class TestCatalogFileValidation:
+    """Phase 1 hardening: catalog_file validates content, not just the
+    extension (PDFValidator — size, .pdf extension, %PDF- magic bytes)."""
+
+    def test_catalog_file_validated(self, admin_client):
+        """A .pdf-named upload whose bytes lack the %PDF- signature is
+        rejected with a 400 field error and the car is not created."""
+        data = {
+            'brand': 'Toyota',
+            'model': 'RAV4',
+            'persian_name': 'تویوتا راو۴',
+            'slug': 'catalog-spoof',
+            'year': 2025,
+            'fuel_type': 'gasoline',
+            'transmission': 'automatic',
+            'is_active': True,
+            'main_image': SimpleUploadedFile('main.png', _make_valid_png(), 'image/png'),
+            'catalog_file': SimpleUploadedFile(
+                'catalog.pdf', b'plain text pretending to be a pdf', 'application/pdf'
+            ),
+        }
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 400
+        assert 'catalog_file' in response.data
+        assert not Car.objects.filter(slug='catalog-spoof').exists()

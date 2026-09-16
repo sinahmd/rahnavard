@@ -2,23 +2,20 @@ import struct
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
+from io import BytesIO
+from PIL import Image
 
 from .models import Branch
 
 
-def _make_tiny_png():
-    """Return a minimal valid PNG (1x1 pixel) as bytes."""
-    import zlib
-
-    def _chunk(chunk_type, data):
-        c = chunk_type + data
-        crc = struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
-        return struct.pack(">I", len(data)) + c + crc
-
-    sig = b"\x89PNG\r\n\x1a\n"
-    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
-    raw = zlib.compress(b"\x00\x00\x00\x00")
-    return sig + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", raw) + _chunk(b"IEND", b"")
+def _make_valid_png(width=800, height=600):
+    """Return a valid PNG image with the given dimensions."""
+    img = Image.new('RGB', (width, height), 'white')
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    buf.name = 'test.png'
+    return buf.getvalue()
 
 
 @pytest.fixture
@@ -207,7 +204,7 @@ class TestBranchAdminAPI:
             'address': 'آدرس جدید',
             'phone': '09119999999',
             'map_url': 'https://maps.google.com',
-            'map_image': SimpleUploadedFile('map.png', _make_tiny_png(), 'image/png'),
+            'map_image': SimpleUploadedFile('map.png', _make_valid_png(), 'image/png'),
             'is_active': True
         }
         response = admin_client.post('/api/v1/admin/branches/', data, format='multipart')

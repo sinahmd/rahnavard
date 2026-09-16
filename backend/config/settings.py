@@ -175,6 +175,33 @@ CSRF_COOKIE_HTTPONLY = False  # readable on purpose: echoed as X-CSRFToken
 CSRF_COOKIE_SAMESITE = "Lax"
 
 
+# Cache / throttle state
+# The DRF throttles (login, inquiries, anon/user) keep their counters in the
+# default cache. Django's implicit default — LocMemCache — is per-process, and
+# production runs `gunicorn --workers 2` (entrypoint.sh), i.e. two worker
+# processes holding two independent counters, so the configured rate is
+# delivered at roughly double. A file cache keeps the counters in
+# process-external storage shared by every worker of the single backend
+# container, and they now also survive a worker crash or recycle instead of
+# silently resetting. CACHE_DIR must stay OUTSIDE /app: in local Docker /app is
+# the host bind-mount (cache files would land in the working tree), and in
+# production /app/media is mounted into nginx read-only and served publicly, so
+# throttle keys (client IPs) would leak over HTTP. Single container today — a
+# multi-replica backend would need a genuinely shared store instead.
+CACHE_DIR = env("CACHE_DIR", default="/var/cache/rahnavard")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": CACHE_DIR,
+        # The generous anon bucket (1000/hour) keeps a key per client IP for a
+        # full hour, so a public site exceeds Django's default cap of 300 live
+        # entries and needlessly culls. Login keys are the freshest, so they
+        # survive culling either way; raising the cap just avoids the churn.
+        "OPTIONS": {"MAX_ENTRIES": 5000},
+    },
+}
+
+
 # REST Framework Configuration
 REST_FRAMEWORK = {
     # SESSION-ONLY (Phase 2 cutover, plan §6.A.4): admin requests authenticate
@@ -205,6 +232,8 @@ REST_FRAMEWORK = {
         # The public inquiry form is the spam magnet — a strict scoped rate
         # instead of the generous global anon bucket (inquiries/views.py).
         "inquiries": "20/hour",
+        # Login brute-force protection — 5 attempts per minute per IP.
+        "login": "5/minute",
     },
     # Throttle keying behind the proxy chain (Arvan edge → nginx → Django):
     # nginx fills X-Forwarded-For via $proxy_add_x_forwarded_for, and DRF's

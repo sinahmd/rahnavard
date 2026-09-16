@@ -2,8 +2,9 @@ from django.contrib.auth import login, logout, update_session_auth_hash
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status, permissions
 from rest_framework.authentication import SessionAuthentication
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from .serializers import (
     LoginSerializer,
@@ -15,6 +16,7 @@ from .serializers import (
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 @authentication_classes([])
+@throttle_classes([ScopedRateThrottle])
 @ensure_csrf_cookie
 def login_view(request):
     """
@@ -39,6 +41,15 @@ def login_view(request):
     return Response({
         'user': UserSerializer(user).data,
     }, status=status.HTTP_200_OK)
+
+
+# Login brute-force protection. DRF's api_view() wrapper does NOT copy
+# `throttle_scope` from the function onto the generated view class, and
+# ScopedRateThrottle reads the scope from the view instance at request time
+# (getattr(view, 'throttle_scope')). The scope must therefore be set on
+# login_view.view_class — setting it on the wrapper function alone leaves the
+# attribute invisible to the throttle, which then silently never engages.
+login_view.view_class.throttle_scope = "login"
 
 
 @api_view(['POST'])
