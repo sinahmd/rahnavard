@@ -1,4 +1,5 @@
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import type { ImageVariants } from '@/types/media'
 
 /**
  * The card image block shared by CarCard, the home FeaturedCars card, and
@@ -9,6 +10,8 @@ import OptimizedImage from '@/components/ui/OptimizedImage'
 interface CarCardImageProps {
   src: string | null
   alt: string
+  /** Additive Phase 4A variant set for `src`; degrades to the original. */
+  variants?: ImageVariants | null
   className?: string
   imageClassName?: string
   placeholderClassName?: string
@@ -17,6 +20,7 @@ interface CarCardImageProps {
 export default function CarCardImage({
   src,
   alt,
+  variants,
   className = '',
   imageClassName = '',
   placeholderClassName = '',
@@ -26,6 +30,7 @@ export default function CarCardImage({
       {src ? (
         <OptimizedImage
           src={src}
+          variants={variants}
           alt={alt}
           width={400}
           height={300}

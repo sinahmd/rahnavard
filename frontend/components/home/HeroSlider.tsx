@@ -159,6 +159,7 @@ export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
             <Link href={slide.link} className="block absolute inset-0">
               <OptimizedImage
                 src={slide.image}
+                variants={slide.image_variants}
                 alt={slide.alt_text}
                 fill
                 className={`object-cover object-center ${
@@ -171,6 +172,7 @@ export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
           ) : (
             <OptimizedImage
               src={slide.image}
+              variants={slide.image_variants}
               alt={slide.alt_text}
               fill
               className={`object-cover object-center ${

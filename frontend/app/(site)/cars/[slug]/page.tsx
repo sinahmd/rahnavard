@@ -169,6 +169,8 @@ export default async function CarDetailPage({ params }: Props) {
                 mainImage={car.main_image}
                 gallery={car.gallery || []}
                 persianName={car.persian_name}
+                mainImageVariants={car.main_image_variants}
+                galleryVariants={car.gallery_variants}
               />
             </div>
 

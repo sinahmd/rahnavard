@@ -282,6 +282,7 @@ export default function ArticlesExplorer({
                     {article.cover_image ? (
                       <OptimizedImage
                         src={article.cover_image}
+                        variants={article.cover_image_variants}
                         alt={article.title}
                         width={400}
                         height={192}

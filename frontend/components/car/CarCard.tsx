@@ -22,6 +22,7 @@ export default function CarCard({ car }: { car: CarListItem }) {
       {/* Image */}
       <CarCardImage
         src={car.main_image}
+        variants={car.main_image_variants}
         alt={car.persian_name}
         className="bg-white p-4"
         imageClassName="transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] group-hover:scale-105"

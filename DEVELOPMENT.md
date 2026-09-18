@@ -474,12 +474,12 @@ The owner approved the plan on 2026-09-05; the cutover commits are on
   repo grep: zero runtime `TokenAuthentication`/`authtoken`/`admin_token`
   references (comments and the purge constant only).
 
-### 3.12 Pre-launch hardening — Phases 1–3 (security, monitoring/backup, gallery storage) (status)
+### 3.12 Pre-launch hardening — Phases 1–4A (security, monitoring/backup, gallery storage, image variants) (status)
 
 `IMPLEMENTATION_PLAN.md` is the authoritative plan for this cycle. Per its §12
 execution contract each phase is implemented and stopped on its own: Phases 1,
-2 and 3 are done, **Phases 4A–9 are NOT started**. Phase 4A (backend image
-variant pipeline) is next and builds on Phase 3's UUID paths.
+2, 3 and 4A are done, **Phases 4B–9 are NOT started**. Phase 4B (frontend
+image delivery) is next and consumes 4A's additive variant fields.
 
 **Phase 1 — security hardening** (committed `5888307`)
 
@@ -620,6 +620,45 @@ variant pipeline) is next and builds on Phase 3's UUID paths.
   public + CSP e2e specs 4/4 green against the local stack (`npx playwright
   test e2e/public.spec.ts e2e/csp-audit.spec.ts`). `admin-auth.spec.ts` was not
   run because it needs the seeded `e2e_admin` user (`e2e/README.md`).
+
+**Phase 4A — upload-time image variant pipeline** (landed 2026-09-18)
+
+- **Variants**: for every content image (`Car.main_image`, `Car.gallery`
+  entries, `Article.cover_image`, `HeroSlide.image`) an upload now generates,
+  with the existing Pillow dependency and strictly after `ImageValidator`
+  accepts the bytes: a WebP re-encode at the original dimensions (quality 82),
+  aspect-preserving thumbnails fitted inside 400×300 / 800×600 / 1600×1200
+  boxes (`Image.thumbnail` — no crop, no upscale), and a 10px WebP LQIP
+  (quality 40). Originals are preserved byte-for-byte. **No schema change**:
+  variant files live in a deterministic sibling `.variants/<stem>/` directory
+  derived from the source path (`apps/core/image_variants.py`;
+  `docs/adr/0009`).
+- **Wiring**: a `post_save` receiver per model (minimal `AppConfig`s added for
+  cars/articles/core) defers generation to `transaction.on_commit`; gallery
+  files bypass signals entirely, so `GalleryField.save_gallery_files` schedules
+  the same worker for exactly the URLs its upload created. Generation runs
+  only after the DB commits and failures are **contained and logged** — a
+  committed row without variants is exactly the pre-4A state and the regen
+  command repairs it. That is the mirror image of Phase 3's policy, where the
+  file path is part of the stored data and a failure must abort the request.
+- **Exposure**: additive read-only `main_image_variants` / `gallery_variants` /
+  `cover_image_variants` / `image_variants` on the public serializers. Each
+  reads disk truth only and returns `null` until the set exists, so
+  pre-backfill responses are byte-identical to the pre-4A API and
+  `main_image`/`gallery` keep their string shapes across the 4A→4B boundary;
+  `gallery_variants[i]` aligns 1:1 with `gallery[i]`.
+- **Backfill**: `regenerate_image_variants` (dry-run default, `--apply`,
+  `--force`, `--strict`) — idempotent, gap-filling, tolerant of unreadable
+  legacy images; walks main/cover/hero images plus every local gallery URL,
+  soft-deleted rows included. **Owner deploy step**: run `--apply` once after
+  deploy; no DB migration exists or is needed.
+- **Known residual risk**: a process crash mid-write can leave one dot-tmp
+  file inside a `.variants` directory (plan Case E) — Phase 5's
+  `cleanup_orphan_media` recognizes `.variants` artifacts by path.
+- **Validation (Docker, 2026-09-18)**: backend **359 passed / 98.62% cov**
+  (baseline was 330 / 98.59), `check` + `makemigrations --check --dry-run`
+  clean; frontend untouched (307 tests, tsc/lint clean). The only uncovered
+  lines in the new modules are exception-only best-effort cleanup guards.
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 

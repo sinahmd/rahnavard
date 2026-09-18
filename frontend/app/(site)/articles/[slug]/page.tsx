@@ -102,6 +102,7 @@ export default async function ArticleDetailPage({ params }: Props) {
             <div className="mb-8 rounded-[14px] overflow-hidden">
               <OptimizedImage
                 src={article.cover_image}
+                variants={article.cover_image_variants}
                 alt={article.title}
                 width={800}
                 height={400}
