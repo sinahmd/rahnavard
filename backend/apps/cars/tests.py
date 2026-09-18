@@ -1,6 +1,8 @@
 import os
+import re
 import struct
 import zlib
+from pathlib import Path
 import pytest
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -900,11 +902,38 @@ class TestCarAdminGalleryAndPagination:
         assert len(car.gallery) == 2
         created = []
         for url in car.gallery:
+            # Immutable, identity-derived path: cars/{pk}/gallery/{uuid}.png
+            assert re.fullmatch(
+                rf'{settings.MEDIA_URL}cars/{car.pk}/gallery/[0-9a-f]{{32}}\.png', url
+            ), url
             relative = url.replace(settings.MEDIA_URL, '')
             path = os.path.join(settings.MEDIA_ROOT, relative)
             assert os.path.exists(path)
             created.append(path)
+        # A successful upload leaves no staging directory behind.
+        assert not list(Path(settings.MEDIA_ROOT).glob('.gallery-upload-*'))
         self._cleanup_media(created)
+
+    def test_gallery_upload_is_content_validated(self, admin_client):
+        """A gallery file whose bytes contradict its name is rejected with a 400
+        gallery field error and no car is created.
+
+        Gallery uploads never pass through an `ImageField`, so Phase 1's content
+        checks (size, extension, MIME, magic bytes, dimensions) are applied
+        explicitly — a `.png` that is not an image must not reach the media tree.
+        """
+        data = self._car_data('gallery-spoofed')
+        data['gallery_0'] = SimpleUploadedFile('fake.png', b'not an image', 'image/png')
+
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+
+        assert response.status_code == 400
+        assert 'gallery' in response.data
+        assert not Car.objects.filter(slug='gallery-spoofed').exists()
+        # The rejected upload left neither a destination file nor a staging dir.
+        assert not list(Path(settings.MEDIA_ROOT).glob('**/.gallery-upload-*'))
+        # Only the car's own `main_image` write survives the rolled-back create.
+        self._cleanup_media([os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png')])
 
     def test_admin_update_preserves_existing_gallery_and_appends(self, admin_client, sample_car):
         """A PATCH with new gallery files keeps existing URLs and appends."""
@@ -921,11 +950,16 @@ class TestCarAdminGalleryAndPagination:
         sample_car.refresh_from_db()
         assert sample_car.gallery[0].endswith('existing.jpg')
         assert len(sample_car.gallery) == 2
-        # The new file must NOT reuse the first image's filename: the counter
-        # continues past the existing gallery (`_gallery_1.png`), so an
-        # edit-append never overwrites the disk file of an existing image.
-        assert sample_car.gallery[1] != sample_car.gallery[0]
-        assert sample_car.gallery[1].endswith(f'{sample_car.slug}_gallery_1.png')
+        # The appended file must NOT reuse the first image's filename: it lands
+        # in this car's own directory under a fresh UUID, so an edit-append can
+        # never overwrite the disk file of an already-listed image (the
+        # property the old slug+counter scheme provided).
+        appended = sample_car.gallery[1]
+        assert appended != sample_car.gallery[0]
+        assert re.fullmatch(
+            rf'{settings.MEDIA_URL}cars/{sample_car.pk}/gallery/[0-9a-f]{{32}}\.png',
+            appended,
+        ), appended
 
         created = []
         for url in sample_car.gallery:
@@ -993,17 +1027,14 @@ class TestCarAdminGalleryAndPagination:
         # The failed insert may have written main.png before the DB raised.
         self._cleanup_media([os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png')])
 
-    def test_distinct_active_cars_do_not_collide_gallery_files(self, admin_client):
-        """Two different active cars uploading gallery_0..N never produce the
-        same on-disk filename.
+    def test_gallery_files_are_isolated_per_car(self, admin_client):
+        """Two cars uploading gallery_0..N produce four distinct files, each
+        under its own identity-derived directory.
 
-        Gallery files are named `{slug}_gallery_{idx}` (slug-based, accepted
-        technical debt — see DEVELOPMENT.md §3.9). Collisions are prevented
-        by the `car_slug_unique_when_not_deleted` partial unique index: two
-        active cars always have distinct slugs, hence distinct filenames even
-        at the same image index. This test pins that guarantee through the
-        real admin API (and would fail loudly if the scheme changed to one
-        that could collide)."""
+        Supersedes the old `{slug}_gallery_{idx}` pin, which relied on the
+        partial unique slug index for collision-freedom. The directory now
+        derives from the primary key, so distinct cars cannot collide even
+        when one is soft-deleted and its slug is reused (ADR-0007)."""
         urls = []
         paths = []
         for slug in ('gallery-a', 'gallery-b'):
@@ -1015,18 +1046,53 @@ class TestCarAdminGalleryAndPagination:
             car = Car.objects.get(slug=slug)
             assert len(car.gallery) == 2
             for url in car.gallery:
+                assert url.startswith(f'{settings.MEDIA_URL}cars/{car.pk}/gallery/')
                 relative = url.replace(settings.MEDIA_URL, '')
                 path = os.path.join(settings.MEDIA_ROOT, relative)
                 assert os.path.exists(path)
                 urls.append(url)
                 paths.append(path)
 
-        # Four distinct URLs and four distinct files across the two cars.
+        # Four distinct URLs, four distinct files, two distinct directories.
         assert len(set(urls)) == 4
         assert len(set(paths)) == 4
+        assert len({url.rsplit('/', 1)[0] for url in urls}) == 2
 
         paths.append(os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png'))
         self._cleanup_media(paths)
+
+    def test_slug_rename_neither_moves_nor_invalidates_gallery_files(
+        self, admin_client, sample_car
+    ):
+        """Changing the slug leaves the gallery URLs and files untouched.
+
+        That is the point of the identity-derived path: the old slug scheme
+        would have left published URLs pointing at a name that no longer
+        matched the car."""
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {**self._gallery_files(1)},
+            format='multipart',
+        )
+        assert response.status_code == 200
+        sample_car.refresh_from_db()
+
+        url = sample_car.gallery[0]
+        path = os.path.join(settings.MEDIA_ROOT, url.replace(settings.MEDIA_URL, ''))
+
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {'slug': 'gallery-renamed-slug'},
+            format='multipart',
+        )
+        assert response.status_code == 200
+        sample_car.refresh_from_db()
+
+        assert sample_car.slug == 'gallery-renamed-slug'
+        assert sample_car.gallery == [url]
+        assert os.path.exists(path)
+
+        self._cleanup_media([path])
 
 
 @pytest.mark.django_db

@@ -99,7 +99,7 @@ relative API URLs in both environments.
 | Suite | Command | What it covers |
 |-------|---------|----------------|
 | Frontend (Jest) | `cd frontend && npm test` | 307 unit/integration tests, clean console |
-| Backend (pytest) | `docker compose exec backend pytest` | 323 tests, ~98.5% coverage, Postgres-backed |
+| Backend (pytest) | `docker compose exec backend pytest` | 330 tests, ~98.6% coverage, Postgres-backed |
 | E2E (Playwright) | `cd frontend && npx playwright test` | Public SSR, CSP violation audit, admin login/session/CSRF matrix — runs against the local Docker stack ([guide](frontend/e2e/README.md)) |
 
 CI runs lint + typecheck + frontend tests + backend tests (with a Postgres

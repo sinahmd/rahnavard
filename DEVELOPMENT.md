@@ -351,20 +351,20 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
     (new files were named `{slug}_gallery_{idx}` with the counter
     restarting at 0) — the counter now continues past the existing gallery
     (pinned by the extended append test).
-  - **slug-based gallery filenames — DECISION SUPERSEDED (2026-09-16)**:
-    gallery files are named `{slug}_gallery_{idx}`. This was accepted as
-    deferred debt on 2026-09-05 (a unique active slug made collisions
-    impossible; readable, stable public URLs). The pre-launch cycle then
-    approved **UUID-based immutable paths** (`cars/{car_id}/gallery/{uuid}{ext}`)
-    in `IMPLEMENTATION_PLAN.md` §4/§7.1 — the rationale and the rejected
-    alternatives now live in `docs/adr/0007-uuid-gallery-storage.md`.
-    **The shipped code still implements the slug scheme**: that migration is
-    Phase 3 of `IMPLEMENTATION_PLAN.md` and has NOT landed. Before
-    implementing it, re-read `GalleryField.save_gallery_files` and re-verify
-    the §7.2 filesystem/DB design (§12.6). The old scheme's no-collision
-    guarantee stays pinned by
-    `test_distinct_active_cars_do_not_collide_gallery_files` until the
-    migration replaces it and its own tests supersede that pin.
+  - **slug-based gallery filenames — REPLACED 2026-09-18 (Phase 3)**:
+    gallery files were named `{slug}_gallery_{idx}`, accepted as deferred debt
+    on 2026-09-05 (a unique active slug made collisions impossible; readable,
+    stable public URLs). The pre-launch cycle approved **UUID-based immutable
+    paths** (`cars/{car_id}/gallery/{uuid}{ext}`) in
+    `IMPLEMENTATION_PLAN.md` §4/§7.1 — rationale and rejected alternatives in
+    `docs/adr/0007-uuid-gallery-storage.md` — and Phase 3 landed it:
+    `GalleryField.save_gallery_files` stages uploads inside `MEDIA_ROOT` and
+    `shutil.move`s them into the identity-derived directory, `cars/0009`
+    renames the files that already existed, and the old no-collision pin
+    (`test_distinct_active_cars_do_not_collide_gallery_files`) is superseded by
+    `test_gallery_files_are_isolated_per_car`, the §7.2 Case A–D matrix in
+    `apps/cars/test_gallery_storage.py`, and the `0009` migration tests. See
+    §3.12.
   - **Axe spot checks** (headless Chrome + axe-core over the hydrated
     public pages) found: unlabeled filter selects (critical) → aria-labels
     added; footer `tel:` link empty when phone unset (serious) → rendered
@@ -474,13 +474,12 @@ The owner approved the plan on 2026-09-05; the cutover commits are on
   repo grep: zero runtime `TokenAuthentication`/`authtoken`/`admin_token`
   references (comments and the purge constant only).
 
-### 3.12 Pre-launch hardening — Phase 1 (security) + Phase 2 (monitoring + backup) (status)
+### 3.12 Pre-launch hardening — Phases 1–3 (security, monitoring/backup, gallery storage) (status)
 
 `IMPLEMENTATION_PLAN.md` is the authoritative plan for this cycle. Per its §12
-execution contract each phase is implemented and stopped on its own: Phase 1 and
-Phase 2 are done, **Phases 3–9 are NOT started**. Phase 3 (gallery UUID storage)
-is next, and its filesystem/DB design must be re-verified against the code
-before any edit (§12.6) — the shipped gallery code is still slug-based.
+execution contract each phase is implemented and stopped on its own: Phases 1,
+2 and 3 are done, **Phases 4A–9 are NOT started**. Phase 4A (backend image
+variant pipeline) is next and builds on Phase 3's UUID paths.
 
 **Phase 1 — security hardening** (committed `5888307`)
 
@@ -563,8 +562,64 @@ before any edit (§12.6) — the shipped gallery code is still slug-based.
   image predates the `@sentry/nextjs` dependency.
 - **Still owner-side (not code)**: DSNs are not set in production, the
   UptimeRobot monitor is not created, and the backup cron is not installed.
-  No ADR exists yet for the image pipeline (Phase 4A); gallery storage has
-  docs/adr/0007 but the code still implements the slug scheme.
+  No ADR exists yet for the image pipeline (Phase 4A); docs/adr/0007 (gallery
+  storage) is now implemented.
+
+**Phase 3 — gallery UUID storage + atomic DB/filesystem writes** (landed 2026-09-18)
+
+- **Immutable paths**: gallery files now live at
+  `cars/{car_id}/gallery/{uuid}{ext}` (relative to `settings.MEDIA_URL`). The
+  directory derives from the primary key, so a slug rename neither moves nor
+  invalidates a file, and a soft-deleted car's slug being reused cannot repoint
+  a published URL (`docs/adr/0007`).
+- **Atomic write with explicit cleanup**: `GalleryField.save_gallery_files`
+  streams each upload into a `.gallery-upload-*` staging directory created
+  **inside `MEDIA_ROOT`** — the same filesystem as the destination, so the final
+  move is a rename rather than a cross-device copy (`tempfile.mkdtemp()`'s
+  default `/tmp` is a different mount in the container) — then `shutil.move`s
+  every staged file into place and returns a `GalleryWrite` that records exactly
+  the paths this upload created. `CarAdminSerializer._commit_gallery` calls
+  `GalleryWrite.cleanup()` when the `gallery` JSONField cannot be saved, and a
+  `finally: shutil.rmtree(staging_dir)` removes the staging directory on every
+  path. **`transaction.atomic()` never rolls back the filesystem**, so this
+  bookkeeping — not the transaction — is what prevents orphans.
+- **The write order deviates from plan §7.2 on purpose**: §7.2 staged the temp
+  files *before* opening the transaction. Gallery paths derive from the car's
+  primary key, so the row must be written first; the staging write therefore
+  happens inside the transaction and the row simply never commits when a write
+  fails. The plan's case-by-case guarantees (A–D: no orphans, no data loss) are
+  unchanged, and the rollback path is additionally covered by the tests.
+- **Data migration `cars/0009_gallery_uuid_paths`**: `RunPython` renames the
+  existing `cars/gallery/{slug}_gallery_{idx}{ext}` files on disk and rewrites
+  the matching JSONField URLs, including soft-deleted cars (the historical model
+  gets a plain manager, not `SoftDeleteManager`). It is idempotent — URLs
+  outside the legacy directory, non-media/external URLs and entries whose file
+  is already missing are returned unchanged — and its reverse is deliberately
+  `RunPython.noop`: a reverse rename could only guess the original slug, and a
+  half-renamed media volume is worse than a database one migration behind. Roll
+  a bad deploy back from a backup (`scripts/restore.sh`).
+- **Tests**: new `apps/cars/test_gallery_storage.py` covers the §7.2 matrix —
+  A (gallery save fails after the move → moved files deleted, row rolled back),
+  B (staging directory cannot be created → no row, no files),
+  C (second file of a batch fails → the first staged file is discarded too),
+  D (failed update → the previous gallery's file and URLs survive untouched) —
+  and `TestGalleryUuidMigration` in `apps/core/test_backfill_migrations.py`
+  pins the rename + URL rewrite, the untouched non-legacy entries (including a
+  missing file, which must not be invented or dropped) and idempotency.
+  `test_gallery_files_are_isolated_per_car` plus
+  `test_slug_rename_neither_moves_nor_invalidates_gallery_files` replace the old
+  slug-scheme pin, and `test_admin_create_with_gallery_files` asserts the new
+  path shape and that no staging directory survives a success.
+- **Known residual risk**: the `main_image` a failed create writes is still left
+  on disk (plain Django `FileField` behaviour, outside the gallery path); the
+  plan assigns orphan *files* to Phase 5's `cleanup_orphan_media` command
+  (dry-run by default).
+- **Validation (Docker, 2026-09-18)**: backend **330 passed / 98.59% cov**,
+  `manage.py check` clean, `makemigrations --check --dry-run` clean; frontend
+  untouched — 307/40 suites, `tsc --noEmit` clean, `next lint` clean, and the
+  public + CSP e2e specs 4/4 green against the local stack (`npx playwright
+  test e2e/public.spec.ts e2e/csp-audit.spec.ts`). `admin-auth.spec.ts` was not
+  run because it needs the seeded `e2e_admin` user (`e2e/README.md`).
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
@@ -1042,4 +1097,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-18 (Phase 2 monitoring + backup landed — backend 323 / frontend 307; monitoring/backup decisions in docs/adr/0008)*
+*Last updated: 2026-09-18 (Phase 3 gallery UUID storage landed — backend 330 / frontend 307; gallery decision implemented in docs/adr/0007, monitoring/backup in docs/adr/0008)*

@@ -1,6 +1,6 @@
 # ADR-0007: UUID-based gallery storage (supersedes the slug-based deferral)
 
-**Status:** Accepted — implementation pending (`IMPLEMENTATION_PLAN.md` Phase 3)
+**Status:** Accepted — implemented 2026-09-18 (`IMPLEMENTATION_PLAN.md` Phase 3)
 **Date:** 2026-09-16 · **Plan ref:** IMPLEMENTATION_PLAN §4 (Storage / correctness), §7.1, §7.2, §11
 
 ## Context
@@ -55,12 +55,24 @@ management command (Phase 5), which is the documented, accepted mitigation.
 
 - Gallery URLs survive slug changes; a soft-deleted car's slug being reused by a
   new car cannot repoint an existing URL.
-- `{slug}_gallery_{idx}` naming is legacy: the current code still uses it until
-  Phase 3 lands. Any doc that reads as current policy for the slug scheme is
-  superseded by this ADR (see `DEVELOPMENT.md` §3.9).
+- `{slug}_gallery_{idx}` naming is historical: Phase 3 replaced it, and
+  `cars/0009_gallery_uuid_paths` renames the files that already existed. Any doc
+  that reads as current policy for the slug scheme is superseded by this ADR
+  (see `DEVELOPMENT.md` §3.9).
 - Orphan-file cleanup becomes a real requirement rather than a hypothetical one;
   it lands with Phase 5.
-- The `test_distinct_active_cars_do_not_collide_gallery_files` pin describes the
-  old scheme's guarantee and is replaced by the migration's own tests in Phase 3.
+- The `test_distinct_active_cars_do_not_collide_gallery_files` pin described the
+  old scheme's guarantee and is replaced by
+  `test_gallery_files_are_isolated_per_car`,
+  `test_slug_rename_neither_moves_nor_invalidates_gallery_files`, the §7.2 Case
+  A–D matrix in `apps/cars/test_gallery_storage.py`, and the `0009` migration
+  tests in `apps/core/test_backfill_migrations.py`.
+- One implementation detail settles a question this ADR left open (it deferred
+  the failure-case matrix to the plan): the plan's §7.2 order — stage the files
+  *before* opening the transaction — is impossible here, because the destination
+  path contains the car's primary key. The row is therefore written first and the
+  staging write happens inside the transaction. A failing write leaves a row that
+  never commits rather than a transaction that never started, which preserves
+  every §7.2 guarantee.
 - Filesystem migrations are **not** equivalent to DB transactions — the data
   migration must handle disk state explicitly alongside the DB rewrite.
