@@ -1,5 +1,9 @@
+import os
+
+from django.conf import settings
 from rest_framework import serializers
 
+from apps.core.image_variants import variants_payload_for_url as _variants_for_url
 from apps.core.validators import ImageValidator
 from .models import HeroSlide, Redirect, SiteSettings, WhyFeature
 
@@ -46,9 +50,24 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
 
 
 class HeroSlideSerializer(serializers.ModelSerializer):
+    # Phase 4A, additive: None until the variant set exists on disk.
+    image_variants = serializers.SerializerMethodField()
+
+    def get_image_variants(self, obj):
+        return _variants_for_url(obj.image.url if obj.image else None)
+
     class Meta:
         model = HeroSlide
-        fields = ["id", "title", "image", "alt_text", "link", "is_active", "display_order"]
+        fields = [
+            "id",
+            "title",
+            "image",
+            "image_variants",
+            "alt_text",
+            "link",
+            "is_active",
+            "display_order",
+        ]
         extra_kwargs = {
             "image": {"validators": [ImageValidator()]},
         }

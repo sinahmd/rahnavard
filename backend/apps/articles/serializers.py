@@ -1,11 +1,21 @@
+import os
+
+from django.conf import settings
 from rest_framework import serializers
 
+from apps.core.image_variants import variants_payload_for_url as _variants_for_url
 from apps.core.validators import ImageValidator
 from .models import Article
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
     """Serializer for article list view."""
+
+    # Phase 4A, additive: None until the variant set exists on disk.
+    cover_image_variants = serializers.SerializerMethodField()
+
+    def get_cover_image_variants(self, obj):
+        return _variants_for_url(obj.cover_image.url if obj.cover_image else None)
 
     class Meta:
         model = Article
@@ -15,6 +25,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
             "slug",
             "excerpt",
             "cover_image",
+            "cover_image_variants",
             "published_at",
             "created_at",
         ]
@@ -22,6 +33,11 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
 class ArticleDetailSerializer(serializers.ModelSerializer):
     """Serializer for article detail view."""
+
+    cover_image_variants = serializers.SerializerMethodField()
+
+    def get_cover_image_variants(self, obj):
+        return _variants_for_url(obj.cover_image.url if obj.cover_image else None)
 
     class Meta:
         model = Article
@@ -32,6 +48,7 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
             "excerpt",
             "content",
             "cover_image",
+            "cover_image_variants",
             "is_published",
             "published_at",
             "seo_title",

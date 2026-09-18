@@ -5,11 +5,13 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.transaction import on_commit
 from rest_framework import serializers
 
+from apps.core.variant_pipeline import generate_for_urls
 from apps.core.validators import ImageValidator, PDFValidator
+from apps.core.image_variants import variants_payload_for_url as _variants_for_url
 from .models import Car
 
 
@@ -55,6 +57,15 @@ class GalleryWrite:
     def __init__(self, urls, created_paths=None):
         self.urls = urls
         self.created_paths = list(created_paths or [])
+
+    @property
+    def created_urls(self):
+        """MEDIA_URL URLs for the files this upload moved into place."""
+        media_root = os.path.join(settings.MEDIA_ROOT, "")
+        return [
+            f"{settings.MEDIA_URL}{os.path.relpath(path, media_root).replace(os.sep, '/')}"
+            for path in self.created_paths
+        ]
 
     def cleanup(self):
         _remove_files(self.created_paths)
@@ -160,6 +171,13 @@ class GalleryField(serializers.Field):
             shutil.rmtree(staging_dir, ignore_errors=True)
 
 
+# Phase 4A: variant generation for freshly uploaded gallery files. The URL
+# list is captured now; the work is deferred to on_commit so a rolled-back
+# transaction never triggers generation for files this request cleaned up.
+def _schedule_gallery_variants(urls):
+    on_commit(lambda: generate_for_urls(list(urls)))
+
+
 class CarListSerializer(serializers.ModelSerializer):
     """Serializer for car list view."""
 
@@ -170,6 +188,12 @@ class CarListSerializer(serializers.ModelSerializer):
     transmission_display = serializers.CharField(
         source="get_transmission_display", read_only=True
     )
+    # Phase 4A, additive: None unless the variant set exists on disk, so
+    # pre-regeneration responses are byte-identical to the pre-4A API.
+    main_image_variants = serializers.SerializerMethodField()
+
+    def get_main_image_variants(self, obj):
+        return _variants_for_url(obj.main_image.url if obj.main_image else None)
 
     class Meta:
         model = Car
@@ -188,6 +212,7 @@ class CarListSerializer(serializers.ModelSerializer):
             "body_type",
             "engine",
             "main_image",
+            "main_image_variants",
             "is_featured",
             "display_order",
             "created_at",
@@ -203,6 +228,17 @@ class CarDetailSerializer(serializers.ModelSerializer):
     transmission_display = serializers.CharField(
         source="get_transmission_display", read_only=True
     )
+    # Phase 4A, additive (see CarListSerializer note). `gallery_variants`
+    # mirrors the gallery list 1:1 — null entries where no variant set exists —
+    # so `gallery[i]` always corresponds to `gallery_variants[i]`.
+    main_image_variants = serializers.SerializerMethodField()
+    gallery_variants = serializers.SerializerMethodField()
+
+    def get_main_image_variants(self, obj):
+        return _variants_for_url(obj.main_image.url if obj.main_image else None)
+
+    def get_gallery_variants(self, obj):
+        return [_variants_for_url(url) for url in (obj.gallery or [])]
 
     class Meta:
         model = Car
@@ -221,7 +257,9 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "engine",
             "price",
             "main_image",
+            "main_image_variants",
             "gallery",
+            "gallery_variants",
             "manufacturer",
             "body_type",
             "color",
@@ -295,6 +333,7 @@ class CarAdminSerializer(serializers.ModelSerializer):
                     instance, raw_request.FILES, gallery_urls
                 )
                 self._commit_gallery(instance, write)
+                _schedule_gallery_variants(write.created_urls)
         return instance
 
     def update(self, instance, validated_data):
@@ -312,6 +351,7 @@ class CarAdminSerializer(serializers.ModelSerializer):
                     # applies when there is nothing to append to.
                     write.urls = gallery_data
                 self._commit_gallery(instance, write)
+                _schedule_gallery_variants(write.created_urls)
         return instance
 
     def _raw_request(self):
