@@ -13,6 +13,32 @@ from .models import HeroSlide, Redirect, SiteSettings, WhyFeature
 from .validators import ImageValidator
 
 
+@pytest.mark.parametrize("data,expected", [({}, False), ({"message": "error"}, False), ({"password": "private"}, True), ({"phone": "private"}, True), ({"token": "private"}, True), ({"secret": "private"}, True)])
+def test_sentry_sensitive_data_predicate(data, expected):
+    from config.settings import _contains_sensitive_data
+
+    assert _contains_sensitive_data({"request": {"data": data}}) is expected
+    assert _contains_sensitive_data({"message": "ordinary error"}) is False
+
+
+def test_sentry_callback_preserves_errors_without_private_context():
+    from config.settings import _sentry_before_send
+
+    assert _sentry_before_send({"request": {"data": {"password": "private"}}}, {}) is None
+    event = {
+        "message": "synthetic failure",
+        "request": {"data": "password=private", "headers": {"Cookie": "private"}},
+        "user": {"email": "private"},
+        "extra": {"phone": "private"},
+        "breadcrumbs": [{"message": "private"}],
+        "exception": {"values": [{"stacktrace": {"frames": [{"filename": "app.py", "vars": {"secret": "private"}}]}}]},
+    }
+    result = _sentry_before_send(event, {})
+    assert result["message"] == "synthetic failure"
+    assert "private" not in str(result)
+    assert result["exception"]["values"][0]["stacktrace"]["frames"][0] == {"filename": "app.py"}
+
+
 def _png_bytes(width=800, height=600):
     """Return a valid PNG image with the given dimensions."""
     img = Image.new('RGB', (width, height), 'white')

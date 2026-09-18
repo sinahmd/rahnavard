@@ -29,6 +29,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      - SENTRY_DSN=${SENTRY_BACKEND_DSN:-}
+      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - DEBUG=${DEBUG:-0}
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-rahnavard.co,www.rahnavard.co,backend,localhost,127.0.0.1}
@@ -54,6 +57,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
     depends_on:
       backend:
         condition: service_healthy
@@ -61,6 +68,9 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://rahnavard.co/api/v1}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://rahnavard.co}
       - BACKEND_INTERNAL_URL=http://backend:8000
+      - SENTRY_DSN=${SENTRY_FRONTEND_DSN:-}
+      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s

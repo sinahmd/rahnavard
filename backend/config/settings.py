@@ -242,6 +242,45 @@ REST_FRAMEWORK = {
     "NUM_PROXIES": 2,
 }
 
+def _contains_sensitive_data(event):
+    if "request" in event and "data" in event["request"]:
+        data = event["request"]["data"]
+        if isinstance(data, dict):
+            sensitive_keys = {"password", "phone", "token", "secret"}
+            if any(k in data for k in sensitive_keys):
+                return True
+    return False
+
+
+def _sentry_before_send(event, hint):
+    if _contains_sensitive_data(event):
+        return None
+    for key in ("request", "user", "breadcrumbs", "extra"):
+        event.pop(key, None)
+    for exception in event.get("exception", {}).get("values", []):
+        for frame in exception.get("stacktrace", {}).get("frames", []):
+            frame.pop("vars", None)
+    return event
+
+
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=0,
+        send_default_pii=False,
+        include_local_variables=False,
+        max_request_body_size="never",
+        release=env("SENTRY_RELEASE", default="") or None,
+        environment=env("SENTRY_ENVIRONMENT", default="production"),
+        before_send=_sentry_before_send,
+        before_breadcrumb=lambda breadcrumb, hint: None,
+    )
+
 
 # Security Settings for Production
 if not DEBUG:

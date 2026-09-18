@@ -25,6 +25,12 @@ services:
       # so an old image cannot bake a wrong (cross-origin) value.
       - NEXT_PUBLIC_API_URL=/api/v1
       - BACKEND_INTERNAL_URL=http://backend:8000
+      - SENTRY_DSN=${SENTRY_FRONTEND_DSN:-}
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN:-}
+      - SENTRY_RELEASE=${SENTRY_RELEASE:-local}
+      - NEXT_PUBLIC_SENTRY_RELEASE=${SENTRY_RELEASE:-local}
+      - SENTRY_ENVIRONMENT=development
+      - NEXT_PUBLIC_SENTRY_ENVIRONMENT=development
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -40,6 +46,9 @@ services:
     depends_on:
       - postgres
     environment:
+      - SENTRY_DSN=${SENTRY_BACKEND_DSN:-}
+      - SENTRY_RELEASE=${SENTRY_RELEASE:-local}
+      - SENTRY_ENVIRONMENT=development
       - DEBUG=1
       - SECRET_KEY=dev-secret-key-change-in-production
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { captureException } from '@sentry/nextjs'
 
 /**
  * Public (site) route-group error boundary. Client error ↔ server retry:
@@ -17,8 +18,7 @@ export default function SiteError({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log the error for diagnostics; the public page shows a friendly message.
-    console.error(error)
+    captureException(error)
   }, [error])
 
   return (
