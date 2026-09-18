@@ -50,6 +50,13 @@ flowchart LR
 - **Health-gated rolling deploys:** explicit migrate → backend rolling
   restart → backend health gate → frontend → nginx bounced last →
   end-to-end health check through nginx. Any gate fails the deploy loudly.
+- **Error monitoring and backups:** Sentry captures Django and Next.js
+  errors through a same-origin `/monitoring-tunnel` — so the enforced CSP's
+  `connect-src 'self'` stays untouched — with request/user context scrubbed,
+  and UptimeRobot watches API availability. DB + media backups run from a
+  committed cron template as checksum-verified, versioned sets
+  ([ADR-0008](docs/adr/0008-monitoring-and-backup.md),
+  [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)).
 - **Data safety:** soft deletes with restore endpoints across all models,
   conditional slug-uniqueness constraints, database indexes for listing
   queries, and GDPR-driven removal of stored IP/user-agent from inquiries.
@@ -60,7 +67,7 @@ flowchart LR
   support for autoplay/animations.
 - **Self-hosted fonts:** Vazirmatn + Poppins committed as woff2 via
   `next/font/local` — zero third-party font requests.
-- **Baseline:** `/` ships ~107 kB first-load JS; the 302-test frontend
+- **Baseline:** `/` ships ~107 kB first-load JS; the 307-test frontend
   suite runs clean (no `act()` or console warnings).
 
 ## Quickstart
@@ -91,8 +98,8 @@ relative API URLs in both environments.
 
 | Suite | Command | What it covers |
 |-------|---------|----------------|
-| Frontend (Jest) | `cd frontend && npm test` | 302 unit/integration tests, clean console |
-| Backend (pytest) | `docker compose exec backend pytest` | 283 tests, ~98% coverage, Postgres-backed |
+| Frontend (Jest) | `cd frontend && npm test` | 307 unit/integration tests, clean console |
+| Backend (pytest) | `docker compose exec backend pytest` | 323 tests, ~98.5% coverage, Postgres-backed |
 | E2E (Playwright) | `cd frontend && npx playwright test` | Public SSR, CSP violation audit, admin login/session/CSRF matrix — runs against the local Docker stack ([guide](frontend/e2e/README.md)) |
 
 CI runs lint + typecheck + frontend tests + backend tests (with a Postgres
@@ -154,6 +161,7 @@ Copy `.env.example` → `.env` and adjust. Key variables:
 | `DATABASE_URL` | backend | `postgres://user:password@postgres:5432/rahnavard` |
 | `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` | backend | `https://rahnavard.co` |
 | `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_API_URL` | frontend | `https://rahnavard.co` / `/api/v1` |
+| `SENTRY_BACKEND_DSN` / `SENTRY_FRONTEND_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | backend + frontend | Sentry DSNs — empty disables error reporting ([ADR-0008](docs/adr/0008-monitoring-and-backup.md)) |
 
 ## Architecture decisions
 
@@ -165,6 +173,8 @@ Copy `.env.example` → `.env` and adjust. Key variables:
 | [0004](docs/adr/0004-server-rendered-public-pages-url-single-source.md) | Server-rendered public pages; URL as the single source of truth |
 | [0005](docs/adr/0005-no-new-client-dependencies.md) | No new client dependencies (state, forms, validation, codegen) |
 | [0006](docs/adr/0006-infra-hardening-local-only-guard-csp-deploy.md) | Infra hardening: local-only guard, CSP rollout, health-gated deploys |
+| [0007](docs/adr/0007-uuid-gallery-storage.md) | UUID-based gallery storage (supersedes the slug-based deferral) |
+| [0008](docs/adr/0008-monitoring-and-backup.md) | Sentry error monitoring and automated, verified backups |
 
 ## Roadmap
 

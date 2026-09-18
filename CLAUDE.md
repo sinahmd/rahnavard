@@ -22,7 +22,7 @@ venv/node_modules, unless the owner says otherwise.
 ```bash
 # Backend — the dev image now installs requirements-dev.txt (pytest included)
 # at build time, so a rebuilt backend image runs tests directly:
-docker compose exec -T backend python -m pytest -q          # 282 passed, 98.32% cov (2026-09-05)
+docker compose exec -T backend python -m pytest -q          # 323 passed, 98.54% cov (2026-09-18)
 docker compose exec -T backend python manage.py check
 docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # pytest uses config.test_settings → SQLite :memory: (no Postgres needed for tests)
@@ -31,7 +31,7 @@ docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # The LOCAL dev frontend/Dockerfile uses the China npm mirror
 # (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
 # Iran — so `docker compose up --build` works locally.
-docker compose exec -T frontend npm test -- --runInBand      # 302 passed, 40 suites, zero act/console warnings (2026-09-05)
+docker compose exec -T frontend npm test -- --runInBand      # 307 passed, 40 suites, zero act/console warnings (2026-09-18)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -39,8 +39,8 @@ docker compose exec -T frontend npm run lint
 docker compose run --rm --no-deps frontend npm run build
 ```
 
-Verified green inside Docker on 2026-09-05 (backend **282 passed** / 98.32%
-cov, frontend **302 passed**, tsc clean, **lint fully clean** — fonts are
+Verified green inside Docker on 2026-09-18 (backend **323 passed** / 98.54%
+cov, frontend **307 passed**, tsc clean, **lint fully clean** — fonts are
 self-hosted via `next/font/local` (frontend/lib/fonts.ts), so the old Google
 Fonts `<link>` warning is gone. Never switch to `next/font/google`: prod
 images are built on a server where Google Fonts is blocked, see plan §J —

@@ -212,6 +212,12 @@ Never use `next/font/google` (prod image builds run where Google Fonts is
 blocked; local files only). Backend tests need no Postgres; frontend needs
 no API server.
 
+Re-verified 2026-09-18 after Phase 1 (security hardening) and Phase 2
+(monitoring + backup): backend **323 passed / 98.54% cov**, frontend
+**307 passed / 40 suites**, `tsc` clean, `lint` clean, `next build` green. The
+2026-09-05 numbers above stay as the record of that run — the current cycle's
+status is §3.12.
+
 ### 3.7 Phase 3 — server/client boundary + route architecture (status)
 
 Phase 3 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §7).
@@ -345,18 +351,20 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
     (new files were named `{slug}_gallery_{idx}` with the counter
     restarting at 0) — the counter now continues past the existing gallery
     (pinned by the extended append test).
-  - **Accepted/deferred technical debt — slug-based gallery filenames**: gallery
-    files are named `{slug}_gallery_{idx}`. This is safe for current public
-    media requirements: each active car has a unique slug (partial unique
-    index), filenames are readable/stable, and public images do not require
-    unpredictable URLs. Changing to UUID-based immutable paths
-    (`cars/{car_id}/gallery/{uuid}.webp`) would need a storage migration,
-    a URL/backward-compatibility plan, and orphan-file cleanup — deferred.
-    One future edge case: slug reuse after soft deletion or slug changes;
-    if that becomes common, move to the immutable identifier above. The
-    no-collision guarantee is pinned by
-    `test_distinct_active_cars_do_not_collide_gallery_files` (two active
-    cars uploading `gallery_0..N` produce four distinct files).
+  - **slug-based gallery filenames — DECISION SUPERSEDED (2026-09-16)**:
+    gallery files are named `{slug}_gallery_{idx}`. This was accepted as
+    deferred debt on 2026-09-05 (a unique active slug made collisions
+    impossible; readable, stable public URLs). The pre-launch cycle then
+    approved **UUID-based immutable paths** (`cars/{car_id}/gallery/{uuid}{ext}`)
+    in `IMPLEMENTATION_PLAN.md` §4/§7.1 — the rationale and the rejected
+    alternatives now live in `docs/adr/0007-uuid-gallery-storage.md`.
+    **The shipped code still implements the slug scheme**: that migration is
+    Phase 3 of `IMPLEMENTATION_PLAN.md` and has NOT landed. Before
+    implementing it, re-read `GalleryField.save_gallery_files` and re-verify
+    the §7.2 filesystem/DB design (§12.6). The old scheme's no-collision
+    guarantee stays pinned by
+    `test_distinct_active_cars_do_not_collide_gallery_files` until the
+    migration replaces it and its own tests supersede that pin.
   - **Axe spot checks** (headless Chrome + axe-core over the hydrated
     public pages) found: unlabeled filter selects (critical) → aria-labels
     added; footer `tel:` link empty when phone unset (serious) → rendered
@@ -465,6 +473,98 @@ The owner approved the plan on 2026-09-05; the cutover commits are on
   stack (§3.6 matrix + CSP audit); curl: login response keys == `['user']`;
   repo grep: zero runtime `TokenAuthentication`/`authtoken`/`admin_token`
   references (comments and the purge constant only).
+
+### 3.12 Pre-launch hardening — Phase 1 (security) + Phase 2 (monitoring + backup) (status)
+
+`IMPLEMENTATION_PLAN.md` is the authoritative plan for this cycle. Per its §12
+execution contract each phase is implemented and stopped on its own: Phase 1 and
+Phase 2 are done, **Phases 3–9 are NOT started**. Phase 3 (gallery UUID storage)
+is next, and its filesystem/DB design must be re-verified against the code
+before any edit (§12.6) — the shipped gallery code is still slug-based.
+
+**Phase 1 — security hardening** (committed `5888307`)
+
+- **Login brute-force protection**: `/api/v1/auth/login/` mounts
+  `ScopedRateThrottle` with scope `login` at `5/minute` per IP
+  (`REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`). The scope is assigned to
+  `login_view.view_class`, **not** to the wrapper function: DRF's `api_view`
+  does not copy `throttle_scope` onto the generated view class and
+  `ScopedRateThrottle` reads it from the view instance, so a function-level
+  assignment silently never engages. Pinned by
+  `test_throttle_scope_is_set_on_the_view_class`.
+- **Shared throttle counters**: `CACHES["default"]` is a `FileBasedCache` at
+  `CACHE_DIR` (`/var/cache/rahnavard`) instead of per-process LocMemCache —
+  gunicorn runs `--workers 2`, so two independent counters delivered roughly
+  double the configured login rate and a worker recycle silently reset it.
+  `CACHE_DIR` must stay outside `/app` (the dev bind-mount) and outside
+  `MEDIA_ROOT` (nginx serves that tree publicly, and throttle keys are client
+  IPs). Two tests pin the backend and the shared-budget behavior.
+- **Upload validation** (`apps/core/validators.py`): `ImageValidator` now checks
+  **magic bytes** (JPEG `FF D8 FF`, PNG, WebP `RIFF` + `WEBP`) and
+  **dimensions** (min 800×600, max 4000×3000, aspect ≤ 3:1) on top of the
+  existing size, extension and MIME checks. A new `PDFValidator` (size, `.pdf`,
+  `%PDF-` signature) is mounted on `Car.catalog_file`, which previously had only
+  an extension check.
+- **Two deliberate deviations from the plan's blanket dimension floor**, both to
+  avoid rejecting legitimate assets: `SiteSettings.logo` uses
+  `ImageValidator(min_width=200, min_height=60)` because the site's own shipped
+  wordmark is 727×340, and `WhyFeature.icon` uses
+  `ImageValidator(check_dimensions=False)` because icons are legitimately small.
+  Size/extension/MIME/magic-bytes/max-dimension checks are unchanged for both.
+- **Test configuration**: `config.test_settings` raises the login rate to
+  `1000/minute` and switches to LocMemCache so the auth suite neither trips the
+  real throttle nor writes cache files into the test container;
+  `TestLoginThrottling` tightens the rate to `5/minute` itself and clears the
+  cache, mirroring the inquiries pattern.
+
+**Phase 2 — monitoring + backup** (landed 2026-09-18)
+
+- **Sentry, both tiers, opt-in**: `sentry-sdk[django]` (backend) and
+  `@sentry/nextjs` (frontend). An empty DSN means the SDK is never initialised,
+  so a clone or a build without DSNs behaves exactly as before. Decisions and
+  rejected alternatives: docs/adr/0008.
+  - Backend scrubbing in `settings.py`: `send_default_pii=False`,
+    `include_local_variables=False`, `max_request_body_size="never"`,
+    breadcrumbs disabled, and a `before_send` that drops `request`/`user`/
+    `breadcrumbs`/`extra` plus stack-frame `vars` — and drops the whole event
+    when the request payload carries a password/phone/token/secret key.
+  - Frontend mirrors it in `frontend/lib/sentry.ts` (`scrubSentryEvent`), wired
+    through `sentry.client.config.ts` / `sentry.server.config.ts` +
+    `instrumentation.ts` (nodejs), and reported from `app/global-error.tsx` and
+    `app/(site)/error.tsx` (which replaced a bare `console.error`).
+  - Browser envelopes use the SDK's same-origin `/monitoring-tunnel` rewrite, so
+    the enforced CSP keeps `connect-src 'self'` instead of being widened.
+    Confirmed on a real production build: with a DSN present the rewrite appears
+    in `routes-manifest.json` and the DSN + release SHA are baked into the
+    client chunks; without one, no tunnel is added and the build stays green.
+  - `SENTRY_RELEASE` is the checked-out git SHA, exported by `deploy.yml` and
+    `scripts/quick-deploy.sh`. It is embedded in the browser bundle, so changing
+    it needs an image rebuild — `quick-deploy.sh --no-build` cannot update it.
+  - `sentry.edge.config.ts` does not exist: nothing runs on the edge runtime
+    today. Add one if a route ever opts into it, or edge errors go unreported.
+- **Uptime**: UptimeRobot HTTP monitor on `/api/v1/settings/` (5-minute
+  interval, email alert). Manual activation; the monitor proves the API answers,
+  not that the frontend renders.
+- **Backup**: `scripts/backup.sh` / `scripts/restore.sh` rewritten — staging
+  directory, integrity proofs (`gzip -t`, `tar -tzf`), `sha256sum` manifest +
+  `rahnavard-backup-v1` `COMPLETE` marker, atomic rename into place, 30-day
+  retention limited to intact versioned sets, offsite upload published only
+  after remote checksum verification, DB credentials resolved inside the
+  postgres container, and one `flock` shared with restore so the two can never
+  overlap. `scripts/rahnavard-backup.cron` is a **template that nothing
+  installs**; `scripts/test_backup.py` exercises both scripts against stubbed
+  `docker`/`ssh`/`rsync` (Linux only — no real stack, remote host or user data).
+  Operational steps: DEPLOYMENT_GUIDE.md §Backup and Restore.
+- **Validation (Docker, 2026-09-18)**: backend **323 passed / 98.54% cov**,
+  `manage.py check` clean, `makemigrations --check --dry-run` clean; frontend
+  **307 passed / 40 suites**, `tsc --noEmit` clean, `next lint` clean,
+  `next build` green with and without a DSN. The frontend checks ran in a
+  throwaway `docker compose run` container with `npm ci`, because the built dev
+  image predates the `@sentry/nextjs` dependency.
+- **Still owner-side (not code)**: DSNs are not set in production, the
+  UptimeRobot monitor is not created, and the backup cron is not installed.
+  No ADR exists yet for the image pipeline (Phase 4A); gallery storage has
+  docs/adr/0007 but the code still implements the slug scheme.
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
@@ -942,4 +1042,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (CSP ENFORCED + Phase 2 cutover complete: session-only auth, admin_token purged; backend 282 / frontend 302 + 13 e2e)*
+*Last updated: 2026-09-18 (Phase 2 monitoring + backup landed — backend 323 / frontend 307; monitoring/backup decisions in docs/adr/0008)*
