@@ -29,6 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    // Phase 5: per-page canonical (plan §4 SEO/UX; listing pages keep the root canonical).
+    alternates: { canonical: `${siteUrl}/cars/${params.slug}` },
     openGraph: {
       title,
       description,

@@ -162,6 +162,17 @@ export default function ArticlesExplorer({
   return (
     <main id="main-content" className="pt-28 pb-20">
       <div className="wrap">
+        {/* Breadcrumb (Phase 5) — same pattern as the detail pages */}
+        <nav className="mb-8 text-sm" aria-label="breadcrumb">
+          <ol className="flex items-center gap-2 text-gray">
+            <li>
+              <Link href="/" className="hover:text-accent-dark transition-colors">خانه</Link>
+            </li>
+            <li className="text-gray-300">/</li>
+            <li className="text-dark font-medium">مقالات</li>
+          </ol>
+        </nav>
+
         {/* Page Header */}
         <div className="mb-8">
           <span className="eyebrow">اخبار</span>
