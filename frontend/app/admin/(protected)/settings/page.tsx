@@ -38,7 +38,6 @@ const defaultSettings: SiteSettings = {
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings)
   const [logoFile, setLogoFile] = useState<File | null>(null)
-  const [whyBackgroundFile, setWhyBackgroundFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -94,11 +93,14 @@ export default function AdminSettingsPage() {
 
     const submitData = new FormData()
 
-    // Append all text fields (image fields are excluded: a stored media URL
-    // is not a valid upload, and the variants object is a read-only extra)
+    // Append all text fields. Excluded keys: image fields (a stored media
+    // URL is not a valid upload; variants are a read-only extra) and the
+    // Why-section fields (owned by the dedicated /admin/why-rahnavard tab).
     Object.entries(settings).forEach(([key, value]) => {
       if (
         key !== 'logo' &&
+        key !== 'why_title' &&
+        key !== 'why_description' &&
         key !== 'why_background' &&
         key !== 'why_background_variants' &&
         value !== null &&
@@ -113,16 +115,10 @@ export default function AdminSettingsPage() {
       submitData.append('logo', logoFile)
     }
 
-    // Append Why-section background file if changed
-    if (whyBackgroundFile) {
-      submitData.append('why_background', whyBackgroundFile)
-    }
-
     try {
       const data = await updateSiteSettings(submitData)
       setSettings(data)
       setLogoFile(null)
-      setWhyBackgroundFile(null)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
@@ -236,23 +232,6 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* Why section background */}
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-bold">پس‌زمینه بخش «چرا ما»</h2>
-          </div>
-          <div className="p-6">
-            <ImageUpload
-              name="why_background"
-              label="تصویر پس‌زمینه بخش چرا ما"
-              value={whyBackgroundFile}
-              onChange={setWhyBackgroundFile}
-              existingUrl={settings.why_background}
-              helpText="فرمت‌های مجاز: jpg، png، webp — حداکثر 5MB — حداقل ابعاد 800×600"
-            />
-          </div>
-        </div>
-
         {/* Social Links */}
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="p-4 border-b">
@@ -348,24 +327,6 @@ export default function AdminSettingsPage() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold mb-2">عنوان بخش «چرا ما»</label>
-                <input
-                  type="text"
-                  value={settings.why_title}
-                  onChange={(e) => handleChange('why_title', e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold mb-2">توضیحات بخش «چرا ما»</label>
-                <textarea
-                  value={settings.why_description}
-                  onChange={(e) => handleChange('why_description', e.target.value)}
-                  rows={3}
-                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-bold mb-2">عنوان بخش خودروها</label>
                 <input
