@@ -40,6 +40,17 @@ describe('getSiteSettings', () => {
     expect(settings.default_og_image).toBeNull()
   })
 
+  it('normalizes the why background media URL', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ why_background: 'http://backend:8000/media/why/bg.jpg' })
+    )
+
+    const settings = await getSiteSettings()
+
+    expect(settings.why_background).toBe('/media/why/bg.jpg')
+    expect(settings.why_background_variants).toBeNull()
+  })
+
   it('returns defaults when the endpoint is unreachable (never throws)', async () => {
     mockFetch.mockRejectedValueOnce(new Error('network down'))
 

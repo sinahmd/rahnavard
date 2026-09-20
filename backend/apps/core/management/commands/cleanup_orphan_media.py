@@ -117,7 +117,7 @@ def _referenced_paths():
 
     site = SiteSettings.objects.filter(pk=1).first()
     if site is not None:
-        for field_file in (site.logo, site.default_og_image):
+        for field_file in (site.logo, site.default_og_image, site.why_background):
             relative = _field_relative(field_file)
             if relative:
                 referenced.add(relative)

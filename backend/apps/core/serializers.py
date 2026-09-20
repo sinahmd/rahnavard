@@ -9,6 +9,12 @@ from .models import HeroSlide, Redirect, SiteSettings, WhyFeature
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
+    # Additive (Phase 4A mechanics): None until the variant set exists on disk.
+    why_background_variants = serializers.SerializerMethodField()
+
+    def get_why_background_variants(self, obj):
+        return _variants_for_url(obj.why_background.url if obj.why_background else None)
+
     class Meta:
         model = SiteSettings
         fields = [
@@ -26,6 +32,8 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             "hero_cta_secondary_link",
             "why_title",
             "why_description",
+            "why_background",
+            "why_background_variants",
             "cars_section_title",
             "cars_section_description",
             "articles_section_title",
@@ -46,6 +54,9 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             # stays identical to the default profile.
             "logo": {"validators": [ImageValidator(min_width=200, min_height=60)]},
             "default_og_image": {"validators": [ImageValidator()]},
+            # Section background is a real content photograph — the full
+            # content-image profile (min 800×600), not a branding profile.
+            "why_background": {"validators": [ImageValidator()]},
         }
 
 

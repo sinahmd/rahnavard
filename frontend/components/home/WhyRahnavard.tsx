@@ -35,11 +35,29 @@ export default function WhyRahnavard({
 
   return (
     <section id="why" ref={sectionRef} className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white py-20">
-      <div className="absolute inset-0 opacity-5 z-[1]">
+      {settings.why_background ? (
+        <>
+          {/* Managed background (SiteSettings.why_background): decorative —
+              empty alt keeps it out of the a11y tree; the lg WebP tier and
+              LQIP blur come from the Phase 4A pipeline via OptimizedImage. */}
+          <OptimizedImage
+            src={settings.why_background}
+            variants={settings.why_background_variants}
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+          {/* Readability wash: dark Persian text keeps AA contrast over the photo. */}
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-white/85 via-white/70 to-white/85" />
+        </>
+      ) : (
+        <div className="absolute inset-0 opacity-5 z-[1]">
         <svg className="w-full h-full" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
           <path fill="currentColor" d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,79.6,-45.8C87.4,-32.5,90,-16.3,88.4,-0.9C86.8,14.4,81,28.9,72.4,41.2C63.8,53.5,52.4,63.7,39.4,71.1C26.4,78.5,11.8,83.2,-2.4,87C-16.5,90.8,-30.2,93.7,-42.5,89.1C-54.8,84.5,-65.7,72.4,-73.4,59C-81.1,45.6,-85.6,30.9,-87.2,16.1C-88.8,1.3,-87.5,-13.6,-82.1,-27.1C-76.7,-40.5,-67.2,-52.5,-55.3,-61.1C-43.4,-69.7,-29.1,-74.9,-14.7,-78.7C-0.3,-82.5,14.3,-84.9,28.1,-83.3C41.9,-81.7,54.9,-76.1,44.7,-76.4Z" transform="translate(100 100)" />
         </svg>
-      </div>
+        </div>
+      )}
 
       <div className="relative z-[2] text-center max-w-[900px] mx-auto px-8">
         <h2 className="text-[42px] font-black text-dark mb-7 opacity-0 scale-95 animate-fade-in-up">

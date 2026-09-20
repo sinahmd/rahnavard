@@ -36,7 +36,7 @@ from apps.core.image_variants import (
     generate_variants,
     source_has_variants,
 )
-from apps.core.models import HeroSlide
+from apps.core.models import HeroSlide, SiteSettings
 
 # (label, queryset-provider, image attribute) — providers are callables so
 # the import-time querysets stay lazy (management commands may run before
@@ -45,6 +45,7 @@ SOURCES = [
     ("car.main_image", lambda: Car.objects.with_deleted(), "main_image"),
     ("article.cover_image", lambda: Article.objects.with_deleted(), "cover_image"),
     ("hero.image", lambda: HeroSlide.objects.all(), "image"),
+    ("settings.why_background", lambda: SiteSettings.objects.all(), "why_background"),
     # Gallery files bypass ImageField and signals; their URLs live in the
     # JSONField and must be walked separately.
     ("car.gallery", lambda: Car.objects.with_deleted(), "gallery"),

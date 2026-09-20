@@ -21,6 +21,8 @@ const defaultSettings: SiteSettings = {
   hero_cta_secondary_link: '',
   why_title: '',
   why_description: '',
+  why_background: null,
+  why_background_variants: null,
   cars_section_title: '',
   cars_section_description: '',
   articles_section_title: '',
@@ -36,6 +38,7 @@ const defaultSettings: SiteSettings = {
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings)
   const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [whyBackgroundFile, setWhyBackgroundFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -91,9 +94,16 @@ export default function AdminSettingsPage() {
 
     const submitData = new FormData()
 
-    // Append all text fields
+    // Append all text fields (image fields are excluded: a stored media URL
+    // is not a valid upload, and the variants object is a read-only extra)
     Object.entries(settings).forEach(([key, value]) => {
-      if (key !== 'logo' && value !== null && value !== undefined) {
+      if (
+        key !== 'logo' &&
+        key !== 'why_background' &&
+        key !== 'why_background_variants' &&
+        value !== null &&
+        value !== undefined
+      ) {
         submitData.append(key, String(value))
       }
     })
@@ -103,10 +113,16 @@ export default function AdminSettingsPage() {
       submitData.append('logo', logoFile)
     }
 
+    // Append Why-section background file if changed
+    if (whyBackgroundFile) {
+      submitData.append('why_background', whyBackgroundFile)
+    }
+
     try {
       const data = await updateSiteSettings(submitData)
       setSettings(data)
       setLogoFile(null)
+      setWhyBackgroundFile(null)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
@@ -216,6 +232,23 @@ export default function AdminSettingsPage() {
               onChange={setLogoFile}
               existingUrl={settings.logo}
               helpText="فرمت‌های مجاز: jpg، png، webp — حداکثر 5MB"
+            />
+          </div>
+        </div>
+
+        {/* Why section background */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-bold">پس‌زمینه بخش «چرا ما»</h2>
+          </div>
+          <div className="p-6">
+            <ImageUpload
+              name="why_background"
+              label="تصویر پس‌زمینه بخش چرا ما"
+              value={whyBackgroundFile}
+              onChange={setWhyBackgroundFile}
+              existingUrl={settings.why_background}
+              helpText="فرمت‌های مجاز: jpg، png، webp — حداکثر 5MB — حداقل ابعاد 800×600"
             />
           </div>
         </div>
