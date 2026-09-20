@@ -52,6 +52,12 @@ build/
 
 # Temp files
 ubuntu@ubuntu---1-vcpu---1-gb-ram~$.txt
+# Scratch artifacts from local agent/tooling runs (tmp-*.pdf/.png/.mjs,
+# .tmp-* curl cookie jars). Matches at any depth. Note: the two committed
+# e2e/tmp-*.spec.ts specs predate this rule and stay tracked pending the
+# owner's fold-or-delete decision — gitignore never affects tracked files.
+tmp-*
+.tmp-*
 
 # Secrets - CRITICAL
 *.key
