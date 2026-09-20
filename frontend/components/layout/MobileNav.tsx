@@ -12,9 +12,10 @@ interface MobileNavProps {
 
 export default function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
   const panelRef = useRef<HTMLElement>(null)
-  // Focus first link on open, trap Tab, close on Escape, return focus to the
-  // hamburger on close (workstream I). The panel also leaves the tab order
-  // while closed so off-screen links are never focusable.
+  // Focus the close button (first focusable in the panel) on open, trap Tab,
+  // close on Escape, return focus to the hamburger on close (workstream I).
+  // The panel also leaves the tab order while closed so off-screen links are
+  // never focusable.
   useModalA11y({ isOpen, onClose, containerRef: panelRef })
 
   return (
@@ -38,6 +39,22 @@ export default function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
         }`}
       >
         <div className="pt-24 px-7 pb-7">
+          {/* Explicit close control (UX-4): the open panel covers the header
+              toggle and the focus trap excludes it, so the drawer needs its
+              own visible, labeled, pointer-reachable close button. Placed
+              first so useModalA11y's initial focus lands on it. */}
+          <div className="mb-9 flex">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="بستن منو"
+              className="w-10 h-10 -mr-2 flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <ul className="flex flex-col gap-[22px]">
             {links.map((link) => (
               <li key={link.href}>

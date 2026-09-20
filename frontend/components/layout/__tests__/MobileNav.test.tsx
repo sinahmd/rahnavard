@@ -86,9 +86,36 @@ describe('MobileNav', () => {
 
   // ── Keyboard / focus behavior (plan §6.I) ────────────────────────────
 
-  it('should move focus to the first link when opened', () => {
+  it('should move focus to the close button when opened (first focusable)', () => {
     render(<MobileNav isOpen={true} onClose={jest.fn()} links={mockLinks} />)
-    expect(screen.getByRole('link', { name: 'خانه' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'بستن منو' })).toHaveFocus()
+  })
+
+  // ── Close button (plan Phase 7 / UX-4) ──────────────────────────────
+
+  it('should render a visible close button inside the panel when open', () => {
+    render(<MobileNav isOpen={true} onClose={jest.fn()} links={mockLinks} />)
+    const close = screen.getByRole('button', { name: 'بستن منو' })
+    expect(close).toBeInTheDocument()
+  })
+
+  it('should not render the close button when closed', () => {
+    render(<MobileNav isOpen={false} onClose={jest.fn()} links={mockLinks} />)
+    expect(screen.queryByRole('button', { name: 'بستن منو' })).not.toBeInTheDocument()
+  })
+
+  it('should call onClose when the close button is clicked', () => {
+    const onClose = jest.fn()
+    render(<MobileNav isOpen={true} onClose={onClose} links={mockLinks} />)
+    fireEvent.click(screen.getByRole('button', { name: 'بستن منو' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('should keep the close button first in the panel tab order', () => {
+    render(<MobileNav isOpen={true} onClose={jest.fn()} links={mockLinks} />)
+    const nav = screen.getByRole('navigation', { name: 'منوی ناوبری' })
+    const focusables = nav.querySelectorAll('button, a')
+    expect(focusables[0]).toBe(screen.getByRole('button', { name: 'بستن منو' }))
   })
 
   it('should close on Escape', () => {
@@ -100,16 +127,16 @@ describe('MobileNav', () => {
 
   it('should trap Tab focus inside the panel', () => {
     render(<MobileNav isOpen={true} onClose={jest.fn()} links={mockLinks} />)
-    const first = screen.getByRole('link', { name: 'خانه' })
+    const close = screen.getByRole('button', { name: 'بستن منو' })
     const last = screen.getByRole('link', { name: 'مقالات' })
 
-    // Tab from the last link wraps to the first.
+    // Tab from the last link wraps to the first focusable (the close button).
     last.focus()
     fireEvent.keyDown(document, { key: 'Tab' })
-    expect(first).toHaveFocus()
+    expect(close).toHaveFocus()
 
-    // Shift+Tab from the first wraps to the last.
-    first.focus()
+    // Shift+Tab from the first focusable wraps to the last link.
+    close.focus()
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
     expect(last).toHaveFocus()
   })
