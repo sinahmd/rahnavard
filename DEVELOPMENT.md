@@ -474,12 +474,62 @@ The owner approved the plan on 2026-09-05; the cutover commits are on
   repo grep: zero runtime `TokenAuthentication`/`authtoken`/`admin_token`
   references (comments and the purge constant only).
 
-### 3.12 Pre-launch hardening — Phases 1–4A (security, monitoring/backup, gallery storage, image variants) (status)
+### 3.12 Pre-launch hardening — Phases 1–5 (security, monitoring/backup, gallery storage, image variants, UX/SEO + orphan cleanup) (status)
 
 `IMPLEMENTATION_PLAN.md` is the authoritative plan for this cycle. Per its §12
 execution contract each phase is implemented and stopped on its own: Phases 1,
-2, 3 and 4A are done, **Phases 4B–9 are NOT started**. Phase 4B (frontend
-image delivery) is next and consumes 4A's additive variant fields.
+2, 3, 4A, 4B and 5 are done; **Phase 6 implemented (committed 2026-09-20, pending
+browser-matrix run + tmp-file cleanup), Phases 7–9 implemented (committed 2026-09-20)**.
+Note: §3.12's per-phase records below kept their original section text; the
+status line above is the live phase tracker.
+
+**Phase 7 — mobile menu close control** (UX-4, implemented 2026-09-20,
+committed 2026-09-20)
+
+- `MobileNav.tsx`: explicit close button in the panel's top row
+  (`aria-label="بستن منو"`), first in the tab order so `useModalA11y`'s
+  initial focus lands on it; hamburger morph, trap, Escape and focus-return
+  untouched. Two existing pins updated deliberately (initial focus target;
+  Tab-wrap-to-first-focusable). 4 new tests.
+
+**Phase 8 — hero slider touch interaction** (UX-3, implemented 2026-09-20,
+committed 2026-09-20)
+
+- `HeroSlider.tsx` gesture logic only: direction lock with a 1.2 slope
+  hysteresis margin (matches the browser's own pan-commit decision), drag
+  offset now accumulates even on non-cancelable moves (a swipe that lost the
+  slope race still completes its transition), and `preventDefault` guarded by
+  `e.cancelable` — zero `[Intervention]` warnings.
+- Tests: 6 new unit tests with synthetic cancelable/non-cancelable touch
+  streams; plus a mobile-emulation e2e spec (`e2e/tmp-hero-swipe.spec.ts`,
+  CDP real-touch input) asserting swipe completion, native vertical scroll,
+  and zero Intervention logs — **temporary, to be folded into the permanent
+  e2e set or deleted with the Phase 6 tmp spec per owner decision**.
+- Known pre-existing quirk (documented, not changed): the edge rubber-band
+  rule keeps right-swipes from the first slide below the 50px threshold
+  (max effective drag 120×0.3=36), so right-swipe=next never fires from
+  slide 1; left-swipe=prev (wraps) works. Fixing this is a behavior change
+  outside Phase 8's scope.
+
+**Phase 9 — Persian typography + digit display layer** (UX-2 + UX-5,
+implemented 2026-09-20, committed 2026-09-20)
+
+- New `lib/format/persianDigits.ts`: `toPersianDigits` (display sites) +
+  `toLatinDigits` (centralizes Footer's inline Persian→Latin `tel:`
+  inversion, now also used by Branches). 11 helper unit tests.
+- Display sites: Footer + Branches phone numbers (Persian text, Latin
+  `tel:`), CarFilters/ActiveFilters price labels («۲ میلیارد»), Pagination
+  numerals (visible Persian, `aria-label` Latin — explorer tests' queries
+  unaffected). Year/URL/ID/JSON-LD channels untouched.
+- Typography contract: `font-poppins` removed from the car-detail h1 +
+  price and CarCard's price span; brand/model Latin spans keep it;
+  convention documented in `lib/fonts.ts`. Plan scope correction:
+  FeaturedCars/RelatedCarsSlider have no own price spans (they embed
+  CarCard), so the plan's "four price spans" was actually two.
+- Tests: Pagination (Persian numerals + Latin aria-labels), Footer (Persian
+  display / Latin href), `poppinsContract.test.ts` class assertions;
+  4 CarPagination tests updated from Latin display-text queries to
+  aria-label queries (the display change they pinned is the feature).
 
 **Phase 1 — security hardening** (committed `5888307`)
 
@@ -659,6 +709,72 @@ image delivery) is next and consumes 4A's additive variant fields.
   (baseline was 330 / 98.59), `check` + `makemigrations --check --dry-run`
   clean; frontend untouched (307 tests, tsc/lint clean). The only uncovered
   lines in the new modules are exception-only best-effort cleanup guards.
+
+**Phase 4B — frontend image delivery** (landed 2026-09-18)
+
+- **`OptimizedImage`** is the single image component and now consumes the
+  4A variant set (`types/media.ts`): tier derivation (`sm`/`md`/`lg`) from
+  the slot width or an explicit `tier` prop, preference of the generated
+  WebP variant for same-origin `/media/` srcs, the backend LQIP passed
+  through as next/image's `blur` placeholder, and an event-driven
+  `onError` fallback that advances variant → original and stops after
+  the chain is exhausted — a broken variant can never reroute into the
+  media-incapable optimizer and loop. Media URLs stay `unoptimized`
+  (nginx owns `/media/` in dev and prod; the frontend container has no
+  media volume, so next/image's on-demand optimizer 404s). Non-media
+  srcs keep the optimizer exactly as before.
+- **Consumers** wired with the additive `variants` prop: `CarCard`,
+  `CarCardImage`, `CarImageGallery` (per-slide lookup plus a thumbnail
+  variant on the strip), `RelatedCarsSlider`, `FeaturedCars`,
+  `HeroSlider`, `LatestArticles`, `ArticlesExplorer`, and the car/article
+  detail pages. `types/car.ts`, `types/article.ts` and `types/heroSlide.ts`
+  gain the additive `*_variants` fields.
+- **Tests**: `components/ui/__tests__/OptimizedImage.test.tsx` — 13 tests
+  pinning tier selection (incl. explicit-override), blur pass-through,
+  no-variant and null-variant degradation, the non-media exemption, and
+  the error-fallback chain (advance / exhaustion / stale-event ignore).
+- **Known residual risk**: unchanged from 4A — a crash mid-write can leave
+  one dot-tmp file inside a `.variants` directory (plan Case E), cleaned
+  by Phase 5's `cleanup_orphan_media`.
+- **Validation (Docker, 2026-09-18)**: frontend **319 passed / 41 suites**,
+  `tsc --noEmit` clean, `next lint` fully clean, `next build` green
+  (throwaway container); backend untouched at **359 passed / 98.62%**.
+
+**Phase 5 — UX/SEO polish + orphan cleanup** (committed `8b55dee`, 2026-09-19)
+
+- **Listing breadcrumbs**: `/cars` and `/articles` render the same
+  breadcrumb pattern as the detail pages (home → section,
+  `aria-label="breadcrumb"`), added inside the SSR'd explorer islands
+  (`CarsExplorer`/`ArticlesExplorer`) so the first server HTML carries
+  them. Detail pages were already complete and are untouched.
+- **Per-page canonical URLs**: car and article detail `generateMetadata`
+  emit `alternates.canonical` built from `NEXT_PUBLIC_SITE_URL`
+  (`${siteUrl}/cars/${slug}` / `${siteUrl}/articles/${slug}`). Listing
+  shells stay canonical-free — the root canonical is sufficient (plan §5
+  deferred list). Pinned by `app/(site)/__tests__/detail-metadata.test.ts`,
+  including the listing-shells-stay-clean assertion.
+- **`cleanup_orphan_media`** (`apps/core/management/commands/`): dry-run by
+  default, `--delete` to remove. Orphan classes: files no row references
+  (the FileField-replacement case `test_gallery_storage.py` explicitly
+  deferred here), Phase 3 `.gallery-upload-*` staging leftovers (§7.2
+  Case E), Phase 4A variant sets whose original is dead or missing on disk,
+  and crash-mid-write dot-tmp files inside a live original's `.variants`
+  directory (ADR-0009). Never touches: files of soft-deleted rows
+  (`with_deleted()`), the `SiteSettings` singleton, variant sets of live
+  originals (minus their tmp artifacts), and unknown dot-prefixed paths.
+  Directories are pruned only when emptied (`os.rmdir`), never recursively.
+- **Tests**: `apps/core/test_cleanup_orphan_media.py` (14 tests — every
+  orphan class, keep-classes, dry-run default, idempotent delete, prune
+  behavior) plus the breadcrumb tests in both explorer suites and the new
+  metadata suite. Coverage note: the dip to **98.12%** is the command's
+  exception-only guard branches, same shape as Phase 4A's.
+- **Validation (Docker, 2026-09-19)**: backend **373 passed / 98.12% cov**,
+  `check` + `makemigrations --check` clean; frontend **326 passed / 42
+  suites**, `tsc --noEmit` clean, `next lint` clean.
+- **Owner deploy steps (unchanged + new)**: run
+  `regenerate_image_variants --apply` once (the still-pending 4A backfill),
+  then `cleanup_orphan_media` (dry-run), review the list, and only then
+  `--delete`.
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
@@ -1136,4 +1252,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-18 (Phase 3 gallery UUID storage landed — backend 330 / frontend 307; gallery decision implemented in docs/adr/0007, monitoring/backup in docs/adr/0008)*
+*Last updated: 2026-09-19 (Phases 1–5 landed — backend 373 / frontend 326; gallery UUID in docs/adr/0007, monitoring/backup in docs/adr/0008, image variants in docs/adr/0009, PDF.js viewer decision in docs/adr/0010)*

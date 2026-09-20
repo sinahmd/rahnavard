@@ -33,8 +33,14 @@ jest.mock('next/navigation', () => ({
 // attribute `unoptimized`".
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ unoptimized, fill, priority, ...props }) => {
-    return <img {...props} />
+  default: ({ unoptimized, fill, priority, blurDataURL, ...props }) => {
+    // blurDataURL is consumed by the real next/image and never reaches the
+    // DOM; re-emit it as an all-lowercase custom attribute so the mock stays
+    // warning-free (React only warns for camelCase unknown props) while
+    // tests can still assert the passthrough (HTML attribute lookups are
+    // case-insensitive).
+    const blur = blurDataURL !== undefined ? { blurdataurl: blurDataURL } : {}
+    return <img {...props} {...blur} />
   },
 }))
 

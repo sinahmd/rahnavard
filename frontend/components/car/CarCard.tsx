@@ -70,7 +70,7 @@ export default function CarCard({ car }: { car: CarListItem }) {
         {/* Price */}
         {price && (
           <div className="mb-3">
-            <span className="text-[16px] font-extrabold text-dark font-poppins">
+            <span className="text-[16px] font-extrabold text-dark">
               {price}
             </span>
             <span className="text-[12px] font-normal text-gray mr-1">تومان</span>

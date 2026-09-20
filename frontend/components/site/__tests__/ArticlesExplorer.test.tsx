@@ -81,7 +81,7 @@ beforeEach(() => {
 })
 
 describe('ArticlesExplorer — URL-derived listing state', () => {
-  it('renders a listing breadcrumb (home → articles) — Phase 5', () => {
+  it('renders a listing breadcrumb (home → articles) — Phase 5', async () => {
     render(<ArticlesExplorer />)
     const nav = screen.getByRole('navigation', { name: 'breadcrumb' })
     const links = within(nav).getAllByRole('link')
@@ -91,6 +91,9 @@ describe('ArticlesExplorer — URL-derived listing state', () => {
     expect(within(nav).getByText('مقالات')).toBeInTheDocument()
     // The current page marker is not a link.
     expect(within(nav).getByText('مقالات').closest('a')).toBeNull()
+    // No initialData was passed, so the mount fetch resolves; drain it
+    // inside act so its state updates don't land after the test.
+    await flush()
   })
 
   it('renders the server snapshot without a duplicate fetch', async () => {

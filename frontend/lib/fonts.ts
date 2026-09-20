@@ -11,6 +11,13 @@
  * fonts/webfonts/*.woff2, weights 400–900.
  * Poppins: latin subset woff2 (same files Google Fonts serves), weights
  * 500–800, used for latin brand/model text via the `font-poppins` utility.
+ *
+ * TYPOGRAPHY CONTRACT (Phase 9 / UX-2): `font-poppins` is for LATIN-SCRIPT
+ * content only (brand/model English strings). Persian content always uses
+ * the default `font-vazir` stack — do not put `font-poppins` on elements
+ * rendering Persian text (its Poppins face has no Persian glyphs, so the
+ * declaration is a latent regression hazard: a future Poppins subset change
+ * would silently change Persian rendering).
  */
 import localFont from 'next/font/local'
 

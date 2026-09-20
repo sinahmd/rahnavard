@@ -9,11 +9,14 @@ import type { ImageVariants } from '@/types/media'
 // a data attribute while stripping the non-DOM props the same way.
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ unoptimized, fill, priority, alt, ...props }: Record<string, unknown>) => {
+  default: ({ unoptimized, fill, priority, blurDataURL, alt, ...props }: Record<string, unknown>) => {
     const imgProps = { ...props } as Record<string, unknown>
     if (unoptimized !== undefined) imgProps['data-unoptimized'] = String(unoptimized)
     if (fill) imgProps['data-fill'] = 'true'
     if (alt !== undefined) imgProps['alt'] = alt
+    // Like the global mock: re-emit as a lowercase custom attribute (no React
+    // warning, attribute lookups are case-insensitive) or drop it entirely.
+    if (blurDataURL !== undefined) imgProps['blurdataurl'] = blurDataURL
     return <img alt="" {...imgProps} />
   },
 }))

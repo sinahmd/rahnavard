@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { FUEL_TYPE_LABELS, TRANSMISSION_LABELS } from '@/lib/carConstants'
+import { toPersianDigits } from '@/lib/format/persianDigits'
 import { useModalA11y } from '@/components/ui/useModalA11y'
 
 export interface FilterOptions {
@@ -37,10 +38,10 @@ interface Props {
 
 function formatPriceLabel(price: number): string {
   if (price >= 1_000_000_000) {
-    return `${(price / 1_000_000_000).toFixed(0)} میلیارد`
+    return toPersianDigits(`${(price / 1_000_000_000).toFixed(0)} میلیارد`)
   }
   if (price >= 1_000_000) {
-    return `${(price / 1_000_000).toFixed(0)} میلیون`
+    return toPersianDigits(`${(price / 1_000_000).toFixed(0)} میلیون`)
   }
   return new Intl.NumberFormat('fa-IR').format(price)
 }

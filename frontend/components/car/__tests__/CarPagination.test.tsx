@@ -11,14 +11,16 @@ describe('CarPagination', () => {
 
   it('renders page buttons for small page count', () => {
     render(<CarPagination currentPage={1} totalPages={5} onPageChange={jest.fn()} />)
-    expect(screen.getByText('1')).toBeTruthy()
-    expect(screen.getByText('3')).toBeTruthy()
-    expect(screen.getByText('5')).toBeTruthy()
+    // Phase 9 / UX-5: visible numerals are Persian digits; aria-labels stay
+    // Latin for stable queries.
+    expect(screen.getByLabelText('صفحه 1').textContent).toBe('۱')
+    expect(screen.getByLabelText('صفحه 3').textContent).toBe('۳')
+    expect(screen.getByLabelText('صفحه 5').textContent).toBe('۵')
   })
 
   it('highlights current page', () => {
     render(<CarPagination currentPage={2} totalPages={5} onPageChange={jest.fn()} />)
-    const activePage = screen.getByText('2')
+    const activePage = screen.getByLabelText('صفحه 2')
     expect(activePage.getAttribute('aria-current')).toBe('page')
   })
 
@@ -38,7 +40,7 @@ describe('CarPagination', () => {
     const onPageChange = jest.fn()
     render(<CarPagination currentPage={1} totalPages={5} onPageChange={onPageChange} />)
 
-    fireEvent.click(screen.getByText('3'))
+    fireEvent.click(screen.getByLabelText('صفحه 3'))
     expect(onPageChange).toHaveBeenCalledWith(3)
   })
 
@@ -66,7 +68,7 @@ describe('CarPagination', () => {
 
   it('shows first and last page for large page counts', () => {
     render(<CarPagination currentPage={10} totalPages={20} onPageChange={jest.fn()} />)
-    expect(screen.getByText('1')).toBeTruthy()
-    expect(screen.getByText('20')).toBeTruthy()
+    expect(screen.getByLabelText('صفحه 1')).toBeTruthy()
+    expect(screen.getByLabelText('صفحه 20')).toBeTruthy()
   })
 })
