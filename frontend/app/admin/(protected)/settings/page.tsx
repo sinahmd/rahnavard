@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react'
 import ImageUpload from '@/components/admin/ImageUpload'
+import FormActions from '@/components/admin/ui/FormActions'
 import { ApiRequestError } from '@/lib/api/http'
 import { getSiteSettings, updateSiteSettings } from '@/lib/api/settings'
 import type { SiteSettings } from '@/types/settings'
@@ -434,16 +435,16 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-4 justify-end">
+        {/* Actions — sticky bar on mobile, inline on desktop */}
+        <FormActions>
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
+            className="w-full md:w-auto px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
           >
             {saving ? 'در حال ذخیره...' : 'ذخیره تنظیمات'}
           </button>
-        </div>
+        </FormActions>
       </form>
     </div>
   )

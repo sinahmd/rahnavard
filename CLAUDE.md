@@ -31,7 +31,7 @@ docker compose exec -T backend python manage.py makemigrations --check --dry-run
 # The LOCAL dev frontend/Dockerfile uses the China npm mirror
 # (registry.npmmirror.com) — the Arvan mirror (npm.arvancloud.ir) 403s outside
 # Iran — so `docker compose up --build` works locally.
-docker compose exec -T frontend npm test -- --runInBand      # 382 passed, 49 suites, zero act/console warnings (2026-09-20, after Phases 6–9)
+docker compose exec -T frontend npm test -- --runInBand      # 402 passed, 51 suites, zero act/console warnings (2026-09-21, after Phase 11)
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm run lint
 # Production build in a throwaway container so the running dev server's .next
@@ -44,7 +44,8 @@ cov, frontend **382 passed** / 49 suites, tsc clean, **lint fully clean** — fo
 self-hosted via `next/font/local` (frontend/lib/fonts.ts), so the old Google
 Fonts `<link>` warning is gone. Never switch to `next/font/google`: prod
 images are built on a server where Google Fonts is blocked, see plan §J —
-local files only).
+local files only). Frontend re-verified 2026-09-21 after the Phase 11 admin
+responsive work: **402 passed / 51 suites**, tsc clean, lint clean.
 
 ---
 

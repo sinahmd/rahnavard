@@ -62,7 +62,7 @@ describe('Why Rahnavard admin tab', () => {
     // Background preview comes from the stored URL.
     expect(screen.getByAltText('تصویر پس‌زمینه')).toHaveAttribute('src', '/media/why/bg.jpg')
     // The features list renders inside the same tab.
-    await waitFor(() => expect(screen.getByText('تضمین اصالت کالا')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('تضمین اصالت کالا').length).toBeGreaterThan(0))
   })
 
   it('saves a partial PATCH carrying only the why fields', async () => {

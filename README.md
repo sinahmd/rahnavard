@@ -67,7 +67,7 @@ flowchart LR
   support for autoplay/animations.
 - **Self-hosted fonts:** Vazirmatn + Poppins committed as woff2 via
   `next/font/local` — zero third-party font requests.
-- **Baseline:** `/` ships ~107 kB first-load JS; the 307-test frontend
+- **Baseline:** `/` ships ~107 kB first-load JS; the 402-test frontend
   suite runs clean (no `act()` or console warnings).
 
 ## Quickstart

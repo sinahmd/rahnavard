@@ -14,7 +14,9 @@ const formatDate = (dateString: string) => {
 }
 
 const statusButton = (active: boolean) =>
-  `px-3 py-1 rounded-full text-sm font-bold ${active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`
+  `px-3 py-1 min-h-[36px] inline-flex items-center rounded-full text-sm font-bold ${
+    active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+  }`
 
 export default function AdminInquiriesPage() {
   return (
@@ -25,8 +27,8 @@ export default function AdminInquiriesPage() {
       fetchPage={listInquiries}
       rowKey={(inquiry) => inquiry.id}
       columns={[
-        { header: 'نام', cell: (inquiry) => <span className="font-bold">{inquiry.name}</span> },
-        { header: 'تلفن', cell: (inquiry) => <span className="font-mono">{inquiry.phone}</span> },
+        { header: 'نام', cell: (inquiry) => <span className="font-bold">{inquiry.name}</span>, primaryOnMobile: true },
+        { header: 'تلفن', cell: (inquiry) => <span className="font-mono" dir="ltr">{inquiry.phone}</span> },
         { header: 'موضوع', cell: (inquiry) => inquiry.subject || '-' },
         {
           header: 'پیام',

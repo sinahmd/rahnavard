@@ -189,6 +189,7 @@ export default function WhyRahnavardAdminPage() {
         columns={[
           {
             header: 'آیکون',
+            hideOnMobile: true,
             cell: (feature) =>
               feature.icon ? (
                 <OptimizedImage
@@ -204,7 +205,7 @@ export default function WhyRahnavardAdminPage() {
                 </div>
               ),
           },
-          { header: 'عنوان', cell: (feature) => <span className="font-bold">{feature.title}</span> },
+          { header: 'عنوان', cell: (feature) => <span className="font-bold">{feature.title}</span>, primaryOnMobile: true },
           { header: 'توضیحات', cell: (feature) => <span className="text-sm max-w-xs truncate block">{feature.description}</span> },
           { header: 'ترتیب', cell: (feature) => feature.display_order },
           {
@@ -220,7 +221,7 @@ export default function WhyRahnavardAdminPage() {
                   }
                 }}
                 aria-pressed={feature.is_active}
-                className={`px-3 py-1 rounded-full text-sm font-bold ${
+                className={`px-3 py-1 min-h-[36px] inline-flex items-center rounded-full text-sm font-bold ${
                   feature.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 }`}
               >
@@ -234,7 +235,7 @@ export default function WhyRahnavardAdminPage() {
               <div className="flex gap-2">
                 <Link
                   href={`/admin/why-rahnavard/features/${feature.id}/edit`}
-                  className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
+                  className="bg-blue-100 text-blue-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-blue-200 transition-colors"
                 >
                   ویرایش
                 </Link>
@@ -249,7 +250,7 @@ export default function WhyRahnavardAdminPage() {
                       helpers.error('خطا در حذف ویژگی')
                     }
                   }}
-                  className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors"
+                  className="bg-red-100 text-red-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-red-200 transition-colors"
                 >
                   حذف
                 </button>

@@ -19,6 +19,7 @@ export default function AdminHeroSlidesPage() {
       columns={[
         {
           header: 'تصویر',
+          hideOnMobile: true,
           cell: (slide) =>
             slide.image ? (
               <OptimizedImage
@@ -34,7 +35,7 @@ export default function AdminHeroSlidesPage() {
               </div>
             ),
         },
-        { header: 'عنوان', cell: (slide) => slide.title || '-' },
+        { header: 'عنوان', cell: (slide) => slide.title || '-', primaryOnMobile: true },
         { header: 'متن جایگزین', cell: (slide) => <span className="text-sm">{slide.alt_text}</span> },
         { header: 'ترتیب', cell: (slide) => slide.display_order },
         { header: 'لینک', cell: (slide) => <span className="text-sm text-gray-500">{slide.link || '-'}</span> },
@@ -51,7 +52,7 @@ export default function AdminHeroSlidesPage() {
                 }
               }}
               aria-pressed={slide.is_active}
-              className={`px-3 py-1 rounded-full text-sm font-bold ${
+              className={`px-3 py-1 min-h-[36px] inline-flex items-center rounded-full text-sm font-bold ${
                 slide.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}
             >
@@ -65,7 +66,7 @@ export default function AdminHeroSlidesPage() {
             <div className="flex gap-2">
               <Link
                 href={`/admin/hero-slides/${slide.id}/edit`}
-                className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
+                className="bg-blue-100 text-blue-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-blue-200 transition-colors"
               >
                 ویرایش
               </Link>
@@ -80,7 +81,7 @@ export default function AdminHeroSlidesPage() {
                     helpers.error('خطا در حذف اسلاید')
                   }
                 }}
-                className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors"
+                className="bg-red-100 text-red-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-red-200 transition-colors"
               >
                 حذف
               </button>

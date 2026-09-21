@@ -54,16 +54,16 @@ describe('AdminListPage', () => {
     const fetchPage = jest.fn().mockResolvedValue(pageOf([1, 2], 2))
     renderList(fetchPage)
 
-    expect(await screen.findByText('ردیف 1')).toBeInTheDocument()
-    expect(screen.getByText('ردیف 2')).toBeInTheDocument()
-    expect(screen.getByText('نام')).toBeInTheDocument()
+    expect((await screen.findAllByText('ردیف 1'))[0]).toBeInTheDocument()
+    expect(screen.getAllByText('ردیف 2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('نام').length).toBeGreaterThan(0)
     expect(fetchPage).toHaveBeenCalledWith(1)
   })
 
   it('shows the empty state when the page has no rows', async () => {
     const fetchPage = jest.fn().mockResolvedValue(pageOf([], 0))
     renderList(fetchPage)
-    expect(await screen.findByText('چیزی وجود ندارد')).toBeInTheDocument()
+    expect((await screen.findAllByText('چیزی وجود ندارد'))[0]).toBeInTheDocument()
   })
 
   it('announces the loading state to assistive tech', async () => {
@@ -72,13 +72,13 @@ describe('AdminListPage', () => {
     // Shown on first paint, before the fetch resolves.
     expect(screen.getByRole('status')).toHaveTextContent('در حال بارگذاری...')
     // Settle the fetch chain inside act so no state update leaks past the test.
-    await waitFor(() => expect(screen.getByText('ردیف 1')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('ردیف 1').length).toBeGreaterThan(0))
   })
 
   it('gives the table a caption and column-header scope', async () => {
     const fetchPage = jest.fn().mockResolvedValue(pageOf([1], 1))
     const { container } = renderList(fetchPage)
-    await screen.findByText('ردیف 1')
+    await screen.findAllByText('ردیف 1')
 
     expect(container.querySelector('caption')).toHaveTextContent('مدیریت آزمون')
     screen.getAllByRole('columnheader').forEach((th) =>
@@ -95,7 +95,7 @@ describe('AdminListPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('خطا در بارگذاری')
     fireEvent.click(screen.getByRole('button', { name: 'تلاش مجدد' }))
-    expect(await screen.findByText('ردیف 1')).toBeInTheDocument()
+    expect((await screen.findAllByText('ردیف 1'))[0]).toBeInTheDocument()
     expect(fetchPage).toHaveBeenCalledTimes(2)
   })
 
@@ -103,7 +103,7 @@ describe('AdminListPage', () => {
     // 45 rows at page_size 20 → 3 pages.
     const fetchPage = jest.fn().mockResolvedValue(pageOf([1, 2], 45))
     renderList(fetchPage)
-    await screen.findByText('ردیف 1')
+    await screen.findAllByText('ردیف 1')
 
     expect(screen.getByText('نمایش 2 از 45')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'صفحه 3' })).toBeInTheDocument()
@@ -133,7 +133,7 @@ describe('AdminListPage', () => {
       .mockResolvedValueOnce({ count: 40, next: null, previous: null, results: [] })
       .mockResolvedValueOnce(pageOf([21], 40))
     renderList(fetchPage)
-    await screen.findByText('ردیف 1')
+    await screen.findAllByText('ردیف 1')
 
     fireEvent.click(screen.getByRole('button', { name: 'صفحه 3' }))
     await waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith(2))
@@ -149,7 +149,7 @@ describe('AdminListPage', () => {
       .mockRejectedValueOnce({ status: 404 })
       .mockResolvedValueOnce(firstPage)
     renderList(fetchPage)
-    await screen.findByText('ردیف 1')
+    await screen.findAllByText('ردیف 1')
 
     fireEvent.click(screen.getByRole('button', { name: 'صفحه 2' }))
     await waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith(1))
@@ -162,7 +162,8 @@ describe('AdminListPage', () => {
     const fetchPage = jest.fn().mockResolvedValue(pageOf([1], 1))
     renderList(fetchPage)
 
-    fireEvent.click(await screen.findByText('خطا 1'))
+    // Row actions exist in both the desktop table and the mobile card list.
+    fireEvent.click((await screen.findAllByText('خطا 1'))[0])
     expect(await screen.findByRole('alert')).toHaveTextContent('خطای ردیف')
   })
 
@@ -170,8 +171,50 @@ describe('AdminListPage', () => {
     const fetchPage = jest.fn().mockResolvedValue(pageOf([1], 1))
     renderList(fetchPage)
 
-    fireEvent.click(await screen.findByText('به‌روزرسانی 1'))
+    fireEvent.click((await screen.findAllByText('به‌روزرسانی 1'))[0])
     await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2))
     expect(fetchPage).toHaveBeenLastCalledWith(1)
+  })
+
+  it('renders rows as cards on mobile and keeps the table on desktop', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(pageOf([1], 1))
+    const { container } = renderList(fetchPage)
+    await screen.findAllByText('ردیف 1')
+
+    // Card list present and carries the mobile-only marker class.
+    const cardList = container.querySelector('div.md\\:hidden')
+    expect(cardList).not.toBeNull()
+    // The desktop table is hidden below md.
+    const table = container.querySelector('table')
+    expect(table?.className).toContain('hidden')
+    expect(table?.className).toContain('md:table')
+  })
+
+  it('renders the primaryOnMobile column as the card title line, first in the card', async () => {
+    // Cars-page shape: the primary column is declared THIRD on desktop.
+    const fetchPage = jest.fn().mockResolvedValue(pageOf([1], 1))
+    const { container } = render(
+      <AdminListPage<Row>
+        title="مدیریت آزمون"
+        fetchPage={fetchPage}
+        rowKey={(r) => r.id}
+        emptyMessage="چیزی وجود ندارد"
+        errorMessage="خطا در بارگذاری"
+        columns={[
+          { header: 'برند', cell: () => 'برند X' },
+          { header: 'عملیات', cell: (r, helpers) => (
+            <button onClick={() => helpers.refresh()}>{`به‌روزرسانی ${r.id}`}</button>
+          ) },
+          { header: 'نام', cell: (r) => r.name, primaryOnMobile: true },
+        ]}
+      />
+    )
+    await screen.findAllByText('ردیف 1')
+
+    const card = container.querySelector('div.md\\:hidden > div')
+    expect(card).not.toBeNull()
+    // The primary column's bold title line is the card's FIRST child.
+    expect(card!.firstElementChild).toHaveTextContent('ردیف 1')
+    expect(card!.firstElementChild).toHaveClass('font-bold')
   })
 })

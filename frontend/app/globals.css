@@ -43,7 +43,9 @@ body {
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   direction: rtl;
-  overflow-x: hidden;
+  /* No overflow-x here: with it set on BOTH html and body, body becomes a
+     non-scrolling scroll container and position:sticky descendants (the admin
+     FormActions bar) never travel. html-level clipping is sufficient. */
 }
 
 img {

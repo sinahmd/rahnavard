@@ -479,7 +479,8 @@ The owner approved the plan on 2026-09-05; the cutover commits are on
 `IMPLEMENTATION_PLAN.md` is the authoritative plan for this cycle. Per its §12
 execution contract each phase is implemented and stopped on its own: Phases 1,
 2, 3, 4A, 4B and 5 are done; **Phase 6 implemented (committed 2026-09-20, pending
-browser-matrix run + tmp-file cleanup), Phases 7–9 implemented (committed 2026-09-20)**.
+browser-matrix run + tmp-file cleanup), Phases 7–9 implemented (committed 2026-09-20),
+Phase 11 (admin responsive redesign) implemented 2026-09-21**.
 Note: §3.12's per-phase records below kept their original section text; the
 status line above is the live phase tracker.
 
@@ -530,6 +531,22 @@ implemented 2026-09-20, committed 2026-09-20)
   display / Latin href), `poppinsContract.test.ts` class assertions;
   4 CarPagination tests updated from Latin display-text queries to
   aria-label queries (the display change they pinned is the feature).
+
+**Phase 11 — admin panel responsive redesign** (implemented 2026-09-21)
+
+- Responsive shell in `admin/(protected)/layout.tsx`: below `lg` the navigation
+  is a focus-trapped overlay drawer (shared `NavLinks`/`UserCard`/`SidebarFooter`
+  with the desktop sidebar, `useModalA11y`, labeled close, body scroll lock,
+  `aria-controls`/`aria-hidden`); at `lg+` the collapsible sidebar with its
+  toggle in the topbar. `AdminListPage` renders stacked cards below `md` via the
+  declarative `hideOnMobile`/`primaryOnMobile` column flags (primary renders
+  first regardless of desktop column order). `ConfirmDialog` is a bottom sheet
+  on phones; `AdminForm` + settings share the sticky `FormActions` bar
+  (`components/admin/ui/FormActions.tsx`); hover-only upload affordances became
+  always-visible touch controls; row actions normalized to a 36px tap scale;
+  RTL fixes (`text-start` card values, `dir="ltr"` phone values). Data flow,
+  API client, auth guard and routing untouched — presentation only.
+- Verified in Docker: jest **402 passed / 51 suites**, `tsc` clean, `lint` clean.
 
 **Phase 1 — security hardening** (committed `5888307`)
 
@@ -1252,4 +1269,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-19 (Phases 1–5 landed — backend 373 / frontend 326; gallery UUID in docs/adr/0007, monitoring/backup in docs/adr/0008, image variants in docs/adr/0009, PDF.js viewer decision in docs/adr/0010)*
+*Last updated: 2026-09-21 (hardening cycle Phases 1–11 landed/implemented — backend 373 / frontend 402; gallery UUID in docs/adr/0007, monitoring/backup in docs/adr/0008, image variants in docs/adr/0009, PDF.js viewer decision in docs/adr/0010)*

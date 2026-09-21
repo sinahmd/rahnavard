@@ -7,6 +7,7 @@ import type { FormField, FormValues } from '@/types/admin-form'
 import { useAdminForm } from './useAdminForm'
 import FieldControl, { fieldToControlProps } from './fields'
 import ErrorState from '@/components/admin/ui/ErrorState'
+import FormActions from '@/components/admin/ui/FormActions'
 
 interface AdminFormProps<TEntity extends object> {
   entityNamePersian: string
@@ -80,11 +81,11 @@ export default function AdminForm<TEntity extends object = Record<string, unknow
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <Link href={backUrl} className="text-gray-600 hover:text-dark transition-colors">
+        <div className="flex min-w-0 items-center gap-4">
+          <Link href={backUrl} className="shrink-0 text-gray-600 hover:text-dark transition-colors">
             ← بازگشت
           </Link>
-          <h1 className="text-2xl font-bold">
+          <h1 className="min-w-0 truncate text-xl md:text-2xl font-bold">
             {isEdit ? `ویرایش ${entityNamePersian}` : `${entityNamePersian} جدید`}
           </h1>
         </div>
@@ -121,22 +122,24 @@ export default function AdminForm<TEntity extends object = Record<string, unknow
           </div>
         ))}
 
-        {/* Actions */}
-        <div className="flex gap-4 justify-end">
-          <Link
-            href={backUrl}
-            className="px-6 py-3 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors font-bold"
-          >
-            انصراف
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
-          >
-            {saving ? 'در حال ذخیره...' : isEdit ? 'بروزرسانی' : 'ایجاد'}
-          </button>
-        </div>
+        {/* Actions — sticky full-width bar on mobile, inline on desktop */}
+        <FormActions>
+          <div className="flex gap-3 md:gap-4">
+            <Link
+              href={backUrl}
+              className="flex-1 md:flex-none text-center px-6 py-3 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors font-bold"
+            >
+              انصراف
+            </Link>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 md:flex-none px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'در حال ذخیره...' : isEdit ? 'بروزرسانی' : 'ایجاد'}
+            </button>
+          </div>
+        </FormActions>
       </form>
     </div>
   )
