@@ -231,6 +231,9 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
           DEBUG: '1'
           DATABASE_URL: sqlite:///test.db
+          # Non-root runners cannot mkdir the production cache dir (same
+          # reason as the CACHE_DIR override on the lint job's check step).
+          CACHE_DIR: /tmp/rahnavard-cache
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
