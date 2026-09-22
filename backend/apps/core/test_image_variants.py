@@ -11,6 +11,7 @@ import base64
 import contextlib
 import io
 import os
+import stat
 from pathlib import Path
 from unittest import mock
 
@@ -194,14 +195,44 @@ class TestGenerateVariants:
         assert not is_variant_artifact(os.path.join("media", "cars", "x.png"))
 
     def test_non_rgb_source_is_converted(self, media_root):
-        # RGBA (typical of PNGs with transparency) must convert cleanly.
-        image = Image.new("RGBA", (400, 300), (10, 200, 10, 128))
+        # P-mode (palette) PNGs are the classic non-RGB non-alpha case; the
+        # pipeline must normalize them (to RGBA now) without erroring.
+        image = Image.new("P", (400, 300))
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
-        path = _store(media_root, "cars/alpha.png", buffer.getvalue())
+        path = _store(media_root, "cars/palette.png", buffer.getvalue())
         generate_variants(path)
         with Image.open(Path(variant_dir_for(path)) / "sm.webp") as thumb:
             assert thumb.size == (400, 300)  # 4:3 landscape fills the box exactly
+
+    def test_transparent_source_keeps_alpha(self, media_root):
+        # Remove-bg cutouts are RGBA PNGs; the WebP variants must carry the
+        # alpha channel instead of flattening it onto black. Regression pin
+        # for the production incident: 403→chmod exposed variants whose
+        # transparent backgrounds had been composited black.
+        image = Image.new("RGBA", (400, 300), (10, 200, 10, 0))
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        path = _store(media_root, "cars/cutout.png", buffer.getvalue())
+        generate_variants(path)
+        for name in ("sm.webp", "webp.webp"):
+            with Image.open(Path(variant_dir_for(path)) / name) as out:
+                assert out.mode == "RGBA"
+                alpha = out.getchannel("A")
+                # A fully transparent source must stay fully transparent —
+                # the alpha histogram must contain 0, never just 255 (the
+                # flatten-to-black signature).
+                assert alpha.getextrema()[0] == 0
+
+    def test_variant_files_are_world_readable(self, source_png):
+        # `tempfile.mkstemp` creates 0600 and `os.replace` preserves that
+        # mode; nginx's unprivileged worker then 403s. Every generated file
+        # must land at 0644 like Django FileField uploads do.
+        generate_variants(source_png)
+        directory = Path(variant_dir_for(source_png))
+        for name in ("webp.webp", "sm.webp", "md.webp", "lg.webp", "lqip.webp"):
+            mode = stat.S_IMODE(os.stat(directory / name).st_mode)
+            assert mode == 0o644, f"{name} has mode {oct(mode)}"
 
     def test_missing_source_raises_file_not_found(self, media_root):
         ghost = str(Path(media_root) / "cars" / "ghost.png")
