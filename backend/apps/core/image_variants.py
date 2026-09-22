@@ -187,8 +187,17 @@ def generate_variants(source_path):
         # phone photos are not rotated.
         img.load()
         img = ImageOps.exif_transpose(img)
-        if img.mode not in ("RGB", "L"):
+        # Mode normalization for the WebP encode. Alpha must SURVIVE: the
+        # catalog uses transparent cutouts (remove-bg PNGs), and an RGBA→RGB
+        # flatten composites them onto black with dark, jagged fringes at the
+        # cut edges. CMYK (print-color JPEG) has no alpha to keep; every other
+        # non-RGB mode (P, LA, I;16, ...) converts to RGBA so transparency is
+        # carried through — WebP stores it natively and fully-opaque alpha
+        # costs nothing visually.
+        if img.mode == "CMYK":
             img = img.convert("RGB")
+        elif img.mode not in ("RGB", "L", "RGBA"):
+            img = img.convert("RGBA")
 
         outputs = {}
         full = io.BytesIO()
@@ -221,6 +230,12 @@ def generate_variants(source_path):
             try:
                 with os.fdopen(fd, "wb") as handle:
                     handle.write(payload)
+                # `mkstemp` creates the file 0600 by design (immune to umask);
+                # `os.replace` preserves that mode. These files are publicly
+                # served by nginx, whose unprivileged worker cannot read a
+                # root-owned 0600 file — normalize to the same 0644 Django
+                # FileField uploads get before the atomic rename.
+                os.chmod(tmp_path, 0o644)
                 os.replace(tmp_path, final)
             except BaseException:
                 try:
