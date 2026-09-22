@@ -32,6 +32,7 @@ services:
       - SENTRY_DSN=${SENTRY_BACKEND_DSN:-}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - LOGIN_THROTTLE_RATE=${LOGIN_THROTTLE_RATE:-5/minute}
       - DEBUG=${DEBUG:-0}
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-rahnavard.co,www.rahnavard.co,backend,localhost,127.0.0.1}

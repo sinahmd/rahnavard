@@ -233,7 +233,10 @@ REST_FRAMEWORK = {
         # instead of the generous global anon bucket (inquiries/views.py).
         "inquiries": "20/hour",
         # Login brute-force protection — 5 attempts per minute per IP.
-        "login": "5/minute",
+        # Env-overridable so isolated test environments that log in repeatedly
+        # from a single IP (CI e2e against the prod stack) can raise it;
+        # production keeps the default.
+        "login": env("LOGIN_THROTTLE_RATE", default="5/minute"),
     },
     # Throttle keying behind the proxy chain (Arvan edge → nginx → Django):
     # nginx fills X-Forwarded-For via $proxy_add_x_forwarded_for, and DRF's
