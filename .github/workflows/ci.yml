@@ -139,6 +139,11 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
           DEBUG: '1'
           DATABASE_URL: sqlite:///test.db
+          # The production file-cache location (/var/cache/rahnavard) is created
+          # by the root-owned container at runtime; a non-root runner cannot
+          # mkdir it, and the cache system check fails before lint even starts.
+          # Point the check at a writable temp dir — prod/Docker are untouched.
+          CACHE_DIR: /tmp/rahnavard-cache
         run: python manage.py check
 
   test-backend:
