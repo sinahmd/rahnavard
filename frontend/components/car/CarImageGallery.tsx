@@ -95,8 +95,11 @@ export default function CarImageGallery({
         <div className="mt-4 flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {allImages.map((url, idx) => (
             <button key={idx} type="button" onClick={() => setActiveIndex(idx)} className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${activeIndex === idx ? 'border-accent-dark shadow-md scale-105' : 'border-gray-200 hover:border-gray-400 opacity-70 hover:opacity-100'}`} aria-label={`تصویر ${idx + 1}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={variantFor.get(url)?.sm ?? url} alt={`${persianName} - تصویر ${idx + 1}`} className="w-full h-full object-cover" />
+              {/* OptimizedImage gives the thumbs the same variant → original
+                  fallback chain the main viewer has, so a missing/broken
+                  variant file degrades to the original instead of a broken
+                  image icon (plain <img> had no fallback). */}
+              <OptimizedImage src={url} variants={variantFor.get(url)} tier="sm" width={80} height={80} alt={`${persianName} - تصویر ${idx + 1}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
