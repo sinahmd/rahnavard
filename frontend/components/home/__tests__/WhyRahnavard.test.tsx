@@ -198,7 +198,7 @@ describe('WhyRahnavard background (managed image)', () => {
       expect(featureRoot?.querySelector('[aria-hidden="true"]')).toHaveTextContent('01')
       expect(featureRoot?.querySelector('h3')).toHaveClass('font-bold')
       const description = featureRoot?.querySelector('p')
-      expect(description).toHaveClass('bg-white/70')
+      expect(description).toHaveClass('bg-white/10')
       expect(description).toHaveClass('backdrop-blur-sm')
       expect(featureRoot?.querySelector('.bg-accent')).toBeInTheDocument()
     })
