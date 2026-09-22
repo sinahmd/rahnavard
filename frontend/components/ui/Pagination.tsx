@@ -1,5 +1,7 @@
 'use client'
 
+import { toPersianDigits } from '@/lib/format/persianDigits'
+
 interface Props {
   currentPage: number
   totalPages: number
@@ -87,7 +89,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pr
             aria-current={isActive ? 'page' : undefined}
             aria-label={`صفحه ${page}`}
           >
-            {page}
+            {toPersianDigits(page)}
           </button>
         )
       })}

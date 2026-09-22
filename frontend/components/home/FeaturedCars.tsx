@@ -61,6 +61,7 @@ export default function FeaturedCars({
               >
                 <CarCardImage
                   src={car.main_image}
+                  variants={car.main_image_variants}
                   alt={car.persian_name}
                   className="mb-[18px]"
                   imageClassName="transition-transform duration-[450ms] ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-translate-y-1.5"

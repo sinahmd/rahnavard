@@ -1,0 +1,15 @@
+# TEMPLATE ONLY — review paths/user, then explicitly install in /etc/cron.d/.
+# 03:00 in the SERVER timezone (no CRON_TZ override).
+# Requires bash, Docker Compose, flock, GNU coreutils/tar, gzip; python3 for restore.
+# For offsite also install rsync/ssh and provision a key + trusted known_hosts.
+# Protect this file and the backup destination; backups contain .env secrets.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PROJECT_DIR=/var/www/rahnavard
+BACKUP_DIR=/var/backups/rahnavard
+COMPOSE_FILE=docker-compose.prod.yml
+# OFFSITE_HOST=backup@example-host
+# OFFSITE_DIR=/srv/private-backups/rahnavard
+# Without BOTH offsite values the job explicitly reports LOCAL-ONLY.
+# Route cron mail/nonzero exits to a monitored mailbox before installation.
+0 3 * * * root /bin/bash /var/www/rahnavard/scripts/backup.sh

@@ -6,6 +6,8 @@
  * - `ArticleAdmin`    — ArticleAdminSerializer (admin CRUD)
  */
 
+import type { ImageVariants } from './media'
+
 /** ArticleListSerializer — public list rows (`/api/v1/articles/`). */
 export interface ArticleListItem {
   id: number
@@ -13,6 +15,8 @@ export interface ArticleListItem {
   slug: string
   excerpt: string
   cover_image: string | null
+  /** Additive Phase 4A field; null until the variant set exists on disk. */
+  cover_image_variants?: ImageVariants | null
   published_at: string | null
   created_at: string
 }
@@ -25,6 +29,8 @@ export interface ArticleDetail {
   excerpt: string
   content: string
   cover_image: string | null
+  /** Additive Phase 4A field; null until the variant set exists on disk. */
+  cover_image_variants?: ImageVariants | null
   is_published: boolean
   published_at: string | null
   seo_title: string

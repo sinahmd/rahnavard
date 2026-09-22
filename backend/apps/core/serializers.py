@@ -1,10 +1,20 @@
+import os
+
+from django.conf import settings
 from rest_framework import serializers
 
+from apps.core.image_variants import variants_payload_for_url as _variants_for_url
 from apps.core.validators import ImageValidator
 from .models import HeroSlide, Redirect, SiteSettings, WhyFeature
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
+    # Additive (Phase 4A mechanics): None until the variant set exists on disk.
+    why_background_variants = serializers.SerializerMethodField()
+
+    def get_why_background_variants(self, obj):
+        return _variants_for_url(obj.why_background.url if obj.why_background else None)
+
     class Meta:
         model = SiteSettings
         fields = [
@@ -22,6 +32,8 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             "hero_cta_secondary_link",
             "why_title",
             "why_description",
+            "why_background",
+            "why_background_variants",
             "cars_section_title",
             "cars_section_description",
             "articles_section_title",
@@ -34,15 +46,39 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             "default_og_image",
         ]
         extra_kwargs = {
-            "logo": {"validators": [ImageValidator()]},
+            # Branding asset, not a content image: a wordmark is legitimately
+            # wide and short, so the content-image floor (800x600) rejects the
+            # site's own shipped logo (assets/logo.png, 727x340). Keep a floor
+            # that rejects unusably small files, but not the photo profile.
+            # Every other check (size/extension/MIME/magic bytes/max dims)
+            # stays identical to the default profile.
+            "logo": {"validators": [ImageValidator(min_width=200, min_height=60)]},
             "default_og_image": {"validators": [ImageValidator()]},
+            # Section background is a real content photograph — the full
+            # content-image profile (min 800×600), not a branding profile.
+            "why_background": {"validators": [ImageValidator()]},
         }
 
 
 class HeroSlideSerializer(serializers.ModelSerializer):
+    # Phase 4A, additive: None until the variant set exists on disk.
+    image_variants = serializers.SerializerMethodField()
+
+    def get_image_variants(self, obj):
+        return _variants_for_url(obj.image.url if obj.image else None)
+
     class Meta:
         model = HeroSlide
-        fields = ["id", "title", "image", "alt_text", "link", "is_active", "display_order"]
+        fields = [
+            "id",
+            "title",
+            "image",
+            "image_variants",
+            "alt_text",
+            "link",
+            "is_active",
+            "display_order",
+        ]
         extra_kwargs = {
             "image": {"validators": [ImageValidator()]},
         }
@@ -53,7 +89,8 @@ class WhyFeatureSerializer(serializers.ModelSerializer):
         model = WhyFeature
         fields = ["id", "title", "description", "icon", "is_active", "display_order"]
         extra_kwargs = {
-            "icon": {"validators": [ImageValidator()]},
+            # Icons are legitimately small — skip dimension validation.
+            "icon": {"validators": [ImageValidator(check_dimensions=False)]},
         }
 
 

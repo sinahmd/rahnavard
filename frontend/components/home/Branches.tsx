@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import { toLatinDigits, toPersianDigits } from '@/lib/format/persianDigits'
 import type { Branch } from '@/types/branch'
 import type { SiteSettings } from '@/types/settings'
 import SectionHead from '@/components/site/SectionHead'
@@ -65,8 +66,8 @@ export default function Branches({
                   <h3 className="text-[19px] font-extrabold mb-2.5">{branch.name}</h3>
                   <p className="text-gray text-[14.5px] mb-1.5">{branch.address}</p>
                   {branch.phone && (
-                    <a href={`tel:${branch.phone}`} className="text-dark font-bold mt-2.5 inline-block ltr text-right" style={{ unicodeBidi: 'embed' }}>
-                      {branch.phone}
+                    <a href={`tel:${toLatinDigits(branch.phone)}`} className="text-dark font-bold mt-2.5 inline-block ltr text-right" style={{ unicodeBidi: 'embed' }}>
+                      {toPersianDigits(branch.phone)}
                     </a>
                   )}
                 </div>

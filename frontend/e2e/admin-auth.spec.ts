@@ -114,10 +114,10 @@ test('deleted session cookie surfaces errors on soft nav, redirects on hard nav'
   await adminLogin(page)
 
   await page.context().clearCookies()
-  await page.getByRole('link', { name: 'ویژگی‌ها' }).click()
+  await page.getByRole('link', { name: 'بخش چرا راهنورد' }).click()
   await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 15_000 })
 
-  await page.goto('/admin/features')
+  await page.goto('/admin/why-rahnavard')
   await page.waitForURL(/\/admin\/login/, { timeout: 15_000 })
 })
 
@@ -133,21 +133,21 @@ test('admin CRUD writes carry X-CSRFToken and succeed end-to-end', async ({ page
   await adminLogin(page)
 
   // CREATE
-  await page.goto('/admin/features/new')
+  await page.goto('/admin/why-rahnavard/features/new')
   await page.getByLabel('عنوان').fill(title)
   await page.getByLabel('توضیحات').fill('ویژگی آزمایشی E2E — حذف خودکار')
   await page.getByRole('button', { name: 'ایجاد' }).click()
-  await page.waitForURL(/\/admin\/features$/)
+  await page.waitForURL(/\/admin\/why-rahnavard$/)
   const row = page.locator('tr', { hasText: title })
   await expect(row).toBeVisible()
 
   // EDIT
   await row.getByRole('link', { name: 'ویرایش' }).click()
-  await page.waitForURL(/\/admin\/features\/\d+\/edit/)
+  await page.waitForURL(/\/admin\/why-rahnavard\/features\/\d+\/edit/)
   const edited = `${title}-v2`
   await page.getByLabel('عنوان').fill(edited)
   await page.getByRole('button', { name: 'بروزرسانی' }).click()
-  await page.waitForURL(/\/admin\/features$/)
+  await page.waitForURL(/\/admin\/why-rahnavard$/)
   await expect(page.locator('tr', { hasText: edited })).toBeVisible()
   // hasText is substring-based, so the edited row still matches `title`;
   // exclude it before asserting the original title is gone.

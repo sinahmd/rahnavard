@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react'
 import ImageUpload from '@/components/admin/ImageUpload'
+import FormActions from '@/components/admin/ui/FormActions'
 import { ApiRequestError } from '@/lib/api/http'
 import { getSiteSettings, updateSiteSettings } from '@/lib/api/settings'
 import type { SiteSettings } from '@/types/settings'
@@ -21,6 +22,8 @@ const defaultSettings: SiteSettings = {
   hero_cta_secondary_link: '',
   why_title: '',
   why_description: '',
+  why_background: null,
+  why_background_variants: null,
   cars_section_title: '',
   cars_section_description: '',
   articles_section_title: '',
@@ -91,9 +94,19 @@ export default function AdminSettingsPage() {
 
     const submitData = new FormData()
 
-    // Append all text fields
+    // Append all text fields. Excluded keys: image fields (a stored media
+    // URL is not a valid upload; variants are a read-only extra) and the
+    // Why-section fields (owned by the dedicated /admin/why-rahnavard tab).
     Object.entries(settings).forEach(([key, value]) => {
-      if (key !== 'logo' && value !== null && value !== undefined) {
+      if (
+        key !== 'logo' &&
+        key !== 'why_title' &&
+        key !== 'why_description' &&
+        key !== 'why_background' &&
+        key !== 'why_background_variants' &&
+        value !== null &&
+        value !== undefined
+      ) {
         submitData.append(key, String(value))
       }
     })
@@ -316,24 +329,6 @@ export default function AdminSettingsPage() {
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-bold mb-2">عنوان بخش «چرا ما»</label>
-                <input
-                  type="text"
-                  value={settings.why_title}
-                  onChange={(e) => handleChange('why_title', e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold mb-2">توضیحات بخش «چرا ما»</label>
-                <textarea
-                  value={settings.why_description}
-                  onChange={(e) => handleChange('why_description', e.target.value)}
-                  rows={3}
-                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-bold mb-2">عنوان بخش خودروها</label>
                 <input
                   type="text"
@@ -440,16 +435,16 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-4 justify-end">
+        {/* Actions — sticky bar on mobile, inline on desktop */}
+        <FormActions>
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
+            className="w-full md:w-auto px-6 py-3 rounded-lg bg-accent text-dark font-bold hover:bg-accent-dark disabled:opacity-50 transition-colors"
           >
             {saving ? 'در حال ذخیره...' : 'ذخیره تنظیمات'}
           </button>
-        </div>
+        </FormActions>
       </form>
     </div>
   )

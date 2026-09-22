@@ -212,6 +212,12 @@ Never use `next/font/google` (prod image builds run where Google Fonts is
 blocked; local files only). Backend tests need no Postgres; frontend needs
 no API server.
 
+Re-verified 2026-09-18 after Phase 1 (security hardening) and Phase 2
+(monitoring + backup): backend **323 passed / 98.54% cov**, frontend
+**307 passed / 40 suites**, `tsc` clean, `lint` clean, `next build` green. The
+2026-09-05 numbers above stay as the record of that run — the current cycle's
+status is §3.12.
+
 ### 3.7 Phase 3 — server/client boundary + route architecture (status)
 
 Phase 3 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §7).
@@ -345,18 +351,20 @@ Phase 5 is committed on `develop` (see docs/SENIOR_REFACTOR_PLAN.md §6.H/§6.I/
     (new files were named `{slug}_gallery_{idx}` with the counter
     restarting at 0) — the counter now continues past the existing gallery
     (pinned by the extended append test).
-  - **Accepted/deferred technical debt — slug-based gallery filenames**: gallery
-    files are named `{slug}_gallery_{idx}`. This is safe for current public
-    media requirements: each active car has a unique slug (partial unique
-    index), filenames are readable/stable, and public images do not require
-    unpredictable URLs. Changing to UUID-based immutable paths
-    (`cars/{car_id}/gallery/{uuid}.webp`) would need a storage migration,
-    a URL/backward-compatibility plan, and orphan-file cleanup — deferred.
-    One future edge case: slug reuse after soft deletion or slug changes;
-    if that becomes common, move to the immutable identifier above. The
-    no-collision guarantee is pinned by
-    `test_distinct_active_cars_do_not_collide_gallery_files` (two active
-    cars uploading `gallery_0..N` produce four distinct files).
+  - **slug-based gallery filenames — REPLACED 2026-09-18 (Phase 3)**:
+    gallery files were named `{slug}_gallery_{idx}`, accepted as deferred debt
+    on 2026-09-05 (a unique active slug made collisions impossible; readable,
+    stable public URLs). The pre-launch cycle approved **UUID-based immutable
+    paths** (`cars/{car_id}/gallery/{uuid}{ext}`) in
+    `IMPLEMENTATION_PLAN.md` §4/§7.1 — rationale and rejected alternatives in
+    `docs/adr/0007-uuid-gallery-storage.md` — and Phase 3 landed it:
+    `GalleryField.save_gallery_files` stages uploads inside `MEDIA_ROOT` and
+    `shutil.move`s them into the identity-derived directory, `cars/0009`
+    renames the files that already existed, and the old no-collision pin
+    (`test_distinct_active_cars_do_not_collide_gallery_files`) is superseded by
+    `test_gallery_files_are_isolated_per_car`, the §7.2 Case A–D matrix in
+    `apps/cars/test_gallery_storage.py`, and the `0009` migration tests. See
+    §3.12.
   - **Axe spot checks** (headless Chrome + axe-core over the hydrated
     public pages) found: unlabeled filter selects (critical) → aria-labels
     added; footer `tel:` link empty when phone unset (serious) → rendered
@@ -465,6 +473,325 @@ The owner approved the plan on 2026-09-05; the cutover commits are on
   stack (§3.6 matrix + CSP audit); curl: login response keys == `['user']`;
   repo grep: zero runtime `TokenAuthentication`/`authtoken`/`admin_token`
   references (comments and the purge constant only).
+
+### 3.12 Pre-launch hardening — Phases 1–5 (security, monitoring/backup, gallery storage, image variants, UX/SEO + orphan cleanup) (status)
+
+`IMPLEMENTATION_PLAN.md` is the authoritative plan for this cycle. Per its §12
+execution contract each phase is implemented and stopped on its own: Phases 1,
+2, 3, 4A, 4B and 5 are done; **Phase 6 implemented (committed 2026-09-20, pending
+browser-matrix run + tmp-file cleanup), Phases 7–9 implemented (committed 2026-09-20),
+Phase 11 (admin responsive redesign) implemented 2026-09-21**.
+Note: §3.12's per-phase records below kept their original section text; the
+status line above is the live phase tracker.
+
+**Phase 7 — mobile menu close control** (UX-4, implemented 2026-09-20,
+committed 2026-09-20)
+
+- `MobileNav.tsx`: explicit close button in the panel's top row
+  (`aria-label="بستن منو"`), first in the tab order so `useModalA11y`'s
+  initial focus lands on it; hamburger morph, trap, Escape and focus-return
+  untouched. Two existing pins updated deliberately (initial focus target;
+  Tab-wrap-to-first-focusable). 4 new tests.
+
+**Phase 8 — hero slider touch interaction** (UX-3, implemented 2026-09-20,
+committed 2026-09-20)
+
+- `HeroSlider.tsx` gesture logic only: direction lock with a 1.2 slope
+  hysteresis margin (matches the browser's own pan-commit decision), drag
+  offset now accumulates even on non-cancelable moves (a swipe that lost the
+  slope race still completes its transition), and `preventDefault` guarded by
+  `e.cancelable` — zero `[Intervention]` warnings.
+- Tests: 6 new unit tests with synthetic cancelable/non-cancelable touch
+  streams; plus a mobile-emulation e2e spec (`e2e/tmp-hero-swipe.spec.ts`,
+  CDP real-touch input) asserting swipe completion, native vertical scroll,
+  and zero Intervention logs — **temporary, to be folded into the permanent
+  e2e set or deleted with the Phase 6 tmp spec per owner decision**.
+- Known pre-existing quirk (documented, not changed): the edge rubber-band
+  rule keeps right-swipes from the first slide below the 50px threshold
+  (max effective drag 120×0.3=36), so right-swipe=next never fires from
+  slide 1; left-swipe=prev (wraps) works. Fixing this is a behavior change
+  outside Phase 8's scope.
+
+**Phase 9 — Persian typography + digit display layer** (UX-2 + UX-5,
+implemented 2026-09-20, committed 2026-09-20)
+
+- New `lib/format/persianDigits.ts`: `toPersianDigits` (display sites) +
+  `toLatinDigits` (centralizes Footer's inline Persian→Latin `tel:`
+  inversion, now also used by Branches). 11 helper unit tests.
+- Display sites: Footer + Branches phone numbers (Persian text, Latin
+  `tel:`), CarFilters/ActiveFilters price labels («۲ میلیارد»), Pagination
+  numerals (visible Persian, `aria-label` Latin — explorer tests' queries
+  unaffected). Year/URL/ID/JSON-LD channels untouched.
+- Typography contract: `font-poppins` removed from the car-detail h1 +
+  price and CarCard's price span; brand/model Latin spans keep it;
+  convention documented in `lib/fonts.ts`. Plan scope correction:
+  FeaturedCars/RelatedCarsSlider have no own price spans (they embed
+  CarCard), so the plan's "four price spans" was actually two.
+- Tests: Pagination (Persian numerals + Latin aria-labels), Footer (Persian
+  display / Latin href), `poppinsContract.test.ts` class assertions;
+  4 CarPagination tests updated from Latin display-text queries to
+  aria-label queries (the display change they pinned is the feature).
+
+**Phase 11 — admin panel responsive redesign** (implemented 2026-09-21)
+
+- Responsive shell in `admin/(protected)/layout.tsx`: below `lg` the navigation
+  is a focus-trapped overlay drawer (shared `NavLinks`/`UserCard`/`SidebarFooter`
+  with the desktop sidebar, `useModalA11y`, labeled close, body scroll lock,
+  `aria-controls`/`aria-hidden`); at `lg+` the collapsible sidebar with its
+  toggle in the topbar. `AdminListPage` renders stacked cards below `md` via the
+  declarative `hideOnMobile`/`primaryOnMobile` column flags (primary renders
+  first regardless of desktop column order). `ConfirmDialog` is a bottom sheet
+  on phones; `AdminForm` + settings share the sticky `FormActions` bar
+  (`components/admin/ui/FormActions.tsx`); hover-only upload affordances became
+  always-visible touch controls; row actions normalized to a 36px tap scale;
+  RTL fixes (`text-start` card values, `dir="ltr"` phone values). Data flow,
+  API client, auth guard and routing untouched — presentation only.
+- Verified in Docker: jest **402 passed / 51 suites**, `tsc` clean, `lint` clean.
+
+**Phase 1 — security hardening** (committed `5888307`)
+
+- **Login brute-force protection**: `/api/v1/auth/login/` mounts
+  `ScopedRateThrottle` with scope `login` at `5/minute` per IP
+  (`REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`). The scope is assigned to
+  `login_view.view_class`, **not** to the wrapper function: DRF's `api_view`
+  does not copy `throttle_scope` onto the generated view class and
+  `ScopedRateThrottle` reads it from the view instance, so a function-level
+  assignment silently never engages. Pinned by
+  `test_throttle_scope_is_set_on_the_view_class`.
+- **Shared throttle counters**: `CACHES["default"]` is a `FileBasedCache` at
+  `CACHE_DIR` (`/var/cache/rahnavard`) instead of per-process LocMemCache —
+  gunicorn runs `--workers 2`, so two independent counters delivered roughly
+  double the configured login rate and a worker recycle silently reset it.
+  `CACHE_DIR` must stay outside `/app` (the dev bind-mount) and outside
+  `MEDIA_ROOT` (nginx serves that tree publicly, and throttle keys are client
+  IPs). Two tests pin the backend and the shared-budget behavior.
+- **Upload validation** (`apps/core/validators.py`): `ImageValidator` now checks
+  **magic bytes** (JPEG `FF D8 FF`, PNG, WebP `RIFF` + `WEBP`) and
+  **dimensions** (min 800×600, max 4000×3000, aspect ≤ 3:1) on top of the
+  existing size, extension and MIME checks. A new `PDFValidator` (size, `.pdf`,
+  `%PDF-` signature) is mounted on `Car.catalog_file`, which previously had only
+  an extension check.
+- **Two deliberate deviations from the plan's blanket dimension floor**, both to
+  avoid rejecting legitimate assets: `SiteSettings.logo` uses
+  `ImageValidator(min_width=200, min_height=60)` because the site's own shipped
+  wordmark is 727×340, and `WhyFeature.icon` uses
+  `ImageValidator(check_dimensions=False)` because icons are legitimately small.
+  Size/extension/MIME/magic-bytes/max-dimension checks are unchanged for both.
+- **Test configuration**: `config.test_settings` raises the login rate to
+  `1000/minute` and switches to LocMemCache so the auth suite neither trips the
+  real throttle nor writes cache files into the test container;
+  `TestLoginThrottling` tightens the rate to `5/minute` itself and clears the
+  cache, mirroring the inquiries pattern.
+
+**Phase 2 — monitoring + backup** (landed 2026-09-18)
+
+- **Sentry, both tiers, opt-in**: `sentry-sdk[django]` (backend) and
+  `@sentry/nextjs` (frontend). An empty DSN means the SDK is never initialised,
+  so a clone or a build without DSNs behaves exactly as before. Decisions and
+  rejected alternatives: docs/adr/0008.
+  - Backend scrubbing in `settings.py`: `send_default_pii=False`,
+    `include_local_variables=False`, `max_request_body_size="never"`,
+    breadcrumbs disabled, and a `before_send` that drops `request`/`user`/
+    `breadcrumbs`/`extra` plus stack-frame `vars` — and drops the whole event
+    when the request payload carries a password/phone/token/secret key.
+  - Frontend mirrors it in `frontend/lib/sentry.ts` (`scrubSentryEvent`), wired
+    through `sentry.client.config.ts` / `sentry.server.config.ts` +
+    `instrumentation.ts` (nodejs), and reported from `app/global-error.tsx` and
+    `app/(site)/error.tsx` (which replaced a bare `console.error`).
+  - Browser envelopes use the SDK's same-origin `/monitoring-tunnel` rewrite, so
+    the enforced CSP keeps `connect-src 'self'` instead of being widened.
+    Confirmed on a real production build: with a DSN present the rewrite appears
+    in `routes-manifest.json` and the DSN + release SHA are baked into the
+    client chunks; without one, no tunnel is added and the build stays green.
+  - `SENTRY_RELEASE` is the checked-out git SHA, exported by `deploy.yml` and
+    `scripts/quick-deploy.sh`. It is embedded in the browser bundle, so changing
+    it needs an image rebuild — `quick-deploy.sh --no-build` cannot update it.
+  - `sentry.edge.config.ts` does not exist: nothing runs on the edge runtime
+    today. Add one if a route ever opts into it, or edge errors go unreported.
+- **Uptime**: UptimeRobot HTTP monitor on `/api/v1/settings/` (5-minute
+  interval, email alert). Manual activation; the monitor proves the API answers,
+  not that the frontend renders.
+- **Backup**: `scripts/backup.sh` / `scripts/restore.sh` rewritten — staging
+  directory, integrity proofs (`gzip -t`, `tar -tzf`), `sha256sum` manifest +
+  `rahnavard-backup-v1` `COMPLETE` marker, atomic rename into place, 30-day
+  retention limited to intact versioned sets, offsite upload published only
+  after remote checksum verification, DB credentials resolved inside the
+  postgres container, and one `flock` shared with restore so the two can never
+  overlap. `scripts/rahnavard-backup.cron` is a **template that nothing
+  installs**; `scripts/test_backup.py` exercises both scripts against stubbed
+  `docker`/`ssh`/`rsync` (Linux only — no real stack, remote host or user data).
+  Operational steps: DEPLOYMENT_GUIDE.md §Backup and Restore.
+- **Validation (Docker, 2026-09-18)**: backend **323 passed / 98.54% cov**,
+  `manage.py check` clean, `makemigrations --check --dry-run` clean; frontend
+  **307 passed / 40 suites**, `tsc --noEmit` clean, `next lint` clean,
+  `next build` green with and without a DSN. The frontend checks ran in a
+  throwaway `docker compose run` container with `npm ci`, because the built dev
+  image predates the `@sentry/nextjs` dependency.
+- **Still owner-side (not code)**: DSNs are not set in production, the
+  UptimeRobot monitor is not created, and the backup cron is not installed.
+  No ADR exists yet for the image pipeline (Phase 4A); docs/adr/0007 (gallery
+  storage) is now implemented.
+
+**Phase 3 — gallery UUID storage + atomic DB/filesystem writes** (landed 2026-09-18)
+
+- **Immutable paths**: gallery files now live at
+  `cars/{car_id}/gallery/{uuid}{ext}` (relative to `settings.MEDIA_URL`). The
+  directory derives from the primary key, so a slug rename neither moves nor
+  invalidates a file, and a soft-deleted car's slug being reused cannot repoint
+  a published URL (`docs/adr/0007`).
+- **Atomic write with explicit cleanup**: `GalleryField.save_gallery_files`
+  streams each upload into a `.gallery-upload-*` staging directory created
+  **inside `MEDIA_ROOT`** — the same filesystem as the destination, so the final
+  move is a rename rather than a cross-device copy (`tempfile.mkdtemp()`'s
+  default `/tmp` is a different mount in the container) — then `shutil.move`s
+  every staged file into place and returns a `GalleryWrite` that records exactly
+  the paths this upload created. `CarAdminSerializer._commit_gallery` calls
+  `GalleryWrite.cleanup()` when the `gallery` JSONField cannot be saved, and a
+  `finally: shutil.rmtree(staging_dir)` removes the staging directory on every
+  path. **`transaction.atomic()` never rolls back the filesystem**, so this
+  bookkeeping — not the transaction — is what prevents orphans.
+- **The write order deviates from plan §7.2 on purpose**: §7.2 staged the temp
+  files *before* opening the transaction. Gallery paths derive from the car's
+  primary key, so the row must be written first; the staging write therefore
+  happens inside the transaction and the row simply never commits when a write
+  fails. The plan's case-by-case guarantees (A–D: no orphans, no data loss) are
+  unchanged, and the rollback path is additionally covered by the tests.
+- **Data migration `cars/0009_gallery_uuid_paths`**: `RunPython` renames the
+  existing `cars/gallery/{slug}_gallery_{idx}{ext}` files on disk and rewrites
+  the matching JSONField URLs, including soft-deleted cars (the historical model
+  gets a plain manager, not `SoftDeleteManager`). It is idempotent — URLs
+  outside the legacy directory, non-media/external URLs and entries whose file
+  is already missing are returned unchanged — and its reverse is deliberately
+  `RunPython.noop`: a reverse rename could only guess the original slug, and a
+  half-renamed media volume is worse than a database one migration behind. Roll
+  a bad deploy back from a backup (`scripts/restore.sh`).
+- **Tests**: new `apps/cars/test_gallery_storage.py` covers the §7.2 matrix —
+  A (gallery save fails after the move → moved files deleted, row rolled back),
+  B (staging directory cannot be created → no row, no files),
+  C (second file of a batch fails → the first staged file is discarded too),
+  D (failed update → the previous gallery's file and URLs survive untouched) —
+  and `TestGalleryUuidMigration` in `apps/core/test_backfill_migrations.py`
+  pins the rename + URL rewrite, the untouched non-legacy entries (including a
+  missing file, which must not be invented or dropped) and idempotency.
+  `test_gallery_files_are_isolated_per_car` plus
+  `test_slug_rename_neither_moves_nor_invalidates_gallery_files` replace the old
+  slug-scheme pin, and `test_admin_create_with_gallery_files` asserts the new
+  path shape and that no staging directory survives a success.
+- **Known residual risk**: the `main_image` a failed create writes is still left
+  on disk (plain Django `FileField` behaviour, outside the gallery path); the
+  plan assigns orphan *files* to Phase 5's `cleanup_orphan_media` command
+  (dry-run by default).
+- **Validation (Docker, 2026-09-18)**: backend **330 passed / 98.59% cov**,
+  `manage.py check` clean, `makemigrations --check --dry-run` clean; frontend
+  untouched — 307/40 suites, `tsc --noEmit` clean, `next lint` clean, and the
+  public + CSP e2e specs 4/4 green against the local stack (`npx playwright
+  test e2e/public.spec.ts e2e/csp-audit.spec.ts`). `admin-auth.spec.ts` was not
+  run because it needs the seeded `e2e_admin` user (`e2e/README.md`).
+
+**Phase 4A — upload-time image variant pipeline** (landed 2026-09-18)
+
+- **Variants**: for every content image (`Car.main_image`, `Car.gallery`
+  entries, `Article.cover_image`, `HeroSlide.image`) an upload now generates,
+  with the existing Pillow dependency and strictly after `ImageValidator`
+  accepts the bytes: a WebP re-encode at the original dimensions (quality 82),
+  aspect-preserving thumbnails fitted inside 400×300 / 800×600 / 1600×1200
+  boxes (`Image.thumbnail` — no crop, no upscale), and a 10px WebP LQIP
+  (quality 40). Originals are preserved byte-for-byte. **No schema change**:
+  variant files live in a deterministic sibling `.variants/<stem>/` directory
+  derived from the source path (`apps/core/image_variants.py`;
+  `docs/adr/0009`).
+- **Wiring**: a `post_save` receiver per model (minimal `AppConfig`s added for
+  cars/articles/core) defers generation to `transaction.on_commit`; gallery
+  files bypass signals entirely, so `GalleryField.save_gallery_files` schedules
+  the same worker for exactly the URLs its upload created. Generation runs
+  only after the DB commits and failures are **contained and logged** — a
+  committed row without variants is exactly the pre-4A state and the regen
+  command repairs it. That is the mirror image of Phase 3's policy, where the
+  file path is part of the stored data and a failure must abort the request.
+- **Exposure**: additive read-only `main_image_variants` / `gallery_variants` /
+  `cover_image_variants` / `image_variants` on the public serializers. Each
+  reads disk truth only and returns `null` until the set exists, so
+  pre-backfill responses are byte-identical to the pre-4A API and
+  `main_image`/`gallery` keep their string shapes across the 4A→4B boundary;
+  `gallery_variants[i]` aligns 1:1 with `gallery[i]`.
+- **Backfill**: `regenerate_image_variants` (dry-run default, `--apply`,
+  `--force`, `--strict`) — idempotent, gap-filling, tolerant of unreadable
+  legacy images; walks main/cover/hero images plus every local gallery URL,
+  soft-deleted rows included. **Owner deploy step**: run `--apply` once after
+  deploy; no DB migration exists or is needed.
+- **Known residual risk**: a process crash mid-write can leave one dot-tmp
+  file inside a `.variants` directory (plan Case E) — Phase 5's
+  `cleanup_orphan_media` recognizes `.variants` artifacts by path.
+- **Validation (Docker, 2026-09-18)**: backend **359 passed / 98.62% cov**
+  (baseline was 330 / 98.59), `check` + `makemigrations --check --dry-run`
+  clean; frontend untouched (307 tests, tsc/lint clean). The only uncovered
+  lines in the new modules are exception-only best-effort cleanup guards.
+
+**Phase 4B — frontend image delivery** (landed 2026-09-18)
+
+- **`OptimizedImage`** is the single image component and now consumes the
+  4A variant set (`types/media.ts`): tier derivation (`sm`/`md`/`lg`) from
+  the slot width or an explicit `tier` prop, preference of the generated
+  WebP variant for same-origin `/media/` srcs, the backend LQIP passed
+  through as next/image's `blur` placeholder, and an event-driven
+  `onError` fallback that advances variant → original and stops after
+  the chain is exhausted — a broken variant can never reroute into the
+  media-incapable optimizer and loop. Media URLs stay `unoptimized`
+  (nginx owns `/media/` in dev and prod; the frontend container has no
+  media volume, so next/image's on-demand optimizer 404s). Non-media
+  srcs keep the optimizer exactly as before.
+- **Consumers** wired with the additive `variants` prop: `CarCard`,
+  `CarCardImage`, `CarImageGallery` (per-slide lookup plus a thumbnail
+  variant on the strip), `RelatedCarsSlider`, `FeaturedCars`,
+  `HeroSlider`, `LatestArticles`, `ArticlesExplorer`, and the car/article
+  detail pages. `types/car.ts`, `types/article.ts` and `types/heroSlide.ts`
+  gain the additive `*_variants` fields.
+- **Tests**: `components/ui/__tests__/OptimizedImage.test.tsx` — 13 tests
+  pinning tier selection (incl. explicit-override), blur pass-through,
+  no-variant and null-variant degradation, the non-media exemption, and
+  the error-fallback chain (advance / exhaustion / stale-event ignore).
+- **Known residual risk**: unchanged from 4A — a crash mid-write can leave
+  one dot-tmp file inside a `.variants` directory (plan Case E), cleaned
+  by Phase 5's `cleanup_orphan_media`.
+- **Validation (Docker, 2026-09-18)**: frontend **319 passed / 41 suites**,
+  `tsc --noEmit` clean, `next lint` fully clean, `next build` green
+  (throwaway container); backend untouched at **359 passed / 98.62%**.
+
+**Phase 5 — UX/SEO polish + orphan cleanup** (committed `8b55dee`, 2026-09-19)
+
+- **Listing breadcrumbs**: `/cars` and `/articles` render the same
+  breadcrumb pattern as the detail pages (home → section,
+  `aria-label="breadcrumb"`), added inside the SSR'd explorer islands
+  (`CarsExplorer`/`ArticlesExplorer`) so the first server HTML carries
+  them. Detail pages were already complete and are untouched.
+- **Per-page canonical URLs**: car and article detail `generateMetadata`
+  emit `alternates.canonical` built from `NEXT_PUBLIC_SITE_URL`
+  (`${siteUrl}/cars/${slug}` / `${siteUrl}/articles/${slug}`). Listing
+  shells stay canonical-free — the root canonical is sufficient (plan §5
+  deferred list). Pinned by `app/(site)/__tests__/detail-metadata.test.ts`,
+  including the listing-shells-stay-clean assertion.
+- **`cleanup_orphan_media`** (`apps/core/management/commands/`): dry-run by
+  default, `--delete` to remove. Orphan classes: files no row references
+  (the FileField-replacement case `test_gallery_storage.py` explicitly
+  deferred here), Phase 3 `.gallery-upload-*` staging leftovers (§7.2
+  Case E), Phase 4A variant sets whose original is dead or missing on disk,
+  and crash-mid-write dot-tmp files inside a live original's `.variants`
+  directory (ADR-0009). Never touches: files of soft-deleted rows
+  (`with_deleted()`), the `SiteSettings` singleton, variant sets of live
+  originals (minus their tmp artifacts), and unknown dot-prefixed paths.
+  Directories are pruned only when emptied (`os.rmdir`), never recursively.
+- **Tests**: `apps/core/test_cleanup_orphan_media.py` (14 tests — every
+  orphan class, keep-classes, dry-run default, idempotent delete, prune
+  behavior) plus the breadcrumb tests in both explorer suites and the new
+  metadata suite. Coverage note: the dip to **98.12%** is the command's
+  exception-only guard branches, same shape as Phase 4A's.
+- **Validation (Docker, 2026-09-19)**: backend **373 passed / 98.12% cov**,
+  `check` + `makemigrations --check` clean; frontend **326 passed / 42
+  suites**, `tsc --noEmit` clean, `next lint` clean.
+- **Owner deploy steps (unchanged + new)**: run
+  `regenerate_image_variants --apply` once (the still-pending 4A backfill),
+  then `cleanup_orphan_media` (dry-run), review the list, and only then
+  `--delete`.
 
 ### 3.6 Phase 2 — auth staging smoke checklist (session cookies + CSRF)
 
@@ -942,4 +1269,4 @@ See Section 7 for the full merge workflow.
 
 ---
 
-*Last updated: 2026-09-05 (CSP ENFORCED + Phase 2 cutover complete: session-only auth, admin_token purged; backend 282 / frontend 302 + 13 e2e)*
+*Last updated: 2026-09-21 (hardening cycle Phases 1–11 landed/implemented — backend 373 / frontend 402; gallery UUID in docs/adr/0007, monitoring/backup in docs/adr/0008, image variants in docs/adr/0009, PDF.js viewer decision in docs/adr/0010)*

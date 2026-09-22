@@ -81,6 +81,7 @@ jobs:
               exit 1
             fi
             git reset --hard origin/main
+            export SENTRY_RELEASE="$(git rev-parse HEAD)"
             echo "✅ Code at $(git rev-parse --short HEAD)"
 
             # Step 2: Build Docker images. --progress=plain streams build

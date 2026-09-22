@@ -139,6 +139,11 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
           DEBUG: '1'
           DATABASE_URL: sqlite:///test.db
+          # The production file-cache location (/var/cache/rahnavard) is created
+          # by the root-owned container at runtime; a non-root runner cannot
+          # mkdir it, and the cache system check fails before lint even starts.
+          # Point the check at a writable temp dir — prod/Docker are untouched.
+          CACHE_DIR: /tmp/rahnavard-cache
         run: python manage.py check
 
   test-backend:
@@ -226,6 +231,9 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
           DEBUG: '1'
           DATABASE_URL: sqlite:///test.db
+          # Non-root runners cannot mkdir the production cache dir (same
+          # reason as the CACHE_DIR override on the lint job's check step).
+          CACHE_DIR: /tmp/rahnavard-cache
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
@@ -260,6 +268,9 @@ jobs:
           CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1
           NEXT_PUBLIC_API_URL=/api/v1
           NEXT_PUBLIC_SITE_URL=http://localhost
+          # e2e logs in repeatedly from one IP; the default 5/minute login
+          # throttle would 429 the later logins (csp-audit admin sweep).
+          LOGIN_THROTTLE_RATE=1000/minute
           EOF
           echo ".env written (compose interpolation only — never committed)"
 

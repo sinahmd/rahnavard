@@ -6,6 +6,8 @@
  * - `CarAdmin`     — CarAdminSerializer (admin CRUD endpoints)
  */
 
+import type { ImageVariants } from './media'
+
 /** CarListSerializer — public list rows (`/api/v1/cars/`). */
 export interface CarListItem {
   id: number
@@ -22,6 +24,8 @@ export interface CarListItem {
   body_type: string | null
   engine: string | null
   main_image: string | null
+  /** Additive Phase 4A field; null until the variant set exists on disk. */
+  main_image_variants?: ImageVariants | null
   is_featured: boolean
   display_order: number
   created_at: string
@@ -43,7 +47,14 @@ export interface CarDetail {
   engine: string | null
   price: string | null
   main_image: string | null
+  /** Additive Phase 4A field; null until the variant set exists on disk. */
+  main_image_variants?: ImageVariants | null
   gallery: string[]
+  /**
+   * Additive Phase 4A field mirroring `gallery` 1:1 — null entries where the
+   * corresponding gallery image has no variant set on disk.
+   */
+  gallery_variants?: Array<ImageVariants | null>
   manufacturer: string | null
   body_type: string | null
   color: string | null

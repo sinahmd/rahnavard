@@ -66,6 +66,7 @@ export default function RelatedCarsSlider({ currentSlug }: Props) {
             >
               <CarCardImage
                 src={car.main_image}
+                variants={car.main_image_variants}
                 alt={car.persian_name}
                 className="mb-4"
                 placeholderClassName="text-sm"

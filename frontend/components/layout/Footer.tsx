@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import { toLatinDigits, toPersianDigits } from '@/lib/format/persianDigits'
 import type { SiteSettings } from '@/types/settings'
 
 function getQuickLinks(pathname: string) {
@@ -72,10 +73,10 @@ export default function Footer({ settings }: { settings: SiteSettings }) {
               {settings.phone && (
                 <li className="ltr text-right">
                   <a
-                    href={`tel:${settings.phone.replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 1728))}`}
+                    href={`tel:${toLatinDigits(settings.phone)}`}
                     className="text-white/60 text-[14px] hover:text-accent transition-colors"
                   >
-                    {settings.phone}
+                    {toPersianDigits(settings.phone)}
                   </a>
                 </li>
               )}

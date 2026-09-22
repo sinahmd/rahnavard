@@ -175,6 +175,33 @@ CSRF_COOKIE_HTTPONLY = False  # readable on purpose: echoed as X-CSRFToken
 CSRF_COOKIE_SAMESITE = "Lax"
 
 
+# Cache / throttle state
+# The DRF throttles (login, inquiries, anon/user) keep their counters in the
+# default cache. Django's implicit default — LocMemCache — is per-process, and
+# production runs `gunicorn --workers 2` (entrypoint.sh), i.e. two worker
+# processes holding two independent counters, so the configured rate is
+# delivered at roughly double. A file cache keeps the counters in
+# process-external storage shared by every worker of the single backend
+# container, and they now also survive a worker crash or recycle instead of
+# silently resetting. CACHE_DIR must stay OUTSIDE /app: in local Docker /app is
+# the host bind-mount (cache files would land in the working tree), and in
+# production /app/media is mounted into nginx read-only and served publicly, so
+# throttle keys (client IPs) would leak over HTTP. Single container today — a
+# multi-replica backend would need a genuinely shared store instead.
+CACHE_DIR = env("CACHE_DIR", default="/var/cache/rahnavard")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": CACHE_DIR,
+        # The generous anon bucket (1000/hour) keeps a key per client IP for a
+        # full hour, so a public site exceeds Django's default cap of 300 live
+        # entries and needlessly culls. Login keys are the freshest, so they
+        # survive culling either way; raising the cap just avoids the churn.
+        "OPTIONS": {"MAX_ENTRIES": 5000},
+    },
+}
+
+
 # REST Framework Configuration
 REST_FRAMEWORK = {
     # SESSION-ONLY (Phase 2 cutover, plan §6.A.4): admin requests authenticate
@@ -205,6 +232,11 @@ REST_FRAMEWORK = {
         # The public inquiry form is the spam magnet — a strict scoped rate
         # instead of the generous global anon bucket (inquiries/views.py).
         "inquiries": "20/hour",
+        # Login brute-force protection — 5 attempts per minute per IP.
+        # Env-overridable so isolated test environments that log in repeatedly
+        # from a single IP (CI e2e against the prod stack) can raise it;
+        # production keeps the default.
+        "login": env("LOGIN_THROTTLE_RATE", default="5/minute"),
     },
     # Throttle keying behind the proxy chain (Arvan edge → nginx → Django):
     # nginx fills X-Forwarded-For via $proxy_add_x_forwarded_for, and DRF's
@@ -212,6 +244,45 @@ REST_FRAMEWORK = {
     # header. Two trusted hops leave the client address Arvan inserted.
     "NUM_PROXIES": 2,
 }
+
+def _contains_sensitive_data(event):
+    if "request" in event and "data" in event["request"]:
+        data = event["request"]["data"]
+        if isinstance(data, dict):
+            sensitive_keys = {"password", "phone", "token", "secret"}
+            if any(k in data for k in sensitive_keys):
+                return True
+    return False
+
+
+def _sentry_before_send(event, hint):
+    if _contains_sensitive_data(event):
+        return None
+    for key in ("request", "user", "breadcrumbs", "extra"):
+        event.pop(key, None)
+    for exception in event.get("exception", {}).get("values", []):
+        for frame in exception.get("stacktrace", {}).get("frames", []):
+            frame.pop("vars", None)
+    return event
+
+
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=0,
+        send_default_pii=False,
+        include_local_variables=False,
+        max_request_body_size="never",
+        release=env("SENTRY_RELEASE", default="") or None,
+        environment=env("SENTRY_ENVIRONMENT", default="production"),
+        before_send=_sentry_before_send,
+        before_breadcrumb=lambda breadcrumb, hint: None,
+    )
 
 
 # Security Settings for Production

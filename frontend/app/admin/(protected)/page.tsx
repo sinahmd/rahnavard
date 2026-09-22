@@ -61,15 +61,15 @@ export default function AdminDashboard() {
 
       {error && <ErrorState message={error} />}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
         {statsDisplay.map((stat, index) => (
-          <div key={index} className="bg-white rounded-lg shadow p-6 flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${stat.color}`}>
+          <div key={index} className="bg-white rounded-lg shadow p-4 md:p-6 flex items-center gap-3 md:gap-4">
+            <div className={`w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-full flex items-center justify-center text-xl md:text-2xl ${stat.color}`}>
               {stat.icon}
             </div>
-            <div>
-              <p className="text-gray-600 text-sm">{stat.label}</p>
-              <p className="text-2xl font-bold">{stat.value}</p>
+            <div className="min-w-0">
+              <p className="text-gray-600 text-xs md:text-sm truncate">{stat.label}</p>
+              <p className="text-xl md:text-2xl font-bold">{stat.value}</p>
             </div>
           </div>
         ))}
@@ -83,26 +83,45 @@ export default function AdminDashboard() {
           {inquiries.length === 0 ? (
             <p className="text-gray-500 text-center py-4">استعلامی وجود ندارد</p>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="text-right text-gray-600">
-                  <th className="pb-3">نام</th>
-                  <th className="pb-3">تلفن</th>
-                  <th className="pb-3">موضوع</th>
-                  <th className="pb-3">تاریخ</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Mobile: stacked cards; Desktop: table */}
+              <div className="md:hidden divide-y">
                 {inquiries.map((inquiry) => (
-                  <tr key={inquiry.id} className="border-t">
-                    <td className="py-3">{inquiry.name}</td>
-                    <td className="py-3 font-mono">{inquiry.phone}</td>
-                    <td className="py-3">{inquiry.subject || '-'}</td>
-                    <td className="py-3 text-gray-500">{formatDate(inquiry.created_at)}</td>
-                  </tr>
+                  <div key={inquiry.id} className="py-3">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-bold">{inquiry.name}</span>
+                      <span className="text-xs text-gray-500">{formatDate(inquiry.created_at)}</span>
+                    </div>
+                    {inquiry.subject && (
+                      <p className="text-sm text-gray-700 mb-1">{inquiry.subject}</p>
+                    )}
+                    <p className="text-sm font-mono text-gray-500" dir="ltr">
+                      {inquiry.phone}
+                    </p>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <table className="hidden md:table w-full">
+                <thead>
+                  <tr className="text-right text-gray-600">
+                    <th className="pb-3">نام</th>
+                    <th className="pb-3">تلفن</th>
+                    <th className="pb-3">موضوع</th>
+                    <th className="pb-3">تاریخ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inquiries.map((inquiry) => (
+                    <tr key={inquiry.id} className="border-t">
+                      <td className="py-3">{inquiry.name}</td>
+                      <td className="py-3 font-mono">{inquiry.phone}</td>
+                      <td className="py-3">{inquiry.subject || '-'}</td>
+                      <td className="py-3 text-gray-500">{formatDate(inquiry.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
       </div>

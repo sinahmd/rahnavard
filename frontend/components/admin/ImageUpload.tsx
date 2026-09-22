@@ -166,19 +166,18 @@ export default function ImageUpload({
               alt={label}
               className="w-full max-h-48 object-cover rounded-lg"
             />
-            <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center opacity-0 hover:opacity-100">
-              <span className="bg-white/90 text-dark px-3 py-1 rounded text-sm font-bold">
-                تغییر تصویر
-              </span>
+            {/* Touch-friendly: visible hint chip instead of hover-only overlay */}
+            <div className="absolute bottom-2 right-2 bg-white/90 text-dark px-3 min-h-[32px] inline-flex items-center rounded text-sm font-bold pointer-events-none">
+              تغییر تصویر
             </div>
-            {/* Remove button */}
+            {/* Remove button — 36px target, always visible (no hover on touch) */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 handleRemove()
               }}
-              className="absolute top-2 left-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm hover:bg-red-600 transition-colors"
+              className="absolute top-2 left-2 bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center text-base shadow-md"
               aria-label="حذف تصویر"
             >
               ✕

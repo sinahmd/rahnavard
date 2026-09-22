@@ -29,6 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    // Phase 5: per-page canonical (plan §4 SEO/UX; listing pages keep the root canonical).
+    alternates: { canonical: `${siteUrl}/cars/${params.slug}` },
     openGraph: {
       title,
       description,
@@ -169,6 +171,8 @@ export default async function CarDetailPage({ params }: Props) {
                 mainImage={car.main_image}
                 gallery={car.gallery || []}
                 persianName={car.persian_name}
+                mainImageVariants={car.main_image_variants}
+                galleryVariants={car.gallery_variants}
               />
             </div>
 
@@ -179,7 +183,7 @@ export default async function CarDetailPage({ params }: Props) {
                 <span className="inline-block px-3 py-1 bg-accent/20 text-accent-dark text-xs font-bold rounded-full mb-3">
                   {car.brand}
                 </span>
-                <h1 className="font-poppins text-3xl md:text-4xl font-extrabold text-dark leading-tight">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-dark leading-tight">
                   {car.persian_name}
                 </h1>
                 <p className="text-gray mt-1 text-sm">
@@ -191,7 +195,7 @@ export default async function CarDetailPage({ params }: Props) {
               {car.price && (
                 <div className="bg-gradient-to-l from-accent/10 to-accent/5 border border-accent/30 rounded-xl p-4 mb-6">
                   <p className="text-xs text-gray font-medium mb-1">قیمت</p>
-                  <p className="text-2xl font-extrabold text-dark font-poppins">
+                  <p className="text-2xl font-extrabold text-dark">
                     {new Intl.NumberFormat('fa-IR').format(Number(car.price))}
                     <span className="text-sm font-normal text-gray mr-1">تومان</span>
                   </p>

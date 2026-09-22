@@ -42,6 +42,11 @@ class SiteSettings(models.Model):
         default="راهنورد خودرو با تمرکز بر واردات خودروهای روز دنیا، تلاش می‌کند تجربه‌ای مطمئن، شفاف و حرفه‌ای در خرید خودروهای وارداتی برای مشتریان خود فراهم کند.",
         verbose_name="توضیحات بخش چرا ما",
     )
+    why_background = models.ImageField(
+        upload_to="why/",
+        blank=True,
+        verbose_name="تصویر پس‌زمینه بخش چرا ما",
+    )
 
     # Cars Section
     cars_section_title = models.CharField(

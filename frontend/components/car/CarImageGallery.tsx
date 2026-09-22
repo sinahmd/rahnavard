@@ -2,15 +2,56 @@
 
 import { useState } from 'react'
 import OptimizedImage from '@/components/ui/OptimizedImage'
+import type { ImageVariants } from '@/types/media'
 
 interface Props {
   mainImage: string | null
   gallery: string[]
   persianName: string
+  /** Additive Phase 4A variant set for `mainImage` (may be null/undefined). */
+  mainImageVariants?: ImageVariants | null
+  /**
+   * Additive Phase 4A field mirroring `gallery` 1:1; missing/null entries
+   * degrade that slide to its original URL.
+   */
+  galleryVariants?: Array<ImageVariants | null>
 }
 
-export default function CarImageGallery({ mainImage, gallery, persianName }: Props) {
+/**
+ * Per-slide variant lookup: `variants[i]` corresponds to `images[i]`
+ * (null where the API has no variant set for that image).
+ */
+function buildVariantLookup(
+  mainImage: string | null,
+  gallery: string[],
+  mainImageVariants?: ImageVariants | null,
+  galleryVariants?: Array<ImageVariants | null>
+): Map<string, ImageVariants> {
+  const lookup = new Map<string, ImageVariants>()
+  const entries: ReadonlyArray<readonly [string | null, ImageVariants | null | undefined]> = [
+    [mainImage, mainImageVariants],
+    ...gallery.map((url, i) => [url, galleryVariants?.[i]] as const),
+  ]
+  for (const [url, variants] of entries) {
+    if (url && variants && !lookup.has(url)) lookup.set(url, variants)
+  }
+  return lookup
+}
+
+export default function CarImageGallery({
+  mainImage,
+  gallery,
+  persianName,
+  mainImageVariants,
+  galleryVariants,
+}: Props) {
   const allImages = [mainImage, ...gallery].filter((url): url is string => Boolean(url))
+  const variantFor = buildVariantLookup(
+    mainImage,
+    gallery,
+    mainImageVariants,
+    galleryVariants
+  )
   const [activeIndex, setActiveIndex] = useState(0)
   const [zoomed, setZoomed] = useState(false)
 
@@ -28,19 +69,21 @@ export default function CarImageGallery({ mainImage, gallery, persianName }: Pro
   }
 
   const activeImage = allImages[activeIndex]
+  const activeVariants = variantFor.get(activeImage)
 
   return (
     <>
       <div className="relative w-full aspect-[4/3] bg-white rounded-[14px] overflow-hidden cursor-zoom-in group" onClick={() => setZoomed(true)}>
-        <OptimizedImage src={activeImage} alt={`${persianName} - تصویر ${activeIndex + 1}`} width={800} height={600} className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" priority />
+        <OptimizedImage src={activeImage} variants={activeVariants} alt={`${persianName} - تصویر ${activeIndex + 1}`} width={800} height={600} className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" priority />
         {allImages.length > 1 && <div className="absolute bottom-3 left-3 bg-dark/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm font-medium">{activeIndex + 1} / {allImages.length}</div>}
         {allImages.length > 1 && (
           <>
             <button type="button" onClick={(e) => { e.stopPropagation(); setActiveIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1)) }} className="absolute top-1/2 right-3 -translate-y-1/2 w-10 h-10 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors opacity-0 group-hover:opacity-100" aria-label="تصویر قبلی">
-              <svg className="w-5 h-5 text-dark rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5l7 7-7 7" /></svg>
+              <svg className="w-5 h-5 text-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5l7 7-7 7" /></svg>
             </button>
             <button type="button" onClick={(e) => { e.stopPropagation(); setActiveIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1)) }} className="absolute top-1/2 left-3 -translate-y-1/2 w-10 h-10 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors opacity-0 group-hover:opacity-100" aria-label="تصویر بعدی">
-              <svg className="w-5 h-5 text-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5l7 7-7 7" /></svg>
+
+              <svg className="w-5 h-5 text-dark rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5l7 7-7 7" /></svg>
             </button>
           </>
         )}
@@ -53,7 +96,7 @@ export default function CarImageGallery({ mainImage, gallery, persianName }: Pro
           {allImages.map((url, idx) => (
             <button key={idx} type="button" onClick={() => setActiveIndex(idx)} className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${activeIndex === idx ? 'border-accent-dark shadow-md scale-105' : 'border-gray-200 hover:border-gray-400 opacity-70 hover:opacity-100'}`} aria-label={`تصویر ${idx + 1}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt={`${persianName} - تصویر ${idx + 1}`} className="w-full h-full object-cover" />
+              <img src={variantFor.get(url)?.sm ?? url} alt={`${persianName} - تصویر ${idx + 1}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

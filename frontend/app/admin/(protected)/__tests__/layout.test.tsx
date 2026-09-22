@@ -6,7 +6,7 @@
  * authenticated shell.
  */
 import '@testing-library/jest-dom'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { useRouter, usePathname } from 'next/navigation'
 import AdminLayout from '../../layout'
 import ProtectedLayout from '../layout'
@@ -94,5 +94,36 @@ describe('ProtectedLayout (guard)', () => {
     expect(screen.getAllByText('admin').length).toBeGreaterThan(0)
     expect(assignMock).not.toHaveBeenCalled()
     expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('exposes the mobile drawer through aria-controls and aria-hidden state', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(adminUser, 200))
+
+    render(
+      <AdminLayout>
+        <ProtectedLayout>
+          <div>protected content</div>
+        </ProtectedLayout>
+      </AdminLayout>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('protected content')).toBeInTheDocument()
+    })
+
+    // The hamburger points at the drawer panel, which is inert while closed.
+    const drawer = document.getElementById('admin-mobile-drawer')
+    expect(drawer).not.toBeNull()
+    expect(drawer).toHaveAttribute('aria-hidden', 'true')
+
+    const hamburger = screen.getByRole('button', { name: 'باز کردن منو' })
+    expect(hamburger).toHaveAttribute('aria-controls', 'admin-mobile-drawer')
+
+    fireEvent.click(hamburger)
+    expect(drawer).toHaveAttribute('aria-hidden', 'false')
+    // The labeled close control lives inside the dialog (MobileNav pattern).
+    expect(
+      within(drawer as HTMLElement).getByRole('button', { name: 'بستن منو' })
+    ).toBeInTheDocument()
   })
 })

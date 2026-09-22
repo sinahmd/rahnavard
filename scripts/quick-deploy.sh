@@ -47,6 +47,7 @@ echo ""
 echo "📥 Pulling latest code..."
 git fetch --depth 1 origin main
 git reset --hard origin/main
+export SENTRY_RELEASE="$(git rev-parse HEAD)"
 echo "✅ Code updated to $(git rev-parse --short HEAD)"
 
 if [ "$PULL_ONLY" = true ]; then

@@ -2,6 +2,7 @@
 
 import { FilterState } from './CarFilters'
 import { FUEL_TYPE_LABELS, TRANSMISSION_LABELS } from '@/lib/carConstants'
+import { toPersianDigits } from '@/lib/format/persianDigits'
 
 interface Props {
   filters: FilterState
@@ -12,8 +13,8 @@ interface Props {
 
 function formatPrice(price: string): string {
   const num = parseInt(price, 10)
-  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(0)} میلیارد تومان`
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(0)} میلیون تومان`
+  if (num >= 1_000_000_000) return toPersianDigits(`${(num / 1_000_000_000).toFixed(0)} میلیارد تومان`)
+  if (num >= 1_000_000) return toPersianDigits(`${(num / 1_000_000).toFixed(0)} میلیون تومان`)
   return `${new Intl.NumberFormat('fa-IR').format(num)} تومان`
 }
 

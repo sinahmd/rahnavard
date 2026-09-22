@@ -108,8 +108,8 @@ export default function GalleryUpload({
           <p className="text-xs text-gray font-medium mb-2">تصاویر فعلی:</p>
           <div className="flex flex-wrap gap-3">
             {existingUrls.map((url, idx) => (
-              <div key={`existing-${idx}`} className="relative group">
-                <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-gray-200">
+              <div key={`existing-${idx}`} className="relative">
+                <div className="w-28 h-28 sm:w-24 sm:h-24 rounded-lg overflow-hidden border-2 border-gray-200">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt={`تصویر ${idx + 1}`} className="w-full h-full object-cover" />
                 </div>
@@ -120,7 +120,8 @@ export default function GalleryUpload({
                       e.stopPropagation()
                       onExistingRemove(idx)
                     }}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                    className="absolute -top-2 -right-2 w-9 h-9 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-md"
+                    aria-label={`حذف تصویر ${idx + 1}`}
                   >
                     ✕
                   </button>
@@ -137,8 +138,8 @@ export default function GalleryUpload({
           <p className="text-xs text-gray font-medium mb-2">تصاویر جدید:</p>
           <div className="flex flex-wrap gap-3">
             {value.map((file, idx) => (
-              <div key={`new-${idx}`} className="relative group">
-                <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-accent/30">
+              <div key={`new-${idx}`} className="relative">
+                <div className="w-28 h-28 sm:w-24 sm:h-24 rounded-lg overflow-hidden border-2 border-accent/30">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={URL.createObjectURL(file)}
@@ -152,11 +153,12 @@ export default function GalleryUpload({
                     e.stopPropagation()
                     removeNew(idx)
                   }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                  className="absolute -top-2 -right-2 w-9 h-9 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-md"
+                  aria-label={`حذف ${file.name}`}
                 >
                   ✕
                 </button>
-                <p className="text-[10px] text-gray mt-1 truncate w-24">{file.name}</p>
+                <p className="text-[10px] text-gray mt-1 truncate w-28 sm:w-24">{file.name}</p>
               </div>
             ))}
           </div>

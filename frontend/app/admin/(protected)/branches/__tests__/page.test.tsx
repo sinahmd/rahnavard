@@ -43,8 +43,8 @@ it('renders branches returned by the typed endpoint', async () => {
 
   render(<AdminBranchesPage />)
 
-  expect(await screen.findByText('شعبه مرکزی ساری')).toBeInTheDocument()
-  expect(screen.getByText('ساری، خیابان امام')).toBeInTheDocument()
+  expect((await screen.findAllByText('شعبه مرکزی ساری'))[0]).toBeInTheDocument()
+  expect(screen.getAllByText('ساری، خیابان امام').length).toBeGreaterThan(0)
   expect(mockListBranches).toHaveBeenCalledTimes(1)
 })
 
@@ -58,7 +58,7 @@ it('shows the empty state when there are no branches', async () => {
 
   render(<AdminBranchesPage />)
 
-  expect(await screen.findByText('شعبه‌ای وجود ندارد')).toBeInTheDocument()
+  expect((await screen.findAllByText('شعبه‌ای وجود ندارد'))[0]).toBeInTheDocument()
 })
 
 it('toggles branch activity through the typed endpoint', async () => {
@@ -78,10 +78,10 @@ it('toggles branch activity through the typed endpoint', async () => {
 
   render(<AdminBranchesPage />)
 
-  const toggle = await screen.findByRole('button', { name: 'فعال' })
+  const toggle = await screen.findAllByRole('button', { name: 'فعال' })
   // Status is conveyed to assistive tech (aria-pressed), not only by color.
-  expect(toggle).toHaveAttribute('aria-pressed', 'true')
-  fireEvent.click(toggle)
+  expect(toggle[0]).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(toggle[0])
 
   expect(mockSetBranchActive).toHaveBeenCalledWith(1, false)
   await waitFor(() => expect(mockListBranches).toHaveBeenCalledTimes(2))
@@ -112,8 +112,8 @@ it('deletes after confirming in the accessible dialog', async () => {
 
   render(<AdminBranchesPage />)
 
-  const deleteButton = await screen.findByRole('button', { name: 'حذف' })
-  fireEvent.click(deleteButton)
+  const deleteButtons = await screen.findAllByRole('button', { name: 'حذف' })
+  fireEvent.click(deleteButtons[0])
 
   // The ConfirmDialog opens instead of window.confirm.
   const dialog = await screen.findByRole('dialog')
@@ -123,7 +123,9 @@ it('deletes after confirming in the accessible dialog', async () => {
   // Confirm resolves asynchronously — settle each step of the chain.
   await waitFor(() => expect(mockDeleteBranch).toHaveBeenCalledWith(1))
   await waitFor(() => expect(mockListBranches).toHaveBeenCalledTimes(2))
-  await waitFor(() => expect(screen.getByText('شعبه‌ای وجود ندارد')).toBeInTheDocument())
+  await waitFor(() =>
+    expect(screen.getAllByText('شعبه‌ای وجود ندارد').length).toBeGreaterThan(0)
+  )
   // Dialog is closed after the action.
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
@@ -138,8 +140,8 @@ it('skips deletion when the confirm dialog is cancelled', async () => {
 
   render(<AdminBranchesPage />)
 
-  const deleteButton = await screen.findByRole('button', { name: 'حذف' })
-  fireEvent.click(deleteButton)
+  const deleteButtons = await screen.findAllByRole('button', { name: 'حذف' })
+  fireEvent.click(deleteButtons[0])
 
   const dialog = await screen.findByRole('dialog')
   fireEvent.click(within(dialog).getByRole('button', { name: 'انصراف' }))

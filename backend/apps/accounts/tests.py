@@ -427,3 +427,116 @@ class TestIsSuperUserOrReadOnlyPermission:
         request.user = None
         perm = IsSuperUserOrReadOnly()
         assert perm.has_permission(request, None) is False
+
+
+@pytest.mark.django_db
+class TestLoginThrottling:
+    """Login brute-force protection (Phase 1 hardening): the scoped 'login'
+    rate (5/minute per IP) must actually engage on /api/v1/auth/login/."""
+
+    def test_throttle_scope_is_set_on_the_view_class(self):
+        """Regression pin: ScopedRateThrottle reads the scope from the view
+        INSTANCE at request time. Setting `throttle_scope` on the api_view
+        wrapper function alone is invisible to it and the throttle silently
+        never engages (verified against DRF's decorators.py/throttling.py).
+        The scope must live on login_view.view_class."""
+        from apps.accounts.views import login_view
+
+        assert getattr(login_view.view_class, 'throttle_scope', None) == 'login'
+
+    def test_login_throttled_after_5_attempts(self, api_client, settings):
+        """Five login attempts (invalid credentials — they consume budget by
+        design, that is the brute-force scenario) from one IP, the sixth
+        gets 429."""
+        from django.core.cache import cache
+        from rest_framework.throttling import ScopedRateThrottle
+
+        cache.clear()
+        fw = dict(settings.REST_FRAMEWORK)
+        fw['DEFAULT_THROTTLE_RATES'] = {
+            **fw['DEFAULT_THROTTLE_RATES'],
+            'login': '5/minute',
+        }
+        # The test client has no proxy chain: key directly on REMOTE_ADDR.
+        fw['NUM_PROXIES'] = 0
+        settings.REST_FRAMEWORK = fw
+
+        # DRF snapshots DEFAULT_THROTTLE_RATES onto ScopedRateThrottle when
+        # the module first imports, so a settings override alone is invisible
+        # once any earlier test made a request — rebind the snapshot too, and
+        # restore it afterwards (same pattern as inquiries throttling tests).
+        original_rates = ScopedRateThrottle.THROTTLE_RATES
+        ScopedRateThrottle.THROTTLE_RATES = {**original_rates, 'login': '5/minute'}
+        try:
+            data = {'username': 'nobody', 'password': 'wrong'}
+            # Distinct client IP: keeps this bucket isolated from other tests.
+            extra = {'REMOTE_ADDR': '10.9.0.1'}
+            for _ in range(5):
+                response = api_client.post('/api/v1/auth/login/', data, format='json', **extra)
+                assert response.status_code == 400
+            response = api_client.post('/api/v1/auth/login/', data, format='json', **extra)
+            assert response.status_code == 429
+        finally:
+            ScopedRateThrottle.THROTTLE_RATES = original_rates
+            cache.clear()
+
+    def test_production_cache_is_shared_between_workers(self):
+        """Phase 1: the login throttle keeps its counters in the default cache,
+        and that cache must not be per-process.
+
+        Django's implicit default (LocMemCache) is per-process, and production
+        runs `gunicorn --workers 2` — two processes holding two independent
+        counters, so a configured 5/minute was delivered at roughly double.
+        Pins the shared backend so it cannot be silently reverted.
+        """
+        from importlib import import_module
+        from pathlib import Path
+
+        # `config.test_settings` rebinds only its own namespace, so the real
+        # production module still holds the configured value.
+        prod = import_module('config.settings')
+        assert (
+            prod.CACHES['default']['BACKEND']
+            == 'django.core.cache.backends.filebased.FileBasedCache'
+        )
+        # Cache files must not land under MEDIA_ROOT: nginx serves that tree
+        # read-only and publicly, so throttle keys (client IPs) would leak.
+        location = Path(prod.CACHES['default']['LOCATION'])
+        assert not location.is_relative_to(Path(prod.MEDIA_ROOT))
+
+    def test_login_budget_is_shared_across_worker_processes(self, tmp_path):
+        """Five attempts split across two worker-like cache instances: the
+        sixth is still denied.
+
+        Two FileBasedCache objects over one directory are exactly what two
+        gunicorn workers are — separate in-memory state over shared on-disk
+        state. With per-process counters each worker would grant its own five
+        and the effective limit would double.
+        """
+        from django.contrib.auth.models import AnonymousUser
+        from django.core.cache.backends.filebased import FileBasedCache
+        from rest_framework.test import APIRequestFactory
+        from rest_framework.throttling import ScopedRateThrottle
+
+        class _LoginView:
+            throttle_scope = 'login'
+
+        # Two "workers" reading and writing the same cache directory.
+        workers = [FileBasedCache(str(tmp_path), {}), FileBasedCache(str(tmp_path), {})]
+
+        # ScopedRateThrottle.get_cache_key() reads request.user: an anonymous
+        # attempt (the brute-force case) keys the bucket on the client IP.
+        request = APIRequestFactory().post('/api/v1/auth/login/')
+        request.user = AnonymousUser()
+
+        original_rates = ScopedRateThrottle.THROTTLE_RATES
+        ScopedRateThrottle.THROTTLE_RATES = {**original_rates, 'login': '5/minute'}
+        try:
+            allowed = []
+            for attempt in range(6):
+                throttle = ScopedRateThrottle()
+                throttle.cache = workers[attempt % len(workers)]
+                allowed.append(throttle.allow_request(request, _LoginView()))
+            assert allowed == [True, True, True, True, True, False]
+        finally:
+            ScopedRateThrottle.THROTTLE_RATES = original_rates

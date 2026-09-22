@@ -26,6 +26,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    // Phase 5: per-page canonical (plan §4 SEO/UX; listing pages keep the root canonical).
+    alternates: { canonical: `${siteUrl}/articles/${params.slug}` },
     openGraph: {
       title,
       description,
@@ -102,6 +104,7 @@ export default async function ArticleDetailPage({ params }: Props) {
             <div className="mb-8 rounded-[14px] overflow-hidden">
               <OptimizedImage
                 src={article.cover_image}
+                variants={article.cover_image_variants}
                 alt={article.title}
                 width={800}
                 height={400}

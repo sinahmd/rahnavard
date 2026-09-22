@@ -62,22 +62,30 @@ export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
       const deltaX = e.touches[0].clientX - touchStartX.current
       const deltaY = e.touches[0].clientY - touchStartY.current
 
-      // Determine scroll direction on first significant movement
+      // Direction lock with hysteresis (UX-3): horizontal wins unless the
+      // gesture is clearly vertical-dominant. The 1.2 slope margin mirrors
+      // how the browser commits to panning, so a slightly drifting swipe
+      // still locks as horizontal instead of racing the page scroll.
       if (!isSwiping.current && !isVerticalScroll.current) {
         if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-          if (Math.abs(deltaY) > Math.abs(deltaX)) {
+          if (Math.abs(deltaY) > Math.abs(deltaX) * 1.2) {
             isVerticalScroll.current = true
-            return
+          } else {
+            isSwiping.current = true
           }
-          isSwiping.current = true
         }
-        return
       }
 
       if (isVerticalScroll.current) return
+      if (!isSwiping.current) return
 
-      // Prevent vertical scroll while swiping horizontally
-      e.preventDefault()
+      // Guard preventDefault on cancelability (UX-3): once the browser has
+      // committed to panning, the event is non-cancelable and calling it is
+      // a no-op that logs an [Intervention] warning and fights an in-flight
+      // scroll. The drag offset below is updated EITHER WAY, so a swipe that
+      // lost the slope race still completes its slide transition on touchend
+      // instead of stalling at a sub-threshold delta.
+      if (e.cancelable) e.preventDefault()
 
       // Clamp the drag with rubber-band resistance at edges
       let clampedDelta = deltaX
@@ -159,6 +167,7 @@ export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
             <Link href={slide.link} className="block absolute inset-0">
               <OptimizedImage
                 src={slide.image}
+                variants={slide.image_variants}
                 alt={slide.alt_text}
                 fill
                 className={`object-cover object-center ${
@@ -171,6 +180,7 @@ export default function HeroSlider({ slides }: { slides: LoadedSlide[] }) {
           ) : (
             <OptimizedImage
               src={slide.image}
+              variants={slide.image_variants}
               alt={slide.alt_text}
               fill
               className={`object-cover object-center ${

@@ -1,74 +1,71 @@
 #!/bin/bash
-# Restore script for Rahnavard Automotive
-# Use this to restore from backup
-
-set -e
-
-BACKUP_DIR="/var/backups/rahnavard"
-PROJECT_DIR="/var/www/rahnavard"
-
-echo "🔄 Starting restore process..."
-
-# List available backups
-echo ""
-echo "📋 Available backups:"
-ls -lh $BACKUP_DIR/
-
-echo ""
-read -p "Enter the backup date (YYYYMMDD_HHMMSS): " BACKUP_DATE
-
-# Verify backup files exist
-if [ ! -f "$BACKUP_DIR/db_$BACKUP_DATE.sql.gz" ]; then
-    echo "❌ Database backup not found!"
-    exit 1
-fi
-
-# Confirm restore
-echo ""
-echo "⚠️  WARNING: This will overwrite the current database!"
-read -p "Are you sure you want to continue? (yes/no): " CONFIRM
-
-if [ "$CONFIRM" != "yes" ]; then
-    echo "Restore cancelled."
-    exit 0
-fi
-
-# Stop services
-echo "🛑 Stopping services..."
-cd $PROJECT_DIR
-docker compose -f docker-compose.prod.yml down
-
-# Start only postgres
-echo "🚀 Starting PostgreSQL..."
-docker compose -f docker-compose.prod.yml up -d postgres
-sleep 5
-
-# Restore database
-echo "🗄️  Restoring database..."
-gunzip -c $BACKUP_DIR/db_$BACKUP_DATE.sql.gz | docker compose -f docker-compose.prod.yml exec -T postgres psql -U rahnavard_user -d rahnavard
-
-# Restore media files
-if [ -f "$BACKUP_DIR/media_$BACKUP_DATE.tar.gz" ]; then
-    echo "📁 Restoring media files..."
-    tar -xzf $BACKUP_DIR/media_$BACKUP_DATE.tar.gz -C $PROJECT_DIR
-fi
-
-# Start all services
-echo "🚀 Starting all services..."
-docker compose -f docker-compose.prod.yml up -d
-
-# Wait for services
-echo "⏳ Waiting for services to start..."
-sleep 10
-
-# Health check
-echo "🏥 Running health checks..."
-if curl -f -s http://localhost:8000/api/v1/settings/ > /dev/null 2>&1; then
-    echo "✅ Backend is healthy"
-else
-    echo "⚠️  Backend health check failed"
-fi
-
-echo ""
-echo "✅ Restore completed!"
-echo "🌐 Website: https://rahnavard.co"
+# Restore only new-format, checksum-verified sets. Never source a saved .env.
+set -euo pipefail
+umask 077
+PROJECT_DIR="${PROJECT_DIR:-/var/www/rahnavard}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/rahnavard}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+[[ "$PROJECT_DIR" == /* && "$BACKUP_DIR" == /* && "$BACKUP_DIR" != / ]] || die 'Project/backup paths must be absolute; backup path cannot be /.'
+[[ "$COMPOSE_FILE" == /* ]] || COMPOSE_FILE="$PROJECT_DIR/$COMPOSE_FILE"
+[[ -f "$COMPOSE_FILE" && -d "$BACKUP_DIR" ]] || die 'Compose file or backup directory missing.'
+command -v flock >/dev/null || die 'flock is required.'
+command -v python3 >/dev/null || die 'python3 is required for archive safety validation.'
+BACKUP_DIR=$(realpath -- "$BACKUP_DIR")
+exec 9>"$BACKUP_DIR/.backup.lock"
+flock -n 9 || die 'Backup or restore already running.'
+compose() { docker compose --project-directory "$PROJECT_DIR" -f "$COMPOSE_FILE" "$@"; }
+printf 'Available sets:\n'
+for DIR in "$BACKUP_DIR"/rahnavard_*; do
+    [[ -d "$DIR" && ! -L "$DIR" ]] && printf '  %s\n' "${DIR##*/}"
+done
+read -r -p 'Enter set name (rahnavard_YYYYMMDD_HHMMSS): ' SET
+[[ "$SET" =~ ^rahnavard_[0-9]{8}_[0-9]{6}$ ]] || die 'Invalid set name.'
+SOURCE="$BACKUP_DIR/$SET"
+[[ -d "$SOURCE" && ! -L "$SOURCE" ]] || die 'Set not found or symlink refused.'
+for FILE in db.sql.gz media.tar.gz env.backup COMPLETE manifest.sha256; do
+    [[ -f "$SOURCE/$FILE" && ! -L "$SOURCE/$FILE" ]] || die "Missing or unsafe file: $FILE"
+done
+# Pin the exact manifest file list: no missing entries or arbitrary paths accepted.
+(
+    cd "$SOURCE"
+    [[ "$(sha256sum db.sql.gz media.tar.gz env.backup COMPLETE)" == "$(<manifest.sha256)" ]] || die 'Manifest mismatch; NOTHING restored.'
+    sha256sum -c manifest.sha256
+)
+[[ $(<"$SOURCE/COMPLETE") == rahnavard-backup-v1 ]] || die 'Unsupported backup format.'
+gzip -t "$SOURCE/db.sql.gz" "$SOURCE/media.tar.gz"
+tar -tzf "$SOURCE/media.tar.gz" >/dev/null
+# Refuse traversal, links and device entries before touching any service or data.
+python3 - "$SOURCE/media.tar.gz" <<'PY'
+import pathlib
+import sys
+import tarfile
+with tarfile.open(sys.argv[1], 'r:gz') as archive:
+    for member in archive:
+        path = pathlib.PurePosixPath(member.name)
+        if path.is_absolute() or '..' in path.parts or not (member.isfile() or member.isdir()):
+            sys.exit('Unsafe media archive member; NOTHING restored.')
+PY
+printf '\nWARNING: This replaces database objects in the dump and ALL media files.\n'
+printf 'Saved env.backup is retained for MANUAL recovery; current .env is NOT overwritten.\n'
+read -r -p 'Are you sure you want to continue? (yes/no): ' CONFIRM
+[[ "$CONFIRM" == yes ]] || { printf 'Restore cancelled.\n'; exit 0; }
+# Keep PostgreSQL and the actual named volumes; take application writers offline.
+# On any failure, leave services stopped for operator recovery, not half-live.
+trap 'printf "Restore failed; application services may be stopped. Inspect before restarting.\n" >&2' ERR
+compose stop nginx frontend backend
+compose up -d postgres
+READY=false
+for ((ATTEMPT=0; ATTEMPT<30; ATTEMPT++)); do
+    if compose exec -T postgres sh -c 'pg_isready --username="${POSTGRES_USER:?}" --dbname="${POSTGRES_DB:?}"'; then
+        READY=true
+        break
+    fi
+    sleep 2
+done
+[[ "$READY" == true ]] || die 'PostgreSQL readiness timed out.'
+gzip -dc "$SOURCE/db.sql.gz" | compose exec -T postgres sh -c 'exec psql -X --set=ON_ERROR_STOP=1 --single-transaction --username="${POSTGRES_USER:?}" --dbname="${POSTGRES_DB:?}"'
+# A one-off backend container mounts the SAME media volume; bypass its entrypoint.
+compose run --rm --no-deps -T --entrypoint sh backend -c 'set -eu; find /app/media -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; exec tar --no-same-owner -xzf - -C /app/media' < "$SOURCE/media.tar.gz"
+compose up -d
+printf 'Restore completed. Verify application health and data before reopening traffic.\n'

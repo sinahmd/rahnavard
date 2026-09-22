@@ -27,6 +27,16 @@ export interface AdminListColumn<T> {
   header: string
   className?: string
   cell: (row: T, helpers: AdminListHelpers) => ReactNode
+  /**
+   * Mobile card list (responsive workstream): skip this column entirely when
+   * rows render as cards below md (e.g. thumbnails that would bloat cards).
+   */
+  hideOnMobile?: boolean
+  /**
+   * Render this column's cell as the card's bold title line instead of a
+   * label/value row. Pick the human-identifying field (name/title).
+   */
+  primaryOnMobile?: boolean
 }
 
 interface AdminListPageProps<T> {
@@ -138,7 +148,7 @@ export default function AdminListPage<T>({
           createHref ? (
             <Link
               href={createHref}
-              className="bg-accent text-dark px-4 py-2 rounded-lg font-bold hover:bg-accent-dark transition-colors"
+              className="bg-accent text-dark px-4 min-h-[44px] inline-flex items-center rounded-lg font-bold hover:bg-accent-dark transition-colors"
             >
               {createLabel || '+ جدید'}
             </Link>
@@ -154,7 +164,8 @@ export default function AdminListPage<T>({
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
+          {/* Desktop: the full table, unchanged. */}
+          <table className="hidden md:table w-full">
             <caption className="sr-only">{title}</caption>
             <thead className="bg-gray-50">
               <tr className="text-right">
@@ -186,6 +197,50 @@ export default function AdminListPage<T>({
             </tbody>
           </table>
 
+          {/* Mobile: the same column config rendered as stacked cards —
+              no horizontal scrolling, actions stay inside each card. The
+              primaryOnMobile column is the card's title line and renders
+              first regardless of its desktop column position. */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {rows.length === 0 ? (
+              <div className="p-4">
+                <EmptyState message={emptyMessage} />
+              </div>
+            ) : (
+              rows.map((row) => {
+                const helpers = { refresh, error: reportError, confirm }
+                const cardColumns = [
+                  ...columns.filter((col) => col.primaryOnMobile),
+                  ...columns.filter((col) => !col.primaryOnMobile),
+                ]
+                return (
+                  <div key={rowKey(row)} className="p-4">
+                    {cardColumns.map((col) => {
+                      if (col.hideOnMobile) return null
+                      const content = col.cell(row, helpers)
+                      if (col.primaryOnMobile) {
+                        return (
+                          <div key={col.header} className="mb-2 text-base font-bold">
+                            {content}
+                          </div>
+                        )
+                      }
+                      return (
+                        <div
+                          key={col.header}
+                          className="flex items-start justify-between gap-3 py-1 text-sm"
+                        >
+                          <span className="shrink-0 text-gray-500">{col.header}</span>
+                          <span className="min-w-0 break-words text-start">{content}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })
+            )}
+          </div>
+
           <ConfirmDialog
             open={!!pendingConfirm}
             title="تأیید حذف"
@@ -196,16 +251,16 @@ export default function AdminListPage<T>({
           />
 
           {totalPages > 1 && (
-            <div className="px-4 py-3 border-t flex items-center justify-between text-sm">
+            <div className="px-4 py-3 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
               <span className="text-gray-600">
                 نمایش {rows.length} از {count}
               </span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap justify-center">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   aria-label="صفحه قبلی"
-                  className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-40 font-bold"
+                  className="px-3 min-h-[36px] rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-40 font-bold"
                 >
                   قبلی
                 </button>
@@ -215,7 +270,7 @@ export default function AdminListPage<T>({
                     onClick={() => setPage(n)}
                     aria-label={`صفحه ${n}`}
                     aria-current={n === page ? 'page' : undefined}
-                    className={`w-8 h-8 rounded font-bold ${
+                    className={`w-9 h-9 rounded font-bold ${
                       n === page ? 'bg-accent text-dark' : 'bg-gray-100 hover:bg-gray-200'
                     }`}
                   >
@@ -226,7 +281,7 @@ export default function AdminListPage<T>({
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                   aria-label="صفحه بعدی"
-                  className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-40 font-bold"
+                  className="px-3 min-h-[36px] rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-40 font-bold"
                 >
                   بعدی
                 </button>

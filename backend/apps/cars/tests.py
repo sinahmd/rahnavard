@@ -1,12 +1,36 @@
 import os
+import re
 import struct
 import zlib
+from pathlib import Path
 import pytest
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from io import BytesIO
+from PIL import Image
 from rest_framework.test import APIClient
 
 from .models import Car
+
+
+def _make_valid_png(width=800, height=600):
+    """Return a valid PNG image with the given dimensions."""
+    img = Image.new('RGB', (width, height), 'white')
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    buf.name = 'test.png'
+    return buf.getvalue()
+
+
+def _make_valid_jpeg(width=800, height=600):
+    """Return a valid JPEG image with the given dimensions."""
+    img = Image.new('RGB', (width, height), 'white')
+    buf = BytesIO()
+    img.save(buf, format='JPEG')
+    buf.seek(0)
+    buf.name = 'test.jpg'
+    return buf.getvalue()
 
 
 def _make_tiny_png():
@@ -40,7 +64,7 @@ def sample_car(db):
         display_order=1,
         main_image=SimpleUploadedFile(
             name='test.jpg',
-            content=b'',
+            content=_make_valid_jpeg(),
             content_type='image/jpeg'
         )
     )
@@ -100,7 +124,7 @@ class TestCarModel:
             year=2025,
             fuel_type='gasoline',
             transmission='automatic',
-            main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+            main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
         )
         assert car.slug is not None
         assert len(car.slug) > 0
@@ -114,7 +138,7 @@ class TestCarModel:
             year=2026,
             fuel_type='gasoline',
             transmission='automatic',
-            main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+            main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
         )
         # Auto-generated slug should differ from sample_car's slug
         assert car.slug != sample_car.slug
@@ -219,7 +243,7 @@ class TestCarSoftDelete:
             year=2025,
             fuel_type='gasoline',
             transmission='automatic',
-            main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+            main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
         )
         assert new_car.slug == original_slug
 
@@ -237,7 +261,7 @@ class TestCarSoftDelete:
                 year=2025,
                 fuel_type='gasoline',
                 transmission='automatic',
-                main_image=SimpleUploadedFile('test.jpg', b'', 'image/jpeg')
+                main_image=SimpleUploadedFile('test.jpg', _make_valid_jpeg(), 'image/jpeg')
             )
 
     def test_multiple_cars_soft_delete(self, sample_cars):
@@ -335,7 +359,7 @@ class TestCarAdminAPI:
             'fuel_type': 'gasoline',
             'transmission': 'automatic',
             'is_active': True,
-            'main_image': SimpleUploadedFile('test.png', _make_tiny_png(), 'image/png')
+            'main_image': SimpleUploadedFile('test.png', _make_valid_png(), 'image/png')
         }
         response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
         assert response.status_code == 201
@@ -367,7 +391,7 @@ class TestCarAdminAPI:
                 '<img src="x" onerror="alert(1)">'
                 '<a href="JaVaScRiPt:alert(1)">bad</a>'
             ),
-            'main_image': SimpleUploadedFile('test.png', _make_tiny_png(), 'image/png')
+            'main_image': SimpleUploadedFile('test.png', _make_valid_png(), 'image/png')
         }
         response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
         assert response.status_code == 201
@@ -539,7 +563,7 @@ def filter_cars(db):
     for i, spec in enumerate(specs):
         car = Car.objects.create(
             display_order=i,
-            main_image=SimpleUploadedFile(f'car{i}.jpg', b'', 'image/jpeg'),
+            main_image=SimpleUploadedFile(f'car{i}.jpg', _make_valid_jpeg(), 'image/jpeg'),
             **spec,
         )
         cars.append(car)
@@ -785,7 +809,7 @@ class TestCarEdgeCases:
             is_active=True,
             is_featured=True,
             display_order=10,
-            main_image=SimpleUploadedFile('featured.jpg', b'', 'image/jpeg'),
+            main_image=SimpleUploadedFile('featured.jpg', _make_valid_jpeg(), 'image/jpeg'),
         )
         response = api_client.get('/api/v1/cars/?is_featured=true')
         assert response.status_code == 200
@@ -823,7 +847,7 @@ class TestCarEdgeCases:
             transmission='automatic',
             is_active=True,
             display_order=0,
-            main_image=SimpleUploadedFile('t.jpg', b'', 'image/jpeg'),
+            main_image=SimpleUploadedFile('t.jpg', _make_valid_jpeg(), 'image/jpeg'),
         )
         response = api_client.get('/api/v1/cars/?search=آزمایشی')
         assert response.status_code == 200
@@ -852,12 +876,12 @@ class TestCarAdminGalleryAndPagination:
             'fuel_type': 'gasoline',
             'transmission': 'automatic',
             'is_active': True,
-            'main_image': SimpleUploadedFile('main.png', _make_tiny_png(), 'image/png'),
+            'main_image': SimpleUploadedFile('main.png', _make_valid_png(), 'image/png'),
         }
 
     def _gallery_files(self, count):
         return {
-            f'gallery_{i}': SimpleUploadedFile(f'g{i}.png', _make_tiny_png(), 'image/png')
+            f'gallery_{i}': SimpleUploadedFile(f'g{i}.png', _make_valid_png(), 'image/png')
             for i in range(count)
         }
 
@@ -878,11 +902,38 @@ class TestCarAdminGalleryAndPagination:
         assert len(car.gallery) == 2
         created = []
         for url in car.gallery:
+            # Immutable, identity-derived path: cars/{pk}/gallery/{uuid}.png
+            assert re.fullmatch(
+                rf'{settings.MEDIA_URL}cars/{car.pk}/gallery/[0-9a-f]{{32}}\.png', url
+            ), url
             relative = url.replace(settings.MEDIA_URL, '')
             path = os.path.join(settings.MEDIA_ROOT, relative)
             assert os.path.exists(path)
             created.append(path)
+        # A successful upload leaves no staging directory behind.
+        assert not list(Path(settings.MEDIA_ROOT).glob('.gallery-upload-*'))
         self._cleanup_media(created)
+
+    def test_gallery_upload_is_content_validated(self, admin_client):
+        """A gallery file whose bytes contradict its name is rejected with a 400
+        gallery field error and no car is created.
+
+        Gallery uploads never pass through an `ImageField`, so Phase 1's content
+        checks (size, extension, MIME, magic bytes, dimensions) are applied
+        explicitly — a `.png` that is not an image must not reach the media tree.
+        """
+        data = self._car_data('gallery-spoofed')
+        data['gallery_0'] = SimpleUploadedFile('fake.png', b'not an image', 'image/png')
+
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+
+        assert response.status_code == 400
+        assert 'gallery' in response.data
+        assert not Car.objects.filter(slug='gallery-spoofed').exists()
+        # The rejected upload left neither a destination file nor a staging dir.
+        assert not list(Path(settings.MEDIA_ROOT).glob('**/.gallery-upload-*'))
+        # Only the car's own `main_image` write survives the rolled-back create.
+        self._cleanup_media([os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png')])
 
     def test_admin_update_preserves_existing_gallery_and_appends(self, admin_client, sample_car):
         """A PATCH with new gallery files keeps existing URLs and appends."""
@@ -899,11 +950,16 @@ class TestCarAdminGalleryAndPagination:
         sample_car.refresh_from_db()
         assert sample_car.gallery[0].endswith('existing.jpg')
         assert len(sample_car.gallery) == 2
-        # The new file must NOT reuse the first image's filename: the counter
-        # continues past the existing gallery (`_gallery_1.png`), so an
-        # edit-append never overwrites the disk file of an existing image.
-        assert sample_car.gallery[1] != sample_car.gallery[0]
-        assert sample_car.gallery[1].endswith(f'{sample_car.slug}_gallery_1.png')
+        # The appended file must NOT reuse the first image's filename: it lands
+        # in this car's own directory under a fresh UUID, so an edit-append can
+        # never overwrite the disk file of an already-listed image (the
+        # property the old slug+counter scheme provided).
+        appended = sample_car.gallery[1]
+        assert appended != sample_car.gallery[0]
+        assert re.fullmatch(
+            rf'{settings.MEDIA_URL}cars/{sample_car.pk}/gallery/[0-9a-f]{{32}}\.png',
+            appended,
+        ), appended
 
         created = []
         for url in sample_car.gallery:
@@ -971,17 +1027,14 @@ class TestCarAdminGalleryAndPagination:
         # The failed insert may have written main.png before the DB raised.
         self._cleanup_media([os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png')])
 
-    def test_distinct_active_cars_do_not_collide_gallery_files(self, admin_client):
-        """Two different active cars uploading gallery_0..N never produce the
-        same on-disk filename.
+    def test_gallery_files_are_isolated_per_car(self, admin_client):
+        """Two cars uploading gallery_0..N produce four distinct files, each
+        under its own identity-derived directory.
 
-        Gallery files are named `{slug}_gallery_{idx}` (slug-based, accepted
-        technical debt — see DEVELOPMENT.md §3.9). Collisions are prevented
-        by the `car_slug_unique_when_not_deleted` partial unique index: two
-        active cars always have distinct slugs, hence distinct filenames even
-        at the same image index. This test pins that guarantee through the
-        real admin API (and would fail loudly if the scheme changed to one
-        that could collide)."""
+        Supersedes the old `{slug}_gallery_{idx}` pin, which relied on the
+        partial unique slug index for collision-freedom. The directory now
+        derives from the primary key, so distinct cars cannot collide even
+        when one is soft-deleted and its slug is reused (ADR-0007)."""
         urls = []
         paths = []
         for slug in ('gallery-a', 'gallery-b'):
@@ -993,15 +1046,78 @@ class TestCarAdminGalleryAndPagination:
             car = Car.objects.get(slug=slug)
             assert len(car.gallery) == 2
             for url in car.gallery:
+                assert url.startswith(f'{settings.MEDIA_URL}cars/{car.pk}/gallery/')
                 relative = url.replace(settings.MEDIA_URL, '')
                 path = os.path.join(settings.MEDIA_ROOT, relative)
                 assert os.path.exists(path)
                 urls.append(url)
                 paths.append(path)
 
-        # Four distinct URLs and four distinct files across the two cars.
+        # Four distinct URLs, four distinct files, two distinct directories.
         assert len(set(urls)) == 4
         assert len(set(paths)) == 4
+        assert len({url.rsplit('/', 1)[0] for url in urls}) == 2
 
         paths.append(os.path.join(settings.MEDIA_ROOT, 'cars', 'main.png'))
         self._cleanup_media(paths)
+
+    def test_slug_rename_neither_moves_nor_invalidates_gallery_files(
+        self, admin_client, sample_car
+    ):
+        """Changing the slug leaves the gallery URLs and files untouched.
+
+        That is the point of the identity-derived path: the old slug scheme
+        would have left published URLs pointing at a name that no longer
+        matched the car."""
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {**self._gallery_files(1)},
+            format='multipart',
+        )
+        assert response.status_code == 200
+        sample_car.refresh_from_db()
+
+        url = sample_car.gallery[0]
+        path = os.path.join(settings.MEDIA_ROOT, url.replace(settings.MEDIA_URL, ''))
+
+        response = admin_client.patch(
+            f'/api/v1/admin/cars/{sample_car.pk}/',
+            {'slug': 'gallery-renamed-slug'},
+            format='multipart',
+        )
+        assert response.status_code == 200
+        sample_car.refresh_from_db()
+
+        assert sample_car.slug == 'gallery-renamed-slug'
+        assert sample_car.gallery == [url]
+        assert os.path.exists(path)
+
+        self._cleanup_media([path])
+
+
+@pytest.mark.django_db
+class TestCatalogFileValidation:
+    """Phase 1 hardening: catalog_file validates content, not just the
+    extension (PDFValidator — size, .pdf extension, %PDF- magic bytes)."""
+
+    def test_catalog_file_validated(self, admin_client):
+        """A .pdf-named upload whose bytes lack the %PDF- signature is
+        rejected with a 400 field error and the car is not created."""
+        data = {
+            'brand': 'Toyota',
+            'model': 'RAV4',
+            'persian_name': 'تویوتا راو۴',
+            'slug': 'catalog-spoof',
+            'year': 2025,
+            'fuel_type': 'gasoline',
+            'transmission': 'automatic',
+            'is_active': True,
+            'main_image': SimpleUploadedFile('main.png', _make_valid_png(), 'image/png'),
+            'catalog_file': SimpleUploadedFile(
+                'catalog.pdf', b'plain text pretending to be a pdf', 'application/pdf'
+            ),
+        }
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 400
+        assert 'catalog_file' in response.data
+        assert not Car.objects.filter(slug='catalog-spoof').exists()

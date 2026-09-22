@@ -4,6 +4,8 @@
  * `/api/v1/settings/` and admin `/api/v1/admin/settings/` endpoints.
  */
 
+import type { ImageVariants } from './media'
+
 export interface SiteSettings {
   site_name: string
   site_description: string
@@ -19,6 +21,8 @@ export interface SiteSettings {
   hero_cta_secondary_link: string
   why_title: string
   why_description: string
+  why_background: string | null
+  why_background_variants: ImageVariants | null
   cars_section_title: string
   cars_section_description: string
   articles_section_title: string

@@ -6,9 +6,10 @@
  * corrected one-directionally.
  */
 import '@testing-library/jest-dom'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import CarsExplorer from '../CarsExplorer'
+import { parseCarListQuery } from '@/lib/data/listQuery'
 import type { CarListItem } from '@/types/car'
 import type { FilterOptions } from '@/components/car/CarFilters'
 
@@ -122,6 +123,25 @@ beforeEach(() => {
 })
 
 describe('CarsExplorer — URL-derived listing state', () => {
+  it('renders a listing breadcrumb (home → cars) — Phase 5', async () => {
+    render(
+      <CarsExplorer
+        initialQuery={parseCarListQuery(new URLSearchParams())}
+        initialFilterOptions={filterOptions}
+      />
+    )
+    const nav = screen.getByRole('navigation', { name: 'breadcrumb' })
+    const links = within(nav).getAllByRole('link')
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveAttribute('href', '/')
+    expect(within(nav).getByText('خانه')).toBeInTheDocument()
+    expect(within(nav).getByText('خودروها')).toBeInTheDocument()
+    // The current page marker is not a link.
+    expect(within(nav).getByText('خودروها').closest('a')).toBeNull()
+    // Drain mount effects so no async work leaks into the next test.
+    await act(async () => {})
+  })
+
   it('renders the server snapshot without a duplicate cars fetch', async () => {
     render(
       <CarsExplorer

@@ -1,11 +1,58 @@
+from io import BytesIO
+
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
+from PIL import Image
 from rest_framework.test import APIClient
 
 from apps.cars.models import Car
 from .mixins import SoftDeleteManager, SoftDeleteMixin
 from .models import HeroSlide, Redirect, SiteSettings, WhyFeature
+from .validators import ImageValidator
+
+
+@pytest.mark.parametrize("data,expected", [({}, False), ({"message": "error"}, False), ({"password": "private"}, True), ({"phone": "private"}, True), ({"token": "private"}, True), ({"secret": "private"}, True)])
+def test_sentry_sensitive_data_predicate(data, expected):
+    from config.settings import _contains_sensitive_data
+
+    assert _contains_sensitive_data({"request": {"data": data}}) is expected
+    assert _contains_sensitive_data({"message": "ordinary error"}) is False
+
+
+def test_sentry_callback_preserves_errors_without_private_context():
+    from config.settings import _sentry_before_send
+
+    assert _sentry_before_send({"request": {"data": {"password": "private"}}}, {}) is None
+    event = {
+        "message": "synthetic failure",
+        "request": {"data": "password=private", "headers": {"Cookie": "private"}},
+        "user": {"email": "private"},
+        "extra": {"phone": "private"},
+        "breadcrumbs": [{"message": "private"}],
+        "exception": {"values": [{"stacktrace": {"frames": [{"filename": "app.py", "vars": {"secret": "private"}}]}}]},
+    }
+    result = _sentry_before_send(event, {})
+    assert result["message"] == "synthetic failure"
+    assert "private" not in str(result)
+    assert result["exception"]["values"][0]["stacktrace"]["frames"][0] == {"filename": "app.py"}
+
+
+def _png_bytes(width=800, height=600):
+    """Return a valid PNG image with the given dimensions."""
+    img = Image.new('RGB', (width, height), 'white')
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    return buf.getvalue()
+
+
+def _jpeg_bytes(width=800, height=600):
+    """Return a valid JPEG image with the given dimensions."""
+    img = Image.new('RGB', (width, height), 'white')
+    buf = BytesIO()
+    img.save(buf, format='JPEG')
+    return buf.getvalue()
 
 
 # ============================================================================
@@ -403,3 +450,394 @@ class TestHomepageDataAPI:
         assert 'settings' in response.data
         assert 'hero_slides' in response.data
         assert 'why_features' in response.data
+
+
+# ============================================================================
+# Upload Validator Tests (Phase 1 hardening)
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestImageValidatorMagicBytes:
+    """Extension and MIME content_type are client-controlled claims; the file
+    content must match the claimed image format."""
+
+    def test_image_validator_rejects_spoofed_mime(self):
+        """PNG extension + PNG content_type wrapping JPEG bytes → rejected."""
+        from django.core.exceptions import ValidationError
+
+        from .validators import ImageValidator
+
+        spoofed = SimpleUploadedFile(
+            'photo.png', _jpeg_bytes(), content_type='image/png'
+        )
+        with pytest.raises(ValidationError):
+            ImageValidator()(spoofed)
+
+    def test_image_validator_accepts_matching_content(self):
+        """A genuine PNG passes all checks (size/ext/magic/dimensions)."""
+        from .validators import ImageValidator
+
+        valid = SimpleUploadedFile(
+            'photo.png', _png_bytes(), content_type='image/png'
+        )
+        ImageValidator()(valid)  # must not raise
+
+
+@pytest.mark.django_db
+class TestImageDimensionValidation:
+    """Phase 1 hardening: min 800x600, max 4000x3000, max aspect 3:1."""
+
+    def test_image_dimensions_validated(self):
+        """Below-min, above-max and over-aspect images are rejected;
+        boundary 800x600 passes; icons skip dimension checks."""
+        from django.core.exceptions import ValidationError
+
+        from .validators import ImageValidator
+
+        def _upload(width, height, name='img.png'):
+            return SimpleUploadedFile(
+                name, _png_bytes(width, height), content_type='image/png'
+            )
+
+        # Below minimum → rejected
+        with pytest.raises(ValidationError):
+            ImageValidator()(_upload(400, 300, 'small.png'))
+
+        # Above maximum (width 4500 > 4000) → rejected
+        with pytest.raises(ValidationError):
+            ImageValidator()(_upload(4500, 600, 'large.png'))
+
+        # Aspect ratio 5:1 (within max dimensions) → rejected
+        with pytest.raises(ValidationError):
+            ImageValidator()(_upload(3000, 600, 'wide.png'))
+
+        # Exact minimum boundary → accepted
+        ImageValidator()(_upload(800, 600, 'boundary.png'))
+
+        # Icons legitimately skip dimension validation
+        tiny_icon = SimpleUploadedFile(
+            'icon.png', _png_bytes(100, 80), content_type='image/png'
+        )
+        ImageValidator(check_dimensions=False)(tiny_icon)  # must not raise
+
+
+@pytest.mark.django_db
+class TestUploadValidatorEdgeCases:
+    """Branch coverage for the upload validators (size, extension, empty and
+    unreadable payloads, PDF magic bytes)."""
+
+    def test_image_validator_rejects_oversize_file(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import ImageValidator
+
+        big = SimpleUploadedFile('big.png', b'x' * (2 * 1024 * 1024), 'image/png')
+        with pytest.raises(ValidationError):
+            ImageValidator(max_size_mb=1)(big)
+
+    def test_image_validator_rejects_disallowed_extension(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import ImageValidator
+
+        gif = SimpleUploadedFile('anim.gif', _png_bytes(), 'image/gif')
+        with pytest.raises(ValidationError):
+            ImageValidator()(gif)
+
+    def test_image_validator_rejects_empty_file(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import ImageValidator
+
+        empty = SimpleUploadedFile('empty.png', b'', 'image/png')
+        with pytest.raises(ValidationError):
+            ImageValidator()(empty)
+
+    def test_validate_dimensions_rejects_unreadable_file(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import validate_dimensions
+
+        garbage = SimpleUploadedFile('garbage.png', b'not an image at all', 'image/png')
+        with pytest.raises(ValidationError):
+            validate_dimensions(garbage)
+
+    def test_pdf_validator_accepts_real_pdf(self):
+        from .validators import PDFValidator
+
+        pdf = SimpleUploadedFile('doc.pdf', b'%PDF-1.4\n%fake-but-signed', 'application/pdf')
+        PDFValidator()(pdf)  # must not raise
+
+    def test_pdf_validator_rejects_non_pdf_extension(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import PDFValidator
+
+        renamed = SimpleUploadedFile('doc.txt', b'%PDF-1.4\n', 'text/plain')
+        with pytest.raises(ValidationError):
+            PDFValidator()(renamed)
+
+    def test_pdf_validator_rejects_missing_magic(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import PDFValidator
+
+        fake = SimpleUploadedFile('doc.pdf', b'just text, no signature', 'application/pdf')
+        with pytest.raises(ValidationError):
+            PDFValidator()(fake)
+
+    def test_pdf_validator_rejects_oversize_file(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import PDFValidator
+
+        big = SimpleUploadedFile('doc.pdf', b'%PDF-1.4\n' + b'x' * (2 * 1024 * 1024), 'application/pdf')
+        with pytest.raises(ValidationError):
+            PDFValidator(max_size_mb=1)(big)
+
+
+@pytest.mark.django_db
+class TestValidateImageFileHelper:
+    """Direct coverage of validate_image_file() and the WebP magic-byte
+    branch — the multipart API path is pinned in TestAdminUploadValidation."""
+
+    def _validate(self, name, content, content_type):
+        from .validators import validate_image_file
+
+        validate_image_file(SimpleUploadedFile(name, content, content_type))
+
+    def test_oversize_raises_with_persian_message(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import MAX_IMAGE_SIZE_BYTES, validate_image_file
+
+        with pytest.raises(ValidationError):
+            self._validate('big.png', b'x' * (MAX_IMAGE_SIZE_BYTES + 1), 'image/png')
+
+    def test_disallowed_extension_raises(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import validate_image_file
+
+        with pytest.raises(ValidationError):
+            self._validate('anim.gif', _png_bytes(), 'image/gif')
+
+    def test_webp_magic_bytes_accepted(self):
+        """A genuine Pillow-encoded WebP passes magic bytes + dimensions."""
+        img = Image.new('RGB', (800, 600), 'white')
+        buf = BytesIO()
+        img.save(buf, format='WEBP')
+        self._validate('pic.webp', buf.getvalue(), 'image/webp')  # must not raise
+
+    def test_webp_wrong_signature_rejected(self):
+        """RIFF container but WEBP marker not at offset 8 → rejected."""
+        from django.core.exceptions import ValidationError
+
+        from .validators import validate_image_file
+
+        bad = b'RIFF' + b'\x00' * 4 + b'WAVE' + b'\x00' * 16
+        with pytest.raises(ValidationError):
+            self._validate('pic.webp', bad, 'image/webp')
+
+    def test_short_webp_rejected(self):
+        """Fewer than 12 bytes cannot carry a WebP signature → rejected."""
+        from django.core.exceptions import ValidationError
+
+        from .validators import validate_image_file
+
+        with pytest.raises(ValidationError):
+            self._validate('pic.webp', b'RIFF\x00\x01', 'image/webp')
+
+    def test_empty_file_raises_empty_message(self):
+        from django.core.exceptions import ValidationError
+
+        from .validators import validate_image_file
+
+        with pytest.raises(ValidationError):
+            self._validate('empty.png', b'', 'image/png')
+
+
+@pytest.mark.django_db
+class TestImageValidatorMimeBranch:
+    """The content_type branch is UNREACHABLE through DRF's ImageField:
+    DRF delegates to Django's forms.ImageField, which overwrites content_type
+    with the MIME Pillow detects from the bytes before validators run
+    (verified: a client-declared 'image/gif' PNG reaches the validator as
+    'image/png', same object). It is pinned here by calling the validator
+    directly, so the branch keeps its contract and its coverage."""
+
+    def test_validator_rejects_disallowed_content_type(self):
+        from django.core.exceptions import ValidationError
+
+        spoofed = SimpleUploadedFile('ok.png', _png_bytes(), 'image/gif')
+        with pytest.raises(ValidationError):
+            ImageValidator()(spoofed)
+
+    def test_validator_accepts_allowed_content_type(self):
+        ImageValidator()(
+            SimpleUploadedFile('ok.png', _png_bytes(), 'image/png')
+        )  # must not raise
+
+
+@pytest.mark.django_db
+class TestAdminUploadValidation:
+    """Upload validation through the real admin multipart API path.
+
+    The load-bearing guard on this path is the magic-byte check — a
+    client-claimed MIME carries no authority because Django re-derives it
+    from the content (see TestImageValidatorMimeBranch).
+    """
+
+    def _car_payload(self, slug, **extra):
+        return {
+            'brand': 'Toyota', 'model': 'RAV4', 'persian_name': 'تویوتا راو۴',
+            'slug': slug, 'year': '2025', 'fuel_type': 'gasoline',
+            'transmission': 'automatic', 'is_active': 'true',
+            **extra,
+        }
+
+    def test_admin_normalizes_spoofed_mime_type(self, admin_client):
+        """A PNG declared image/gif is accepted AND stored as a real PNG:
+        the client's MIME claim is replaced by the content-derived type, so
+        there is nothing to reject — the bytes genuinely are a valid PNG.
+        (Was previously asserted as a 400; that expectation was wrong —
+        Django had already normalized content_type before validation.)"""
+        data = self._car_payload(
+            'mime-spoof',
+            main_image=SimpleUploadedFile('ok.png', _png_bytes(), 'image/gif'),
+        )
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+        car = Car.objects.get(slug='mime-spoof')
+        assert car.main_image.name.endswith('.png')
+        car.main_image.delete(save=False)
+        car.delete()
+
+    def test_admin_rejects_mismatched_extension_content(self, admin_client):
+        """A decodable JPEG renamed .png → magic-byte branch rejects (the
+        spoof ImageValidator exists to catch)."""
+        data = self._car_payload(
+            'ext-spoof',
+            main_image=SimpleUploadedFile('spoof.png', _jpeg_bytes(), 'image/png'),
+        )
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 400
+        assert 'main_image' in response.data
+
+    def test_admin_accepts_valid_upload(self, admin_client):
+        """Genuine PNG with honest content_type → 201 (control)."""
+        data = self._car_payload(
+            'valid-upload',
+            main_image=SimpleUploadedFile('ok.png', _png_bytes(), 'image/png'),
+        )
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 201
+        Car.objects.get(slug='valid-upload').main_image.delete(save=False)
+        Car.objects.get(slug='valid-upload').delete()
+
+    def test_admin_rejects_oversize_main_image(self, admin_client):
+        """A >5MB image (size only — bytes exceed the limit before any
+        parsing) → rejected at the size branch."""
+        data = self._car_payload(
+            'size-spoof',
+            main_image=SimpleUploadedFile('big.png', b'x' * (6 * 1024 * 1024), 'image/png'),
+        )
+        response = admin_client.post('/api/v1/admin/cars/', data, format='multipart')
+        assert response.status_code == 400
+        assert 'main_image' in response.data
+
+
+# ============================================================================
+# SiteSettings.logo — branding-asset dimension profile
+# ============================================================================
+
+
+@pytest.mark.django_db
+class TestSiteSettingsLogoDimensions:
+    """Regression pin: the content-image profile (min 800x600) rejects the
+    site's own shipped logo (assets/logo.png, 727x340). `logo` therefore
+    carries a branding profile (min 200x60) — every other check stays
+    identical to the default, so this relaxes the floor, not the contract."""
+
+    def _logo_field_and_validators(self):
+        """The field + validators DRF actually mounts on SiteSettings.logo."""
+        from .serializers import SiteSettingsSerializer
+
+        field = SiteSettingsSerializer().fields['logo']
+        return field, field.validators
+
+    def _shipped_logo_upload(self):
+        """The shipped branding asset's exact dimensions (assets/logo.png is
+        727x340). Generated rather than read from disk: the backend image
+        mounts only backend/, so the repo-root assets/ dir is not reachable
+        from inside the container."""
+        return SimpleUploadedFile('logo.png', _png_bytes(727, 340), 'image/png')
+
+    def test_shipped_logo_asset_is_accepted(self):
+        """The real branding asset must pass the configured validators."""
+        field, validators = self._logo_field_and_validators()
+        image_validators = [v for v in validators if isinstance(v, ImageValidator)]
+        assert image_validators, 'SiteSettings.logo lost its ImageValidator'
+        upload = self._shipped_logo_upload()
+        for validator in image_validators:
+            validator.set_context(field)
+            validator(upload)  # must not raise
+
+    def test_default_profile_would_reject_the_shipped_logo(self):
+        """Documents WHY the branding profile exists: the default 800x600
+        floor fails on a 727x340 wordmark. Stops the logo being 'simplified'
+        back to a bare ImageValidator() and silently breaking uploads.
+
+        This is the regression pin: it reproduces the defect that shipped."""
+        from django.core.exceptions import ValidationError
+
+        with pytest.raises(ValidationError):
+            ImageValidator()(self._shipped_logo_upload())
+
+    def test_undersized_logo_is_still_rejected(self):
+        """The fix lowers the floor — it does not remove it."""
+        from django.core.exceptions import ValidationError
+
+        _, validators = self._logo_field_and_validators()
+        tiny = SimpleUploadedFile('tiny.png', _png_bytes(100, 30), 'image/png')
+        with pytest.raises(ValidationError):
+            for validator in validators:
+                if isinstance(validator, ImageValidator):
+                    validator(tiny)
+
+    def test_logo_profile_still_enforces_max_dimensions_and_aspect(self):
+        """The branding profile only lowers the FLOOR. The ceiling (4000x3000)
+        and the 3:1 aspect cap are inherited unchanged, so an oversized or
+        banner-shaped upload is still rejected."""
+        from django.core.exceptions import ValidationError
+
+        _, validators = self._logo_field_and_validators()
+        image_validators = [v for v in validators if isinstance(v, ImageValidator)]
+        assert image_validators, 'SiteSettings.logo lost its ImageValidator'
+
+        def _run(upload):
+            for validator in image_validators:
+                validator(upload)
+
+        # 4200x1500 is 2.8:1, so it only trips the max dimension rule.
+        with pytest.raises(ValidationError):
+            _run(SimpleUploadedFile('huge.png', _png_bytes(4200, 1500), 'image/png'))
+
+        # 1400x400 is within the max dimensions but 3.5:1 -> aspect cap.
+        with pytest.raises(ValidationError):
+            _run(SimpleUploadedFile('banner.png', _png_bytes(1400, 400), 'image/png'))
+
+        # The shipped 727x340 wordmark is 2.1:1 and stays accepted.
+        _run(self._shipped_logo_upload())
+
+    def test_logo_still_rejects_mismatched_content(self):
+        """Magic-byte enforcement is untouched by the dimension change."""
+        from django.core.exceptions import ValidationError
+
+        _, validators = self._logo_field_and_validators()
+        spoofed = SimpleUploadedFile('logo.png', _jpeg_bytes(727, 340), 'image/png')
+        with pytest.raises(ValidationError):
+            for validator in validators:
+                if isinstance(validator, ImageValidator):
+                    validator(spoofed)

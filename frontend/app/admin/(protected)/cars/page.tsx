@@ -18,7 +18,7 @@ export default function AdminCarsPage() {
       columns={[
         { header: 'برند', cell: (car) => car.brand },
         { header: 'مدل', cell: (car) => car.model },
-        { header: 'نام فارسی', cell: (car) => car.persian_name },
+        { header: 'نام فارسی', cell: (car) => car.persian_name, primaryOnMobile: true },
         { header: 'سال', cell: (car) => car.year },
         {
           header: 'وضعیت',
@@ -33,7 +33,7 @@ export default function AdminCarsPage() {
                 }
               }}
               aria-pressed={car.is_active}
-              className={`px-3 py-1 rounded-full text-sm font-bold ${
+              className={`px-3 py-1 min-h-[36px] inline-flex items-center rounded-full text-sm font-bold ${
                 car.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}
             >
@@ -54,7 +54,7 @@ export default function AdminCarsPage() {
                 }
               }}
               aria-pressed={car.is_featured}
-              className={`px-3 py-1 rounded-full text-sm font-bold ${
+              className={`px-3 py-1 min-h-[36px] inline-flex items-center rounded-full text-sm font-bold ${
                 car.is_featured ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'
               }`}
             >
@@ -70,7 +70,7 @@ export default function AdminCarsPage() {
                 href={car.catalog_file}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                className="inline-flex items-center gap-1 px-3 py-1 min-h-[36px] rounded-full text-sm font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -87,7 +87,7 @@ export default function AdminCarsPage() {
             <div className="flex gap-2">
               <Link
                 href={`/admin/cars/${car.id}/edit`}
-                className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
+                className="bg-blue-100 text-blue-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-blue-200 transition-colors"
               >
                 ویرایش
               </Link>
@@ -102,7 +102,7 @@ export default function AdminCarsPage() {
                     helpers.error('خطا در حذف خودرو')
                   }
                 }}
-                className="bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors"
+                className="bg-red-100 text-red-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-red-200 transition-colors"
               >
                 حذف
               </button>

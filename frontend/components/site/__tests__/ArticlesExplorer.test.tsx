@@ -5,7 +5,7 @@
  * drive refetches.
  */
 import '@testing-library/jest-dom'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ArticlesExplorer from '../ArticlesExplorer'
 import type { ArticleListItem } from '@/types/article'
@@ -81,6 +81,21 @@ beforeEach(() => {
 })
 
 describe('ArticlesExplorer — URL-derived listing state', () => {
+  it('renders a listing breadcrumb (home → articles) — Phase 5', async () => {
+    render(<ArticlesExplorer />)
+    const nav = screen.getByRole('navigation', { name: 'breadcrumb' })
+    const links = within(nav).getAllByRole('link')
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveAttribute('href', '/')
+    expect(within(nav).getByText('خانه')).toBeInTheDocument()
+    expect(within(nav).getByText('مقالات')).toBeInTheDocument()
+    // The current page marker is not a link.
+    expect(within(nav).getByText('مقالات').closest('a')).toBeNull()
+    // No initialData was passed, so the mount fetch resolves; drain it
+    // inside act so its state updates don't land after the test.
+    await flush()
+  })
+
   it('renders the server snapshot without a duplicate fetch', async () => {
     render(
       <ArticlesExplorer

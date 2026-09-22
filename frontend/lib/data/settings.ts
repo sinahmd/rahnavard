@@ -30,6 +30,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   hero_cta_secondary_link: '#consult',
   why_title: 'چرا راهنورد خودرو؟',
   why_description: '',
+  why_background: null,
+  why_background_variants: null,
   cars_section_title: 'خودروهای ما',
   cars_section_description: 'مجموعه‌ای منتخب از خودروهای وارداتی راهنورد خودرو، آماده تحویل با گارانتی رسمی.',
   articles_section_title: 'مقاله و اطلاعیه',
@@ -54,6 +56,6 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     revalidate: REVALIDATE_SECONDS,
   })
   if (data === null) return DEFAULT_SETTINGS
-  const normalized = normalizeMediaUrls(data, ['logo', 'default_og_image'])
+  const normalized = normalizeMediaUrls(data, ['logo', 'default_og_image', 'why_background'])
   return { ...DEFAULT_SETTINGS, ...(normalized as Partial<SiteSettings>) }
 }
