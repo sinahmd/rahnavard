@@ -268,6 +268,9 @@ jobs:
           CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1
           NEXT_PUBLIC_API_URL=/api/v1
           NEXT_PUBLIC_SITE_URL=http://localhost
+          # e2e logs in repeatedly from one IP; the default 5/minute login
+          # throttle would 429 the later logins (csp-audit admin sweep).
+          LOGIN_THROTTLE_RATE=1000/minute
           EOF
           echo ".env written (compose interpolation only — never committed)"
 

@@ -90,6 +90,7 @@ frontend/playwright-report/
 
 # Assets
 assets/webp/
+assets/why-rahnavard-bg/
 
 # Docs & reports
 # (ignore local scratch docs, but keep the ADR directory and the archive
@@ -111,3 +112,5 @@ PRODUCTION_READINESS_CHECKLIST.md
 # Local agent planning artifacts (never committed).
 .zcode/
 CLAUDE.local.md
+
+DEPLOYMENT_IMPACT_REPORT.md

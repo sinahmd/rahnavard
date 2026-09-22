@@ -51,7 +51,13 @@ test('admin flows produce zero CSP violations', async ({ page }) => {
   for (const path of ['/admin', '/admin/branches', '/admin/branches/new']) {
     const resp = await page.goto(path)
     expect(resp?.status(), `GET ${path}`).toBe(200)
-    await expect(page.getByText('راهنورد')).toBeVisible() // shell actually rendered
+    // await expect(page.getByText('راهنورد')).toBeVisible() // shell actually rendered
+    await expect(
+      page
+        .getByRole('navigation', { name: 'ناوبری پنل مدیریت' })
+        .getByRole('link', { name: 'بخش چرا راهنورد' })
+        .first(),
+      ).toBeVisible()
   }
 
   const { events, console: consoleHits } = await getViolations()
