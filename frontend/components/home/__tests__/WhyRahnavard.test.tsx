@@ -193,9 +193,13 @@ describe('WhyRahnavard background (managed image)', () => {
       const featureRoot = container.querySelector('.why-feature')
       expect(featureRoot).toBeInTheDocument()
       expect(featureRoot?.querySelector('img')).toBeNull()
-      // Contract pieces in order: amber index, bold title, description, amber rule.
+      // Contract pieces in order: amber index, bold title, description on a
+      // frosted plate, amber rule.
       expect(featureRoot?.querySelector('[aria-hidden="true"]')).toHaveTextContent('01')
       expect(featureRoot?.querySelector('h3')).toHaveClass('font-bold')
+      const description = featureRoot?.querySelector('p')
+      expect(description).toHaveClass('bg-white/70')
+      expect(description).toHaveClass('backdrop-blur-sm')
       expect(featureRoot?.querySelector('.bg-accent')).toBeInTheDocument()
     })
 

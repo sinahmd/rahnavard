@@ -74,7 +74,13 @@ export default function WhyRahnavard({
         )}
         <h3 className="text-[21px] font-bold text-dark">{feature.title}</h3>
       </div>
-      <p className="text-[13.5px] leading-[1.8] text-gray-dark mt-1.5">{feature.description}</p>
+      {/* Description sits on a frosted plate: the small gray text crosses
+          the busy photo half of the artwork (courts above, dark floor below)
+          and was illegible bare. The plate hugs the text width and reuses the
+          project's glass-chip language (cf. CarImageGallery controls). */}
+      <p className="inline-block text-[13.5px] leading-[1.8] text-gray-dark mt-1.5 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm">
+        {feature.description}
+      </p>
       <div className="w-6 h-[2px] bg-accent mx-auto mt-3" aria-hidden="true" />
     </div>
   )
