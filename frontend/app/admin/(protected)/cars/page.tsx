@@ -3,7 +3,13 @@
 import Link from 'next/link'
 import AdminListPage from '@/components/admin/list/AdminListPage'
 import type { CarAdmin } from '@/types/car'
-import { deleteCar, listCars, setCarActive, setCarFeatured } from '@/lib/api/cars'
+import {
+  deleteCar,
+  listCars,
+  restoreCar,
+  setCarActive,
+  setCarFeatured,
+} from '@/lib/api/cars'
 
 export default function AdminCarsPage() {
   return (
@@ -16,9 +22,26 @@ export default function AdminCarsPage() {
       fetchPage={listCars}
       rowKey={(car) => car.id}
       columns={[
-        { header: 'برند', cell: (car) => car.brand },
+        {
+          header: 'برند',
+          cell: (car) =>
+            car.is_deleted ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="text-gray-400 line-through">{car.brand}</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                  حذف‌شده
+                </span>
+              </span>
+            ) : (
+              car.brand
+            ),
+        },
         { header: 'مدل', cell: (car) => car.model },
-        { header: 'نام فارسی', cell: (car) => car.persian_name, primaryOnMobile: true },
+        {
+          header: 'نام فارسی',
+          cell: (car) => car.persian_name,
+          primaryOnMobile: true,
+        },
         { header: 'سال', cell: (car) => car.year },
         {
           header: 'وضعیت',
@@ -83,31 +106,50 @@ export default function AdminCarsPage() {
         },
         {
           header: 'عملیات',
-          cell: (car, helpers) => (
-            <div className="flex gap-2">
-              <Link
-                href={`/admin/cars/${car.id}/edit`}
-                className="bg-blue-100 text-blue-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-blue-200 transition-colors"
-              >
-                ویرایش
-              </Link>
+          cell: (car, helpers) =>
+            // Soft-deleted rows stay listed (admin uses the with_deleted
+            // queryset): offer restore instead of edit/delete.
+            car.is_deleted ? (
               <button
                 onClick={async () => {
-                  const ok = await helpers.confirm('آیا از حذف این خودرو اطمینان دارید؟')
-                  if (!ok) return
                   try {
-                    await deleteCar(car.id)
+                    await restoreCar(car.id)
                     helpers.refresh()
                   } catch {
-                    helpers.error('خطا در حذف خودرو')
+                    helpers.error('خطا در بازیابی خودرو')
                   }
                 }}
-                className="bg-red-100 text-red-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-red-200 transition-colors"
+                className="bg-green-100 text-green-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-green-200 transition-colors"
               >
-                حذف
+                بازیابی
               </button>
-            </div>
-          ),
+            ) : (
+              <div className="flex gap-2">
+                <Link
+                  href={`/admin/cars/${car.id}/edit`}
+                  className="bg-blue-100 text-blue-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-blue-200 transition-colors"
+                >
+                  ویرایش
+                </Link>
+                <button
+                  onClick={async () => {
+                    const ok = await helpers.confirm(
+                      'آیا از حذف این خودرو اطمینان دارید؟ خودرو به سبد بازیابی منتقل می‌شود.'
+                    )
+                    if (!ok) return
+                    try {
+                      await deleteCar(car.id)
+                      helpers.refresh()
+                    } catch {
+                      helpers.error('خطا در حذف خودرو')
+                    }
+                  }}
+                  className="bg-red-100 text-red-700 px-3 py-1 min-h-[36px] inline-flex items-center rounded text-sm hover:bg-red-200 transition-colors"
+                >
+                  حذف
+                </button>
+              </div>
+            ),
         },
       ]}
     />

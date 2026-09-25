@@ -57,6 +57,16 @@ export function setCarFeatured(id: number, isFeatured: boolean): Promise<CarAdmi
   })
 }
 
+/**
+ * DELETE is a soft delete (is_deleted=True) — the row stays listed in the
+ * admin (the admin list uses the with_deleted queryset). Use `restoreCar`
+ * to bring it back; hard delete is backend/ORM-only by design.
+ */
 export function deleteCar(id: number): Promise<void> {
   return request<void>(`/admin/cars/${id}/`, { method: 'DELETE' })
+}
+
+/** Undo a soft delete (POST /admin/cars/{id}/restore/). */
+export function restoreCar(id: number): Promise<CarAdmin> {
+  return request<CarAdmin>(`/admin/cars/${id}/restore/`, { method: 'POST' })
 }
