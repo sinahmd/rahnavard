@@ -117,7 +117,10 @@ function SidebarFooter({
   return (
     <div className="space-y-1 border-t p-3">
       {isSuperUser && (
-        <Link
+        // Plain anchor, not <Link>: /django-admin/ is served by Django, so a
+        // Next.js prefetch of its RSC payload is refused by CSP
+        // (connect-src 'self') and logs "Failed to fetch RSC payload" noise.
+        <a
           href="/django-admin/"
           onClick={onNavigate}
           className={`${itemClass} ${collapsed ? 'justify-center' : ''}`}
@@ -125,7 +128,7 @@ function SidebarFooter({
         >
           <span aria-hidden="true">🔧</span>
           {!collapsed && <span>مدیریت پیشرفته</span>}
-        </Link>
+        </a>
       )}
       <Link
         href="/"
